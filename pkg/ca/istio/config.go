@@ -286,10 +286,18 @@ func GetIstioCAClientConfigFromHeimdall(heimdallURL, clientID, clientSecret stri
 		return
 	}
 
-	return config, fmt.Errorf("failed to get Istio CA config: %s", response.Status)
+	return config, ConfigRetrievalError{Status: response.Status}
 }
 
 type IstioCAClientConfigAndEnvironment struct {
 	CAClientConfig IstioCAClientConfig
 	Environment    environment.IstioEnvironment
+}
+
+type ConfigRetrievalError struct {
+	Status string
+}
+
+func (e ConfigRetrievalError) Error() string {
+	return fmt.Sprintf("failed to get Istio CA config: %s", e.Status)
 }

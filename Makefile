@@ -1,28 +1,6 @@
 LICENSEI_VERSION = 0.5.0
 GOLANGCI_VERSION = 1.49.0
 
-all: wasm-httpclient wasm-httpserver wasm-tcpserver
-
-wasm-httpclient:
-	tinygo build -o examples/wasm/tinygo/httpclient.wasm -scheduler=none --no-debug -target=wasi examples/wasm/tinygo/httpclient/httpclient.go
-
-run-wasm-httpclient:
-	go run ./examples/wasm/httpclient/main.go ./examples/wasm/tinygo/httpclient.wasm http://httpbin.org/headers
-run-wasm-tcpserver:
-	go run ./examples/wasm/tcpserver/main.go server ./examples/wasm/tinygo/tcpserver.wasm
-run-wasm-tcpserver-tls:
-	go run ./examples/wasm/tcpserver/main.go tls-server ./examples/wasm/tinygo/tcpserver.wasm
-run-wasm-httpserver:
-	go run ./examples/wasm/tcpserver/main.go server ./examples/wasm/tinygo/httpserver.wasm
-run-wasm-httpserver-tls:
-	go run ./examples/wasm/tcpserver/main.go tls-server ./examples/wasm/tinygo/httpserver.wasm
-
-wasm-httpserver:
-	tinygo build -o examples/wasm/tinygo/httpserver.wasm -scheduler=asyncify --no-debug -target=wasi examples/wasm/tinygo/httpserver/httpserver.go
-
-wasm-tcpserver:
-	tinygo build -o examples/wasm/tinygo/tcpserver.wasm -scheduler=none --no-debug -target=wasi examples/wasm/tinygo/tcpserver/tcpserver.go
-
 heimdall-docker:
 	docker build -t bonifaido/heimdall -f experimental/heimdall/Dockerfile --platform linux/amd64 .
 
