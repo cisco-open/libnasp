@@ -1,0 +1,43 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+
+# editor and IDE paraphernalia
+.idea/*
+*.swp
+*.swo
+*~
+
+!/.idea/go.imports.xml
+!/.idea/copyright
+!/.idea/encodings.xml
+!/.idea/externalDependencies.xml
+!/.idea/koperator.iml
+!/.idea/misc.xml
+!/.idea/modules.xml
+!/.idea/vcs.xml
+/.licensei.cache
+bin/*
+cover.out
+.DS_Store
+testbin/*
+
+.idea
+.vscode
+
+*.pem
+# Rust tcp-metadata filter
+experimental/wasm-tcp-metadata/target
+experimental/wasm-tcp-metadata/Cargo.lock
+experimental/wasm-tcp-metadata/debug

@@ -1,0 +1,17 @@
+[package]
+name = "wasm-tcp-metadata"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+proxy-wasm = "0.2"
+log = "0.4"
+byteorder = "1.4"
+flatbuffers = "22.9.29"
+protobuf = "3.1"
+base64 = "0.13"
