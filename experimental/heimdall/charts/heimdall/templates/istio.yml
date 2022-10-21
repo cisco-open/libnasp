@@ -1,0 +1,65 @@
+# apiVersion: servicemesh.cisco.com/v1alpha1
+# kind: IstioMeshGateway
+# metadata:
+#   labels:
+#     app: heimdall-gw
+#     istio.io/rev: cp-v113x.istio-system
+#   name: heimdall-gw
+#   namespace: heimdall
+# spec:
+#   deployment:
+#     podMetadata:
+#       labels:
+#         app: heimdall-gw
+#   istioControlPlane:
+#     name: cp-v113x
+#     namespace: istio-system
+#   runAsRoot: false
+#   service:
+#     externalTrafficPolicy: Local
+#     metadata:
+#       annotations:
+#         service.beta.kubernetes.io/aws-load-balancer-type: nlb
+#     ports:
+#     - name: https
+#       port: 443
+#       protocol: TCP
+#       targetPort: 8443
+#     type: LoadBalancer
+#   type: ingress
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ include "heimdall.fullname" . }}
+spec:
+  selector:
+    istio: ingressgateway
+    # gateway-name: {{ include "heimdall.fullname" . }}-gw
+    # gateway-type: ingress
+  servers:
+  - hosts:
+    - '*'
+    port:
+      name: https
+      number: 443
+      protocol: HTTPS
+    tls:
+      credentialName: istio://sds
+      mode: SIMPLE
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "heimdall.fullname" . }}
+spec:
+  gateways:
+  - {{ include "heimdall.fullname" . }}
+  hosts:
+  - '*'
+  http:
+  - route:
+    - destination:
+        host: {{ include "heimdall.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 8080
