@@ -39,13 +39,14 @@ func init() {
 	cluster_registry.AddToScheme(scheme.Scheme)
 }
 
+var podNamespace = os.Getenv("POD_NAMESPACE")
 var clusterID = os.Getenv("NASP_CLUSTER_ID")
 var istioVersion = os.Getenv("NASP_ISTIO_VERSION")
 var istioRevision = os.Getenv("NASP_ISTIO_REVISION")
 
 var ErrClientNotFound = errors.New("client not found in database")
 var ErrClusterIDNotFound = errors.New("clusterID not found")
-var ClientDatabaseConfigMap = types.NamespacedName{Namespace: "heimdall", Name: "heimdall-client-database"}
+var ClientDatabaseConfigMap = types.NamespacedName{Namespace: podNamespace, Name: "heimdall-client-database"}
 
 type ConfigRequest struct {
 	ClientID     string `binding:"required"`

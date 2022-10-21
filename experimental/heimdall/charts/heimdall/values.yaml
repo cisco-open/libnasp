@@ -78,6 +78,6 @@ tolerations: []
 affinity: {}
 
 istio:
-  version: "1.13.5"
-  revision: cp-v113x.istio-system
+  version: "1.15.2"
+  revision: cp-v115x.istio-system
   clusterId: kind-kind

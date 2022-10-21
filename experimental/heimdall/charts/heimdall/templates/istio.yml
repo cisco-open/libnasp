@@ -11,7 +11,7 @@ spec:
       labels:
         app: {{ include "heimdall.fullname" . }}-gw
   istioControlPlane:
-    name: icp-v115x-sample
+    name: icp-v115x
     namespace: istio-system
   runAsRoot: false
   service:
@@ -30,7 +30,7 @@ metadata:
   name: {{ include "heimdall.fullname" . }}
 spec:
   selector:
-    gateway-name: heimdall-gw
+    gateway-name: {{ include "heimdall.fullname" . }}-gw
     gateway-type: ingress
   servers:
   - hosts:
