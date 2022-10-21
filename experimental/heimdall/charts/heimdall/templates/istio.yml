@@ -3,7 +3,7 @@ kind: IstioMeshGateway
 metadata:
   labels:
     app: {{ include "heimdall.fullname" . }}-gw
-    istio.io/rev: cp-v115x.istio-system
+    istio.io/rev: {{ .Values.istio.revision }}
   name: {{ include "heimdall.fullname" . }}-gw
 spec:
   deployment:
@@ -11,8 +11,8 @@ spec:
       labels:
         app: {{ include "heimdall.fullname" . }}-gw
   istioControlPlane:
-    name: icp-v115x
-    namespace: istio-system
+    name: {{ .Values.istio.controlPlane }}
+    namespace: {{ .Values.istio.controlPlaneNamespace }}
   runAsRoot: false
   service:
     externalTrafficPolicy: Local
