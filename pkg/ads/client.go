@@ -22,8 +22,6 @@ import (
 
 	"github.com/cisco-open/nasp/pkg/ads/config"
 
-	client2 "github.com/cisco-open/nasp/pkg/ads/client"
-
 	"github.com/cisco-open/nasp/pkg/ads/internal/apiresult"
 	"github.com/cisco-open/nasp/pkg/ads/internal/util"
 
@@ -50,8 +48,8 @@ type client struct {
 
 	requestsChan chan proto.Message // requests to be sent to management server
 
-	resources            map[resource_v3.Type]*client2.ResourceCache // map of resource caches by resource type
-	resourcesUpdatedChan chan struct{}                               // channel to notify about updates received from management server
+	resources            map[resource_v3.Type]*resourceCache // map of resource caches by resource type
+	resourcesUpdatedChan chan struct{}                       // channel to notify about updates received from management server
 
 	apiResults     *sync.Map
 	endpointsStats *endpoint.EndpointsStats
@@ -64,7 +62,7 @@ type client struct {
 func newClient(config *config.ClientConfig) *client {
 	c := &client{
 		config: config,
-		resources: map[resource_v3.Type]*client2.ResourceCache{
+		resources: map[resource_v3.Type]*resourceCache{
 			resource_v3.ClusterType:    {}, // envoy clusters resources received from management server
 			resource_v3.EndpointType:   {}, // envoy cluster members (envoy endpoints resources) received from management server
 			resource_v3.ListenerType:   {}, // envoy listeners resources received from management server
@@ -565,11 +563,19 @@ func (c *client) ack(response proto.Message) proto.Message {
 		c.storeSotWResponseVersionInfo(resp.GetTypeUrl(), resp.GetVersionInfo())
 		c.storeSotWResponseNonce(resp.GetTypeUrl(), resp.GetNonce())
 
+		resourceNames := c.getSubscribedResourceNames(resp.GetTypeUrl())
+		if len(resourceNames) == 1 && resourceNames[0] == "*" {
+			if !c.config.ManagementServerCapabilities.SotWWildcardSubscriptionSupported {
+				resourceNames = nil
+			}
+		}
+
 		return util.AckSotWResponse(
 			resp.GetTypeUrl(),
 			resp.GetVersionInfo(),
 			resp.GetNonce(),
-			c.getSubscribedResourceNames(resp.GetTypeUrl()))
+			resourceNames,
+		)
 	case *discovery_v3.DeltaDiscoveryResponse:
 		return util.AckDeltaResponse(resp.GetTypeUrl(), resp.GetNonce())
 	default:
@@ -583,11 +589,18 @@ func (c *client) nack(response proto.Message, err error) proto.Message {
 	// https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#ack-nack-and-resource-type-instance-version
 	switch resp := response.(type) {
 	case *discovery_v3.DiscoveryResponse:
+		resourceNames := c.getSubscribedResourceNames(resp.GetTypeUrl())
+		if len(resourceNames) == 1 && resourceNames[0] == "*" {
+			if !c.config.ManagementServerCapabilities.SotWWildcardSubscriptionSupported {
+				resourceNames = nil
+			}
+		}
+
 		return util.NackSotWResponse(
 			resp.GetTypeUrl(),
 			c.getLastAckSotWResponseVersionInfo(resp.GetTypeUrl()),
 			c.getLastAckSotWResponseNonce(resp.GetNonce()),
-			c.getSubscribedResourceNames(resp.GetTypeUrl()),
+			resourceNames,
 			err)
 	case *discovery_v3.DeltaDiscoveryResponse:
 		return util.NackDeltaResponse(resp.GetTypeUrl(), resp.GetNonce(), err)

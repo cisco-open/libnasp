@@ -150,8 +150,12 @@ func Connect(ctx context.Context, config *config.ClientConfig) (Client, error) {
 		backoffv4.Retry(func() error {
 			err := apiClient.connectToStream(ctx)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return nil // exiting as the context has been cancelled
+				}
 				log.Error(err, "connection to stream broken, retrying ...")
 			}
+
 			return err
 		}, b)
 	}()

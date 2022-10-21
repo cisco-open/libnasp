@@ -20,4 +20,8 @@ var (
 	// contains one echo endpoint in the demo namespace as the 'echo'
 	//go:embed config_v0.json
 	configV0 []byte
+
+	// contains three echo endpoints in the demo namespace as the 'echo' deployment has been scaled up to three replicas
+	//go:embed config_v1.json
+	configV1 []byte
 )
