@@ -2,7 +2,9 @@ name: Docker image [Heimdall]
 
 on:
   push:
-    branches: ['docker']
+    branches:
+      - 'main'
+      - 'docker'
 
 env:
   REGISTRY: ghcr.io
