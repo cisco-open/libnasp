@@ -1,32 +1,28 @@
-# apiVersion: servicemesh.cisco.com/v1alpha1
-# kind: IstioMeshGateway
-# metadata:
-#   labels:
-#     app: heimdall-gw
-#     istio.io/rev: cp-v113x.istio-system
-#   name: heimdall-gw
-#   namespace: heimdall
-# spec:
-#   deployment:
-#     podMetadata:
-#       labels:
-#         app: heimdall-gw
-#   istioControlPlane:
-#     name: cp-v113x
-#     namespace: istio-system
-#   runAsRoot: false
-#   service:
-#     externalTrafficPolicy: Local
-#     metadata:
-#       annotations:
-#         service.beta.kubernetes.io/aws-load-balancer-type: nlb
-#     ports:
-#     - name: https
-#       port: 443
-#       protocol: TCP
-#       targetPort: 8443
-#     type: LoadBalancer
-#   type: ingress
+apiVersion: servicemesh.cisco.com/v1alpha1
+kind: IstioMeshGateway
+metadata:
+  labels:
+    app: {{ include "heimdall.fullname" . }}-gw
+    istio.io/rev: cp-v115x.istio-system
+  name: {{ include "heimdall.fullname" . }}-gw
+spec:
+  deployment:
+    podMetadata:
+      labels:
+        app: {{ include "heimdall.fullname" . }}-gw
+  istioControlPlane:
+    name: icp-v115x-sample
+    namespace: istio-system
+  runAsRoot: false
+  service:
+    externalTrafficPolicy: Local
+    ports:
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 8443
+    type: LoadBalancer
+  type: ingress
 ---
 apiVersion: networking.istio.io/v1beta1
 kind: Gateway
@@ -34,9 +30,8 @@ metadata:
   name: {{ include "heimdall.fullname" . }}
 spec:
   selector:
-    istio: ingressgateway
-    # gateway-name: {{ include "heimdall.fullname" . }}-gw
-    # gateway-type: ingress
+    gateway-name: heimdall-gw
+    gateway-type: ingress
   servers:
   - hosts:
     - '*'
