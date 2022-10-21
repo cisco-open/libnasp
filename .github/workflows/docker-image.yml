@@ -37,6 +37,6 @@ jobs:
         with:
           context: .
           file: experimental/heimdall/Dockerfile
-          push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          push: true
