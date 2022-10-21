@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-package client
+package ads
 
 import (
 	"sort"
@@ -40,8 +40,8 @@ type resourceSubscription struct {
 	sotwResponseVersion string // the version of the most recent successfully processed SotW subscription response
 }
 
-// ResourceCache stores the latest information successfully received from Management server about subscribed resources of type T
-type ResourceCache struct {
+// resourceCache stores the latest information successfully received from Management server about subscribed resources of type T
+type resourceCache struct {
 	subscription resourceSubscription
 	resources    map[string]proto.Message // resources received from management server
 
@@ -52,7 +52,7 @@ type ResourceCache struct {
 
 // Subscribe initializes subscription data with the given resource names to start receiving
 // updates from the Management server for given resources.
-func (s *ResourceCache) Subscribe(resourceNames []string) {
+func (s *resourceCache) Subscribe(resourceNames []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -66,21 +66,21 @@ func (s *ResourceCache) Subscribe(resourceNames []string) {
 	}
 }
 
-func (s *ResourceCache) IsInitialized() bool {
+func (s *resourceCache) IsInitialized() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return s.initialized
 }
 
-func (s *ResourceCache) ResetSubscription() {
+func (s *resourceCache) ResetSubscription() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.subscription.resourceNames = nil
 }
 
-func (s *ResourceCache) ResetInitialized() {
+func (s *resourceCache) ResetInitialized() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -88,7 +88,7 @@ func (s *ResourceCache) ResetInitialized() {
 }
 
 // GetSubscribedResourceNames returns the list of subscribed resources names
-func (s *ResourceCache) GetSubscribedResourceNames() []string {
+func (s *resourceCache) GetSubscribedResourceNames() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -108,7 +108,7 @@ func (s *ResourceCache) GetSubscribedResourceNames() []string {
 
 // GetLastAckSotWResponseVersionInfo returns the version info of the most recent successfully processed subscription response
 // not used with incremental xDS
-func (s *ResourceCache) GetLastAckSotWResponseVersionInfo() string {
+func (s *resourceCache) GetLastAckSotWResponseVersionInfo() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -117,7 +117,7 @@ func (s *ResourceCache) GetLastAckSotWResponseVersionInfo() string {
 
 // StoreSotWResponseVersionInfo stores the version info of the most recent successfully processed subscription response
 // not used with incremental xDS
-func (s *ResourceCache) StoreSotWResponseVersionInfo(versionInfo string) {
+func (s *resourceCache) StoreSotWResponseVersionInfo(versionInfo string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -126,7 +126,7 @@ func (s *ResourceCache) StoreSotWResponseVersionInfo(versionInfo string) {
 
 // GetLastAckSotWResponseNonce returns the nonce of the most recent successfully processed subscription response
 // not used with incremental xDS
-func (s *ResourceCache) GetLastAckSotWResponseNonce() string {
+func (s *resourceCache) GetLastAckSotWResponseNonce() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -135,7 +135,7 @@ func (s *ResourceCache) GetLastAckSotWResponseNonce() string {
 
 // StoreSotWResponseNonce stores the nonce of the most recent successfully processed subscription response
 // not used with incremental xDS
-func (s *ResourceCache) StoreSotWResponseNonce(nonce string) {
+func (s *resourceCache) StoreSotWResponseNonce(nonce string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -144,7 +144,7 @@ func (s *ResourceCache) StoreSotWResponseNonce(nonce string) {
 
 // RemoveResources removes the resources identified by the given resource names
 // from internal state
-func (s *ResourceCache) RemoveResources(resourceNames []string) {
+func (s *resourceCache) RemoveResources(resourceNames []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -156,7 +156,7 @@ func (s *ResourceCache) RemoveResources(resourceNames []string) {
 
 // RemoveAllResources removes all resources
 // from internal state
-func (s *ResourceCache) RemoveAllResources() {
+func (s *resourceCache) RemoveAllResources() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -165,7 +165,7 @@ func (s *ResourceCache) RemoveAllResources() {
 
 // AddResources unmarshals the given resources collection into typed objects
 // and adds them to internal state
-func (s *ResourceCache) AddResources(resourceType resource_v3.Type, resources []*discovery_v3.Resource) error {
+func (s *resourceCache) AddResources(resourceType resource_v3.Type, resources []*discovery_v3.Resource) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -212,7 +212,7 @@ func (s *ResourceCache) AddResources(resourceType resource_v3.Type, resources []
 	return nil
 }
 
-func (s *ResourceCache) AddIstioResources(resourceType resource_v3.Type, resources []*discovery_v3.Resource) error {
+func (s *resourceCache) AddIstioResources(resourceType resource_v3.Type, resources []*discovery_v3.Resource) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -271,7 +271,7 @@ func (s *ResourceCache) AddIstioResources(resourceType resource_v3.Type, resourc
 
 // SetResources unmarshals the given resources collection into typed objects
 // and assigns it to the internal state
-func (s *ResourceCache) SetResources(resourceType resource_v3.Type, resources []*ptypes.Any) error {
+func (s *resourceCache) SetResources(resourceType resource_v3.Type, resources []*ptypes.Any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -338,7 +338,7 @@ func (s *ResourceCache) SetResources(resourceType resource_v3.Type, resources []
 
 // SetIstioResources unmarshals the given resources collection into typed objects
 // and assigns it to the internal state
-func (s *ResourceCache) SetIstioResources(resourceType resource_v3.Type, resources []*ptypes.Any) error {
+func (s *resourceCache) SetIstioResources(resourceType resource_v3.Type, resources []*ptypes.Any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -400,7 +400,7 @@ func (s *ResourceCache) SetIstioResources(resourceType resource_v3.Type, resourc
 }
 
 // GetResources returns the stored resource instances
-func (s *ResourceCache) GetResources() map[string]proto.Message {
+func (s *resourceCache) GetResources() map[string]proto.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -417,7 +417,7 @@ func (s *ResourceCache) GetResources() map[string]proto.Message {
 }
 
 // GetResource returns the stored resource instance with the given resourceName
-func (s *ResourceCache) GetResource(resourceName string) proto.Message {
+func (s *resourceCache) GetResource(resourceName string) proto.Message {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -429,14 +429,14 @@ func (s *ResourceCache) GetResource(resourceName string) proto.Message {
 	return proto.Clone(resource)
 }
 
-func (s *ResourceCache) IsSubscribedForAll() bool {
+func (s *resourceCache) IsSubscribedForAll() bool {
 	if _, subscribeAll := s.subscription.resourceNames["*"]; subscribeAll {
 		return true // subscribed to all resources
 	}
 	return false
 }
 
-func (s *ResourceCache) IsSubscribedFor(resourceName string) bool {
+func (s *resourceCache) IsSubscribedFor(resourceName string) bool {
 	if s.IsSubscribedForAll() {
 		return true
 	}

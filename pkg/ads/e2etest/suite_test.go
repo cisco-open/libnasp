@@ -22,6 +22,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/testr"
+
 	upda_type_v1 "github.com/cncf/xds/go/udpa/type/v1"
 	envoy_admin_v3 "github.com/envoyproxy/go-control-plane/envoy/admin/v3"
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
@@ -79,7 +82,7 @@ func TestEndToEnd(t *testing.T) {
 	RegisterFailHandler(Fail)
 	ginkoconfig.DefaultReporterConfig.SlowSpecThreshold = 360 // slow test threshold in seconds
 
-	testSuiteContext = context.Background()
+	testSuiteContext = logr.NewContext(context.Background(), testr.NewWithOptions(t, testr.Options{LogTimestamp: true}))
 
 	t.Parallel()
 
@@ -335,7 +338,7 @@ var _ = Describe("The management server is running", func() {
 
 	BeforeEach(func() {
 		managementServerPort = 18000
-		resourceConfigCache = cache.NewSnapshotCache(false, cache.IDHash{}, nil)
+		resourceConfigCache = cache.NewSnapshotCache(true, cache.IDHash{}, nil)
 	})
 
 	JustBeforeEach(func() {
@@ -479,6 +482,81 @@ var _ = Describe("The management server is running", func() {
 			Expect(httpClientProps.UseTLS()).To(BeTrue())
 			Expect(httpClientProps.ServerName()).To(Equal("outbound_.80_._.echo.demo.svc.cluster.local"))
 			Expect(httpClientProps.Address()).To(Equal(&net.TCPAddr{IP: net.ParseIP("10.20.160.131"), Port: 8080}))
+
+			// --- load config_v1.json which contains three echo endpoints in the demo namespace as the 'echo' deployment has been scaled up to three
+			// replicas into Management server
+			var config envoy_admin_v3.ConfigDump
+			err = protojson.Unmarshal(configV1, &config)
+			Expect(err).NotTo(HaveOccurred())
+
+			snapshot, err := createSnapshot("v1", &config)
+			Expect(err).NotTo(HaveOccurred())
+			err = snapshot.Consistent()
+			Expect(err).NotTo(HaveOccurred())
+
+			err = resourceConfigCache.SetSnapshot(ctx, "test-node-id", snapshot)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verify that 3 endpoints are returned by tcp client properties for 10.10.42.110:12050")
+			endpoints := make([]net.Addr, 0, 3)
+			Eventually(func() []net.Addr {
+				tcpResp, err = adsClient.GetTCPClientPropertiesByHost(ctx, "10.10.42.110:12050")
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func() error {
+					for {
+						select {
+						case <-ctx.Done():
+							return ctx.Err()
+						case r := <-tcpResp:
+							tcpClientProps = r.ClientProperties()
+							return r.Error()
+						}
+					}
+				}, testPollDuration, testPollInterval).Should(Succeed())
+
+				Expect(tcpClientProps.Permissive()).To(BeTrue())
+				Expect(tcpClientProps.UseTLS()).To(BeTrue())
+				Expect(tcpClientProps.ServerName()).To(Equal("outbound_.12050_._.echo.demo.svc.cluster.local"))
+
+				endpoints = append(endpoints, tcpClientProps.Address())
+				return endpoints
+			}, 2*testPollDuration, testPollInterval).Should(ContainElements(
+				&net.TCPAddr{IP: net.ParseIP("10.20.164.172"), Port: 8080},
+				&net.TCPAddr{IP: net.ParseIP("10.20.166.13"), Port: 8080},
+				&net.TCPAddr{IP: net.ParseIP("10.20.166.2"), Port: 8080},
+			))
+
+			By("verify that 3 endpoints are returned by http client properties for 10.10.42.110:80")
+			endpoints = make([]net.Addr, 0, 3)
+			Eventually(func() []net.Addr {
+				httpResp, err = adsClient.GetHTTPClientPropertiesByHost(ctx, "10.10.42.110:80")
+				Expect(err).NotTo(HaveOccurred())
+
+				Eventually(func() error {
+					for {
+						select {
+						case <-ctx.Done():
+							return ctx.Err()
+						case r := <-httpResp:
+							httpClientProps = r.ClientProperties()
+							return r.Error()
+						}
+					}
+				}, testPollDuration, testPollInterval).Should(Succeed())
+
+				Expect(httpClientProps.Permissive()).To(BeTrue())
+				Expect(httpClientProps.UseTLS()).To(BeTrue())
+				Expect(httpClientProps.ServerName()).To(Equal("outbound_.80_._.echo.demo.svc.cluster.local"))
+
+				endpoints = append(endpoints, httpClientProps.Address())
+				return endpoints
+			}, 2*testPollDuration, testPollInterval).Should(ContainElements(
+				&net.TCPAddr{IP: net.ParseIP("10.20.164.172"), Port: 8080},
+				&net.TCPAddr{IP: net.ParseIP("10.20.166.13"), Port: 8080},
+				&net.TCPAddr{IP: net.ParseIP("10.20.166.2"), Port: 8080},
+			))
+
 		})
 
 	})
