@@ -1,0 +1,7 @@
+build/
+xcuserdata/
+DerivedData/
+*.xcframework
+*.xcuserstate
+*.aar
+*.jar
