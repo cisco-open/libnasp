@@ -30,3 +30,8 @@ echo "install heimdall"
 kubectl create namespace heimdall
 kubectl label namespace heimdall istio.io/rev=icp-v115x.istio-system
 helm install -n heimdall heimdall ${DIRECTORY}/../experimental/heimdall/charts/heimdall --wait
+
+echo "install echo service for testing"
+kubectl create namespace testing
+kubectl label namespace testing istio.io/rev=icp-v115x.istio-system
+kubectl apply --namespace testing -f ${DIRECTORY}/echo-service.yaml
