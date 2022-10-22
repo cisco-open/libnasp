@@ -25,7 +25,6 @@ import (
 	cluster_registry "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
 	"github.com/gin-gonic/gin"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,13 +39,14 @@ func init() {
 	cluster_registry.AddToScheme(scheme.Scheme)
 }
 
+var podNamespace = os.Getenv("POD_NAMESPACE")
 var clusterID = os.Getenv("NASP_CLUSTER_ID")
 var istioVersion = os.Getenv("NASP_ISTIO_VERSION")
 var istioRevision = os.Getenv("NASP_ISTIO_REVISION")
 
 var ErrClientNotFound = errors.New("client not found in database")
 var ErrClusterIDNotFound = errors.New("clusterID not found")
-var ClientDatabaseConfigMap = types.NamespacedName{Namespace: "heimdall", Name: "client-database"}
+var ClientDatabaseConfigMap = types.NamespacedName{Namespace: podNamespace, Name: "heimdall-client-database"}
 
 type ConfigRequest struct {
 	ClientID     string `binding:"required"`
@@ -77,20 +77,11 @@ func NewConfigMapClientDatabase() (ClientDatabase, error) {
 		return nil, err
 	}
 
+	// Sanity check
 	var configMap corev1.ConfigMap
 	err = c.Get(context.Background(), ClientDatabaseConfigMap, &configMap)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			configMap.Name = ClientDatabaseConfigMap.Name
-			configMap.Namespace = ClientDatabaseConfigMap.Namespace
-			err = c.Create(context.Background(), &configMap)
-			if err != nil {
-				return nil, err
-			}
-
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	return &ConfigMapClientDatabase{c: c}, nil
@@ -129,6 +120,8 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.GET("/", func(c *gin.Context) {
+	})
 	r.POST("/config", func(c *gin.Context) {
 		var configRequest ConfigRequest
 		if err := c.ShouldBindJSON(&configRequest); err != nil {

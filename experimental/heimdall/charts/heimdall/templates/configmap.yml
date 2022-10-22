@@ -1,8 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: client-database
-  namespace: heimdall
+  name: heimdall-client-database
 data:
   16362813-F46B-41AC-B191-A390DB1F6BDF: |
     {
