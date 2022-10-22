@@ -12,7 +12,7 @@ data:
     "Network": "network2",
     "MeshID": "mesh1",
     "ServiceAccountName": "ios-mobile",
-    "Service": "ios-mobile"
+    "ServiceName": "ios-mobile"
     }
   45FD6A76-E415-4292-BED1-AA6FFAD0253D: |
     {
@@ -23,7 +23,7 @@ data:
     "Network": "network2",
     "MeshID": "mesh1",
     "ServiceAccountName": "ios-mobile",
-    "Service": "ios-mobile"
+    "ServiceName": "ios-mobile"
     }
   f09fa15157a1b985: |
     {
@@ -34,5 +34,5 @@ data:
     "Network": "network2",
     "MeshID": "mesh1",
     "ServiceAccountName": "android-mobile",
-    "Service": "android-mobile"
+    "ServiceName": "android-mobile"
     }

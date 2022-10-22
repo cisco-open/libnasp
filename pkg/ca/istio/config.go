@@ -24,11 +24,14 @@ import (
 	"os"
 
 	"emperror.dev/errors"
+	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
@@ -72,10 +75,10 @@ func GetIstioCAClientConfigFromLocal(clusterID string, endpointAddress string) (
 }
 
 func GetIstioCAClientConfig(clusterID string, istioRevision string) (IstioCAClientConfig, error) {
-	return GetIstioCAClientConfigWithKubeConfig(clusterID, istioRevision, nil)
+	return GetIstioCAClientConfigWithKubeConfig(clusterID, istioRevision, nil, nil)
 }
 
-func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string, kubeConfig []byte) (IstioCAClientConfig, error) {
+func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string, kubeConfig []byte, saObjectKey *client.ObjectKey) (IstioCAClientConfig, error) {
 	scheme := runtime.NewScheme()
 	if err := corev1.AddToScheme(scheme); err != nil {
 		return IstioCAClientConfig{}, err
@@ -105,9 +108,22 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 		return IstioCAClientConfig{}, errors.WrapIf(err, "could not get istiod service")
 	}
 
-	token, address, err := GetIMGWData(cl, config, scheme, istioRevision)
+	pod, address, err := GetIMGWData(cl, config, scheme, istioRevision)
 	if err != nil {
 		return IstioCAClientConfig{}, errors.WrapIf(err, "could not get imgw data")
+	}
+
+	var token []byte
+	if saObjectKey == nil {
+		token, err = GetIstioTokenFromPod(config, scheme, pod.GetName(), pod.GetNamespace())
+		if err != nil {
+			return IstioCAClientConfig{}, errors.WrapIf(err, "could not get token from mexp pod")
+		}
+	} else {
+		token, err = CreateK8SToken(context.Background(), config, saObjectKey.Name, saObjectKey.Namespace, []string{"istio-ca"}, 60*60*24)
+		if err != nil {
+			return IstioCAClientConfig{}, errors.WrapIf(err, "could not create new k8s token")
+		}
 	}
 
 	pem, err := GetIstioRootCAPEM(cl, istioRevision)
@@ -125,6 +141,33 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 	}, nil
 }
 
+func CreateK8SToken(ctx context.Context, config *rest.Config, saName, saNamespace string, audiences []string, expirationSeconds int) ([]byte, error) {
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	sa, err := clientset.CoreV1().ServiceAccounts(saNamespace).Get(ctx, saName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	expSeconds := int64(expirationSeconds)
+	re := &authv1.TokenRequest{
+		Spec: authv1.TokenRequestSpec{
+			Audiences:         audiences,
+			ExpirationSeconds: &expSeconds,
+		},
+	}
+
+	res, err := clientset.CoreV1().ServiceAccounts(sa.GetNamespace()).CreateToken(ctx, sa.GetName(), re, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return []byte(res.Status.Token), nil
+}
+
 func GetIstiodService(cl client.Client, istioRevision string) (*corev1.Service, error) {
 	labels := map[string]string{
 		"istio":        "istiod",
@@ -134,7 +177,7 @@ func GetIstiodService(cl client.Client, istioRevision string) (*corev1.Service, 
 	services := &corev1.ServiceList{}
 	err := cl.List(context.Background(), services, client.InNamespace(istioNamespace), client.MatchingLabels(labels))
 	if err != nil {
-		return nil, errors.WrapIf(err, "could not get mexp pods")
+		return nil, errors.WrapIf(err, "could not get istiod pods")
 	}
 
 	if len(services.Items) < 1 {
@@ -144,14 +187,13 @@ func GetIstiodService(cl client.Client, istioRevision string) (*corev1.Service, 
 	return &services.Items[0], nil
 }
 
-func GetIMGWData(cl client.Client, config *rest.Config, scheme *runtime.Scheme, istioRevision string) (token []byte, address string, err error) {
-	labels := map[string]string{
-		"app":          "istio-meshexpansion-gateway",
-		"istio.io/rev": istioRevision,
-	}
-
+func GetIMGWData(cl client.Client, config *rest.Config, scheme *runtime.Scheme, istioRevision string) (pod corev1.Pod, address string, err error) {
 	pods := &corev1.PodList{}
-	err = cl.List(context.Background(), pods, client.InNamespace(istioNamespace), client.MatchingLabels(labels))
+	err = cl.List(context.Background(), pods, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
+		"gateway-type": "ingress",
+		"release":      "istio-meshgateway",
+		"istio.io/rev": istioRevision,
+	}))
 	if err != nil {
 		err = errors.WrapIf(err, "could not get mexp pods")
 		return
@@ -162,16 +204,15 @@ func GetIMGWData(cl client.Client, config *rest.Config, scheme *runtime.Scheme, 
 		return
 	}
 
-	token, err = GetIstioTokenFromPod(config, scheme, pods.Items[0].Name, pods.Items[0].Namespace)
-	if err != nil {
-		err = errors.WrapIf(err, "could not get token from mexp pod")
-		return
-	}
+	pod = pods.Items[0]
 
 	imgws := &unstructured.UnstructuredList{}
 	imgws.SetAPIVersion("servicemesh.cisco.com/v1alpha1")
 	imgws.SetKind("IstioMeshGatewayList")
-	err = cl.List(context.Background(), imgws, client.InNamespace(istioNamespace), client.MatchingLabels(labels))
+	err = cl.List(context.Background(), imgws, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
+		"app":          "istio-meshexpansion-gateway",
+		"istio.io/rev": istioRevision,
+	}))
 	if err != nil {
 		err = errors.WrapIf(err, "could not list imgws")
 		return
@@ -195,7 +236,7 @@ func GetIMGWData(cl client.Client, config *rest.Config, scheme *runtime.Scheme, 
 		err = errors.New("imgw address is not found")
 	}
 
-	return token, address, err
+	return pod, address, err
 }
 
 func GetIstioRootCAPEM(cl client.Client, istioRevision string) ([]byte, error) {
@@ -206,6 +247,19 @@ func GetIstioRootCAPEM(cl client.Client, istioRevision string) ([]byte, error) {
 	}))
 	if err != nil {
 		return nil, errors.WrapIf(err, "could not get configmaps")
+	}
+
+	if len(cms.Items) == 0 {
+		err := cl.List(context.Background(), cms, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
+			"istio.io/config": "true",
+		}))
+		if err != nil {
+			return nil, errors.WrapIf(err, "could not get configmaps")
+		}
+	}
+
+	if len(cms.Items) == 0 {
+		return nil, errors.New("root ca config is not found")
 	}
 
 	configmap := &corev1.ConfigMap{}
@@ -257,10 +311,11 @@ func GetIstioTokenFromPod(config *rest.Config, scheme *runtime.Scheme, name, nam
 	return stdout.Bytes(), nil
 }
 
-func GetIstioCAClientConfigFromHeimdall(heimdallURL, clientID, clientSecret string) (config IstioCAClientConfigAndEnvironment, err error) {
+func GetIstioCAClientConfigFromHeimdall(heimdallURL, clientID, clientSecret, version string) (config IstioCAClientConfigAndEnvironment, err error) {
 	body, err := json.Marshal(map[string]string{
 		"ClientID":     clientID,
 		"ClientSecret": clientSecret,
+		"Version":      version,
 	})
 	if err != nil {
 		return config, err

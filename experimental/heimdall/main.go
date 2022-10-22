@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -51,15 +52,19 @@ var ClientDatabaseConfigMap = types.NamespacedName{Namespace: podNamespace, Name
 type ConfigRequest struct {
 	ClientID     string `binding:"required"`
 	ClientSecret string `binding:"required"`
+	Version      string
 }
 
 type Client struct {
-	ClientID     string
-	ClientSecret string
-	WorkloadName string
-	PodNamespace string
-	Network      string
-	MeshID       string
+	ClientID           string
+	ClientSecret       string
+	WorkloadName       string
+	PodNamespace       string
+	Network            string
+	MeshID             string
+	ServiceName        string
+	Version            string
+	ServiceAccountName string
 }
 
 type ClientDatabase interface {
@@ -142,16 +147,31 @@ func main() {
 			return
 		}
 
-		// TODO generate a unique config for a given client
+		client.Version = configRequest.Version
+
 		var e IstioCAClientConfigAndEnvironment
 
-		e.CAClientConfig, err = istio_ca.GetIstioCAClientConfig(clusterID, istioRevision)
+		e.CAClientConfig, err = istio_ca.GetIstioCAClientConfigWithKubeConfig(clusterID, istioRevision, nil, &types.NamespacedName{
+			Name:      client.ServiceAccountName,
+			Namespace: client.PodNamespace,
+		})
 		if err != nil {
 			c.AbortWithError(500, err)
+			return
 		}
 
+		clientIP := c.ClientIP()
+		if clientIP == "::1" {
+			clientIP = "127.0.0.1"
+		}
+
+		e.Environment.IstioCAAddress = e.CAClientConfig.CAEndpoint
+		e.Environment.ClusterID = e.CAClientConfig.ClusterID
+		e.Environment.DNSDomain = "cluster.local"
 		e.Environment.Type = "sidecar"
-		e.Environment.InstanceIPs = []string{c.ClientIP()}
+		e.Environment.IstioVersion = istioVersion
+		e.Environment.IstioRevision = istioRevision
+		e.Environment.InstanceIPs = []string{clientIP}
 		e.Environment.WorkloadName = client.WorkloadName
 		e.Environment.PodName = client.WorkloadName + "-" + configRequest.ClientID
 		e.Environment.PodNamespace = client.PodNamespace
@@ -161,15 +181,16 @@ func main() {
 		e.Environment.SearchDomains = []string{"svc.cluster.local", "cluster.local"}
 		e.Environment.Labels = map[string]string{
 			"security.istio.io/tlsMode":           "istio",
-			"pod-template-hash":                   "efefefef",
 			"service.istio.io/canonical-revision": "latest",
 			"istio.io/rev":                        e.CAClientConfig.Revision,
 			"topology.istio.io/network":           e.Environment.Network,
 			"k8s-app":                             client.WorkloadName,
-			"service.istio.io/canonical-name":     client.WorkloadName,
+			"service.istio.io/canonical-name":     client.ServiceName,
 			"app":                                 client.WorkloadName,
-			"version":                             "v1",
+			"version":                             client.Version,
 		}
+		e.Environment.PodServiceAccount = client.ServiceAccountName
+		e.Environment.PodOwner = fmt.Sprintf("kubernetes://apis/v1/namespaces/%s/pods/%s", client.PodNamespace, client.WorkloadName)
 
 		c.JSON(http.StatusOK, e)
 	})

@@ -63,27 +63,19 @@ var (
 	IstioCAConfigGetterLocal = func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
 		return istio_ca.GetIstioCAClientConfigFromLocal(e.ClusterID, e.IstioCAAddress)
 	}
-	IstioCAConfigGetterHeimdall = func(heimdallURL, clientID, clientSecret string) IstioCAConfigGetterFunc {
+	IstioCAConfigGetterHeimdall = func(heimdallURL, clientID, clientSecret, version string) IstioCAConfigGetterFunc {
 		return func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
-			c, err := istio_ca.GetIstioCAClientConfigFromHeimdall(heimdallURL, clientID, clientSecret)
+			c, err := istio_ca.GetIstioCAClientConfigFromHeimdall(heimdallURL, clientID, clientSecret, version)
 			if err != nil {
 				return istio_ca.IstioCAClientConfig{}, err
 			}
+
+			e.Override(c.Environment)
 
 			e.ClusterID = c.CAClientConfig.ClusterID
 			e.IstioRevision = c.CAClientConfig.Revision
 			e.IstioCAAddress = c.CAClientConfig.CAEndpointSAN
 			e.IstioVersion = c.Environment.IstioVersion
-
-			e.InstanceIPs = c.Environment.InstanceIPs
-			e.PodName = c.Environment.PodName
-			e.PodNamespace = c.Environment.PodNamespace
-			e.SearchDomains = c.Environment.SearchDomains
-			e.Labels = c.Environment.Labels
-			e.Type = c.Environment.Type
-			e.Network = c.Environment.Network
-			e.MeshID = c.Environment.MeshID
-			e.WorkloadName = c.Environment.WorkloadName
 
 			return c.CAClientConfig, nil
 		}
