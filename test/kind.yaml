@@ -1,17 +1,18 @@
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+name: nasp-test-cluster
 nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
-  extraPortMappings:
-  - containerPort: 31012
-    hostPort: 31012
-    protocol: TCP
-  - containerPort: 31443
-    hostPort: 31443
-    protocol: TCP
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+            extraArgs:
+              service-node-port-range: 15000-32767
+    extraPortMappings:
+      - containerPort: 15012
+        hostPort: 15012
+        protocol: TCP
+      - containerPort: 15443
+        hostPort: 15443
+        protocol: TCP

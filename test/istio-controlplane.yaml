@@ -6,24 +6,31 @@ metadata:
   annotations:
     controlplane.istio.servicemesh.cisco.com/namespace-injection-source: "true"
 spec:
+  clusterID: nasp-test-cluster
   version: 1.15.2
   mode: ACTIVE
   networkName: network1
   meshExpansion:
     enabled: true
     gateway:
+      metadata:
+        annotations:
+          meshgateway.istio.servicemesh.cisco.com/generate-external-service: "false"
       service:
         metadata:
           annotations:
             service.banzaicloud.io/ip-address-override: 127.0.0.1
-        ports:
-        - name: tls-istiod-alt
-          nodePort: 31012
-          port: 31012
-          protocol: TCP
-          targetPort: 15012
-        - name: tls-alt
-          nodePort: 31443
-          port: 31443
-          protocol: TCP
-          targetPort: 15443
+  k8sResourceOverlays:
+    - groupVersionKind:
+        kind: IstioMeshGateway
+      objectKey:
+        name: istio-meshexpansion-icp-v115x
+      patches:
+        - parseValue: false
+          path: /spec/service?/ports?/name=tls-istiod/nodePort?
+          type: replace
+          value: "15012"
+        - parseValue: false
+          path: /spec/service?/ports?/name=tls/nodePort?
+          type: replace
+          value: "15443"
