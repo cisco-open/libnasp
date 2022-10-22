@@ -1,3 +1,4 @@
+{{- if .Values.istio.meshGateway.enabled -}}
 apiVersion: servicemesh.cisco.com/v1alpha1
 kind: IstioMeshGateway
 metadata:
@@ -21,6 +22,9 @@ spec:
       port: 443
       protocol: TCP
       targetPort: 8443
+      {{- if .Values.istio.meshGateway.nodePort }}
+      nodePort: {{ .Values.istio.meshGateway.nodePort }}
+      {{- end }}
     type: LoadBalancer
   type: ingress
 ---
@@ -40,7 +44,7 @@ spec:
       number: 443
       protocol: HTTPS
     tls:
-      credentialName: istio://sds
+      credentialName: {{ include "heimdall.fullname" . }}
       mode: SIMPLE
 ---
 apiVersion: networking.istio.io/v1beta1
@@ -58,3 +62,4 @@ spec:
         host: {{ include "heimdall.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
         port:
           number: 8080
+{{- end }}

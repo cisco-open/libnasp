@@ -33,7 +33,7 @@ kubectl wait --namespace istio-system \
 log "install heimdall"
 kubectl create namespace heimdall
 kubectl label namespace heimdall istio.io/rev=icp-v115x.istio-system
-helm install -n heimdall heimdall ${DIRECTORY}/../experimental/heimdall/charts/heimdall --wait
+helm install -n heimdall heimdall ${DIRECTORY}/../experimental/heimdall/charts/heimdall --wait --set istio.meshGateway.enabled=true --set istio.meshGateway.nodePort=16443
 
 log "install echo service for testing"
 kubectl create namespace testing

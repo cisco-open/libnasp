@@ -83,3 +83,6 @@ istio:
   version: "1.15.2"
   revision: cp-v115x.istio-system
   clusterId: kind-kind
+  meshGateway:
+    enabled: false
+    # nodePort: "16443"

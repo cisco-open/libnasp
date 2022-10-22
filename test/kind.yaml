@@ -10,9 +10,15 @@ nodes:
             extraArgs:
               service-node-port-range: 15000-32767
     extraPortMappings:
+      # istio cp
       - containerPort: 15012
         hostPort: 15012
         protocol: TCP
+      # istio tls passthrough
       - containerPort: 15443
         hostPort: 15443
+        protocol: TCP
+      # heimdall
+      - containerPort: 16443
+        hostPort: 16443
         protocol: TCP
