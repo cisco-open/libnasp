@@ -114,6 +114,9 @@ func (h *httpHandler) serve(responseWriter http.ResponseWriter, request *http.Re
 	h.AfterRequest(wrappedRequest, stream)
 
 	resp.ContentLength = int64(len(crw.body))
+	if crw.statusCode == 0 {
+		crw.statusCode = 200
+	}
 	resp.StatusCode = crw.statusCode
 	resp.Body = io.NopCloser(bytes.NewReader(crw.body))
 

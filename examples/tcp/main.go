@@ -21,58 +21,27 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
-	"strings"
 
 	"k8s.io/klog/v2"
 
-	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
-	"github.com/cisco-open/nasp/pkg/environment"
 	"github.com/cisco-open/nasp/pkg/istio"
 )
 
-func init() {
-	for _, env := range []string{
-		"NASP_ISTIO_CA_ADDR=istiod-cp-v113x.istio-system.svc:15012",
-		"NASP_ISTIO_VERSION=1.13.5",
-		"NASP_ISTIO_REVISION=cp-v113x.istio-system",
-		"NASP_TYPE=sidecar",
-		"NASP_POD_NAME=alpine-efefefef-f5wwf",
-		"NASP_POD_NAMESPACE=default",
-		"NASP_POD_OWNER=kubernetes://apis/apps/v1/namespaces/default/deployments/alpine",
-		"NASP_POD_SERVICE_ACCOUNT=alpine",
-		"NASP_WORKLOAD_NAME=alpine",
-		"NASP_MESH_ID=mesh1",
-		"NASP_CLUSTER_ID=waynz0r-0626-01",
-		"NASP_NETWORK=network2",
-		"NASP_APP_CONTAINERS=alpine",
-		"NASP_INSTANCE_IP=10.20.4.75",
-		"NASP_LABELS=security.istio.io/tlsMode:istio, pod-template-hash:efefefef, service.istio.io/canonical-revision:latest, istio.io/rev:cp-v111x.istio-system, topology.istio.io/network:network1, k8s-app:alpine, service.istio.io/canonical-name:alpine, app:alpine, version:v11",
-		"NASP_SEARCH_DOMAINS=demo.svc.cluster.local,svc.cluster.local,cluster.local",
-	} {
-		p := strings.Split(env, "=")
-		if len(p) != 2 {
-			continue
-		}
-		os.Setenv(p[0], p[1])
-	}
-}
-
 var mode string
+var heimdallURL string
 
 func init() {
-	klog.InitFlags(nil)
+	flag.StringVar(&heimdallURL, "heimdall-url", "https://localhost:16443/config", "Heimdall URL")
 	flag.StringVar(&mode, "mode", "server", "mode")
+	klog.InitFlags(nil)
 	flag.Parse()
 }
 
 func getIIH() (*istio.IstioIntegrationHandler, error) {
 	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
-		MetricsAddress: ":15090",
-		UseTLS:         true,
-		IstioCAConfigGetter: func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
-			return istio_ca.GetIstioCAClientConfig(e.ClusterID, e.IstioRevision)
-		},
+		MetricsAddress:      ":15090",
+		UseTLS:              true,
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, "test-grpc-16362813-F46B-41AC-B191-A390DB1F6BDF", "16362813-F46B-41AC-B191-A390DB1F6BDF", "v1"),
 	}
 
 	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, klog.TODO())
@@ -129,7 +98,7 @@ func server() {
 				fmt.Printf("request: %s", bytes)
 
 				// prepend prefix and send as response
-				line := fmt.Sprintf("%s [%s]", "<< ", bytes)
+				line := fmt.Sprintf("%s %s", "<< ", bytes)
 				fmt.Printf("response: %s", line)
 				conn.Write([]byte(line))
 			}
@@ -149,7 +118,7 @@ func client() {
 		panic(err)
 	}
 
-	conn, err := d.DialContext(ctx, "tcp", "192.168.255.31:10000")
+	conn, err := d.DialContext(ctx, "tcp", "localhost:10000")
 	if err != nil {
 		panic(err)
 	}
@@ -170,5 +139,5 @@ func client() {
 
 	conn.Close()
 
-	fmt.Printf("response: %s\n", reply[:n])
+	fmt.Printf("response: %s", reply[:n])
 }

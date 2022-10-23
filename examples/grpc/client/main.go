@@ -18,8 +18,6 @@ import (
 	"context"
 	"flag"
 	"log"
-	"os"
-	"strings"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -28,33 +26,10 @@ import (
 	"github.com/cisco-open/nasp/pkg/istio"
 )
 
-func init() {
-	for _, env := range []string{
-		"NASP_ISTIO_CA_ADDR=istiod-cp-v113x.istio-system.svc:15012",
-		"NASP_ISTIO_VERSION=1.13.5",
-		"NASP_ISTIO_REVISION=cp-v113x.istio-system",
-		"NASP_NETWORK=network2",
-		"NASP_SEARCH_DOMAINS=demo.svc.cluster.local",
-		"NASP_TYPE=sidecar",
-		"NASP_POD_NAME=grpc-client",
-		"NASP_POD_NAMESPACE=default",
-		"NASP_POD_OWNER=kubernetes://apis/apps/v1/namespaces/default/deployments/alpine",
-		"NASP_WORKLOAD_NAME=alpine",
-		"NASP_MESH_ID=mesh1",
-		"NASP_CLUSTER_ID=waynz0r-0626-01",
-		"NASP_APP_CONTAINERS=alpine",
-		"NASP_INSTANCE_IP=10.20.4.75",
-		"NASP_LABELS=security.istio.io/tlsMode:istio, pod-template-hash:efefefef, service.istio.io/canonical-revision:latest, istio.io/rev:cp-v111x.istio-system, topology.istio.io/network:network1, k8s-app:alpine, service.istio.io/canonical-name:alpine",
-	} {
-		p := strings.Split(env, "=")
-		if len(p) != 2 {
-			continue
-		}
-		os.Setenv(p[0], p[1])
-	}
-}
+var heimdallURL string
 
 func init() {
+	flag.StringVar(&heimdallURL, "heimdall-url", "https://localhost:16443/config", "Heimdall URL")
 	klog.InitFlags(nil)
 	flag.Parse()
 }
@@ -63,7 +38,7 @@ func main() {
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		MetricsAddress:      ":15090",
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterRemote,
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, "test-grpc-16362813-F46B-41AC-B191-A390DB1F6BDF", "16362813-F46B-41AC-B191-A390DB1F6BDF", "v1"),
 	}, klog.TODO())
 	if err != nil {
 		log.Fatal(err)
@@ -75,7 +50,7 @@ func main() {
 	}
 
 	client, err := grpc.Dial(
-		"catalog:8082",
+		"localhost:8082",
 		grpcDialOptions...,
 	)
 	if err != nil {
@@ -86,24 +61,9 @@ func main() {
 
 	iih.Run(ctx)
 
-	c := pb.NewAllsparkClient(client)
-	_, err = c.Incoming(ctx, &pb.Params{})
-	// fmt.Printf("%d -- %s\n", grpc.Code(err), grpc.ErrorDesc(err))
-
-	//iih.RunMetricsServer(context.Background())
-
-	os.Exit(0)
-
 	greeter := pb.NewGreeterClient(client)
 
-	reply, err := greeter.SayHello(context.Background(), &pb.HelloRequest{Name: "joska"})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println(reply.Message)
-
-	reply, err = greeter.SayHello(context.Background(), &pb.HelloRequest{Name: "pista"})
+	reply, err := greeter.SayHello(context.Background(), &pb.HelloRequest{Name: "world"})
 	if err != nil {
 		log.Fatal(err)
 	}
