@@ -10,7 +10,9 @@ data:
     "WorkloadName": "ios-mobile-app",
     "PodNamespace": "external",
     "Network": "network2",
-    "MeshID": "mesh1"
+    "MeshID": "mesh1",
+    "ServiceAccountName": "ios-mobile",
+    "Service": "ios-mobile"
     }
   45FD6A76-E415-4292-BED1-AA6FFAD0253D: |
     {
@@ -19,7 +21,9 @@ data:
     "WorkloadName": "ios-mobile-app",
     "PodNamespace": "external",
     "Network": "network2",
-    "MeshID": "mesh1"
+    "MeshID": "mesh1",
+    "ServiceAccountName": "ios-mobile",
+    "Service": "ios-mobile"
     }
   f09fa15157a1b985: |
     {
@@ -28,5 +32,7 @@ data:
     "WorkloadName": "android-mobile-app",
     "PodNamespace": "external",
     "Network": "network2",
-    "MeshID": "mesh1"
+    "MeshID": "mesh1",
+    "ServiceAccountName": "android-mobile",
+    "Service": "android-mobile"
     }

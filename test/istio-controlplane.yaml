@@ -1,0 +1,36 @@
+apiVersion: servicemesh.cisco.com/v1alpha1
+kind: IstioControlPlane
+metadata:
+  name: icp-v115x
+  namespace: istio-system
+  annotations:
+    controlplane.istio.servicemesh.cisco.com/namespace-injection-source: "true"
+spec:
+  clusterID: nasp-test-cluster
+  version: 1.15.2
+  mode: ACTIVE
+  networkName: network1
+  meshExpansion:
+    enabled: true
+    gateway:
+      metadata:
+        annotations:
+          meshgateway.istio.servicemesh.cisco.com/generate-external-service: "false"
+      service:
+        metadata:
+          annotations:
+            service.banzaicloud.io/ip-address-override: 127.0.0.1
+  k8sResourceOverlays:
+    - groupVersionKind:
+        kind: IstioMeshGateway
+      objectKey:
+        name: istio-meshexpansion-icp-v115x
+      patches:
+        - parseValue: false
+          path: /spec/service?/ports?/name=tls-istiod/nodePort?
+          type: replace
+          value: "15012"
+        - parseValue: false
+          path: /spec/service?/ports?/name=tls/nodePort?
+          type: replace
+          value: "15443"

@@ -1,0 +1,24 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: nasp-test-cluster
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+            extraArgs:
+              service-node-port-range: 15000-32767
+    extraPortMappings:
+      # istio cp
+      - containerPort: 15012
+        hostPort: 15012
+        protocol: TCP
+      # istio tls passthrough
+      - containerPort: 15443
+        hostPort: 15443
+        protocol: TCP
+      # heimdall
+      - containerPort: 16443
+        hostPort: 16443
+        protocol: TCP
