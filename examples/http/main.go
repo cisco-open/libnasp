@@ -20,67 +20,43 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
+	"github.com/go-logr/logr"
 	"k8s.io/klog/v2"
 
-	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
-	"github.com/cisco-open/nasp/pkg/environment"
 	"github.com/cisco-open/nasp/pkg/istio"
+	"github.com/cisco-open/nasp/pkg/network"
 )
 
-func init() {
-	for _, env := range []string{
-		"NASP_ISTIO_CA_ADDR=istiod-cp-v113x.istio-system.svc:15012",
-		"NASP_ISTIO_VERSION=1.13.5",
-		"NASP_ISTIO_REVISION=cp-v113x.istio-system",
-		"NASP_TYPE=sidecar",
-		"NASP_POD_NAME=alpine-efefefef-f5wwf",
-		"NASP_POD_NAMESPACE=default",
-		"NASP_POD_OWNER=kubernetes://apis/apps/v1/namespaces/default/deployments/alpine",
-		"NASP_WORKLOAD_NAME=alpine",
-		"NASP_MESH_ID=mesh1",
-		"NASP_CLUSTER_ID=waynz0r-0626-01",
-		"NASP_NETWORK=network2",
-		"NASP_APP_CONTAINERS=alpine",
-		"NASP_INSTANCE_IP=10.20.4.75",
-		"NASP_LABELS=security.istio.io/tlsMode:istio, pod-template-hash:efefefef, service.istio.io/canonical-revision:latest, istio.io/rev:cp-v111x.istio-system, topology.istio.io/network:network1, k8s-app:alpine, service.istio.io/canonical-name:alpine, app:alpine, version:v11",
-		"NASP_SEARCH_DOMAINS=demo.svc.cluster.local,svc.cluster.local,cluster.local",
-	} {
-		p := strings.Split(env, "=")
-		if len(p) != 2 {
-			continue
-		}
-		os.Setenv(p[0], p[1])
-	}
-}
-
 var mode string
-var url string
+var requestURL string
 var requestCount int
 var usePushGateway bool
 var pushGatewayAddress string
 var sleepBeforeClientExit time.Duration
 var dumpClientResponse bool
+var heimdallURL string
+var sendSubsequentHTTPRequest bool
 
 func init() {
 	flag.StringVar(&mode, "mode", "server", "server/client mode")
-	flag.StringVar(&url, "url", "http://echo:8080", "http client url")
+	flag.StringVar(&requestURL, "request-url", "http://echo.testing:80", "http request url")
 	flag.IntVar(&requestCount, "request-count", 1, "outgoing http request count")
 	flag.BoolVar(&usePushGateway, "use-push-gateway", false, "use push gateway for metrics")
 	flag.StringVar(&pushGatewayAddress, "push-gateway-address", "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091", "push gateway address")
 	flag.DurationVar(&sleepBeforeClientExit, "client-sleep", 0, "sleep duration before client exit")
 	flag.BoolVar(&dumpClientResponse, "dump-client-response", false, "dump http client response")
+	flag.StringVar(&heimdallURL, "heimdall-url", "https://localhost:16443/config", "Heimdall URL")
+	flag.BoolVar(&sendSubsequentHTTPRequest, "send-subsequent-http-request", true, "Whether to send subsequent HTTP request in server mode")
 	klog.InitFlags(nil)
 	flag.Parse()
 }
 
-func sendHTTPRequest(url string, transport http.RoundTripper) error {
+func sendHTTPRequest(url string, transport http.RoundTripper, logger logr.Logger) error {
 	httpClient := &http.Client{
 		Transport: transport,
 	}
@@ -100,16 +76,36 @@ func sendHTTPRequest(url string, transport http.RoundTripper) error {
 		fmt.Printf("%s\n", string(buff))
 	}
 
+	if conn, ok := network.WrappedConnectionFromContext(response.Request.Context()); ok {
+		printConnectionInfo(conn, logger)
+	}
+
 	return nil
 }
 
+func printConnectionInfo(connection network.Connection, logger logr.Logger) {
+	localAddr := connection.LocalAddr().String()
+	remoteAddr := connection.RemoteAddr().String()
+	var localSpiffeID, remoteSpiffeID string
+
+	if cert := connection.GetLocalCertificate(); cert != nil {
+		localSpiffeID = cert.GetFirstURI()
+	}
+
+	if cert := connection.GetPeerCertificate(); cert != nil {
+		remoteSpiffeID = cert.GetFirstURI()
+	}
+
+	logger.Info("connection info", "localAddr", localAddr, "localSpiffeID", localSpiffeID, "remoteAddr", remoteAddr, "remoteSpiffeID", remoteSpiffeID, "ttfb", connection.GetTimeToFirstByte().Format(time.RFC3339Nano))
+}
+
 func main() {
+	logger := klog.TODO()
+
 	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
-		MetricsAddress: ":15090",
-		UseTLS:         true,
-		IstioCAConfigGetter: func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
-			return istio_ca.GetIstioCAClientConfig(e.ClusterID, e.IstioRevision)
-		},
+		MetricsAddress:      ":15090",
+		UseTLS:              true,
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, "test-http-16362813-F46B-41AC-B191-A390DB1F6BDF", "16362813-F46B-41AC-B191-A390DB1F6BDF", "v1"),
 	}
 
 	if usePushGateway {
@@ -119,7 +115,7 @@ func main() {
 		}
 	}
 
-	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, klog.TODO())
+	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, logger)
 	if err != nil {
 		panic(err)
 	}
@@ -140,8 +136,8 @@ func main() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if err := sendHTTPRequest(url, transport); err != nil {
-					klog.Error(err, "could not send http request")
+				if err := sendHTTPRequest(requestURL, transport, logger); err != nil {
+					logger.Error(err, "could not send http request")
 				}
 			}()
 			i++
@@ -159,8 +155,10 @@ func main() {
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
 	r.Use(gin.Logger())
 	r.GET("/", func(c *gin.Context) {
-		if err := sendHTTPRequest("http://echo:8080", transport); err != nil {
-			klog.Error(err, "could not send http request")
+		if sendSubsequentHTTPRequest {
+			if err := sendHTTPRequest(requestURL, transport, logger); err != nil {
+				logger.Error(err, "could not send http request")
+			}
 		}
 		c.Data(http.StatusOK, "text/html", []byte("Hello world!"))
 	})

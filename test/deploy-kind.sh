@@ -60,6 +60,6 @@ log "create external namespace"
 create_and_label_namespace external icp-v115x.istio-system
 
 log "create service accounts in namespace external"
-for saName in ios-mobile android-mobile http-client http-server tcp-client tcp-server grpc-client grpc-server; do
+for saName in ios-mobile android-mobile test-http test-tcp test-grpc; do
     create_sa external ${saName}
 done

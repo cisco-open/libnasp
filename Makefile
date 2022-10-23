@@ -1,8 +1,14 @@
 LICENSEI_VERSION = 0.5.0
 GOLANGCI_VERSION = 1.49.0
+HEIMDALL_IMAGE ?= heimdall
 
-heimdall-docker:
-	docker build -t bonifaido/heimdall -f experimental/heimdall/Dockerfile --platform linux/amd64 .
+.PHONY: help
+.DEFAULT_GOAL := help
+help:
+	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+heimdall-docker: ## Build heimdall docker container
+	docker build -t $(HEIMDALL_IMAGE) -f experimental/heimdall/Dockerfile --platform linux/amd64 .
 
 bin/golangci-lint: bin/golangci-lint-${GOLANGCI_VERSION}
 	@ln -sf golangci-lint-${GOLANGCI_VERSION} bin/golangci-lint
@@ -38,7 +44,7 @@ license-cache: bin/licensei ## Generate license cache
 	bin/licensei cache
 
 .PHONY: test
-test:
+test: ## Run tests
 	go test ./pkg/... \
     	-coverprofile cover.out \
     	-v \

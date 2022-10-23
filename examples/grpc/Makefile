@@ -1,21 +1,18 @@
-proto:
+.PHONY: help
+.DEFAULT_GOAL := help
+help:
+	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+
+.PHONY: proto
+proto: ## Generate hello protobuf
 	protoc --go_out=./pb --go_opt=paths=source_relative \
 	--go-grpc_out=./pb --go-grpc_opt=paths=source_relative \
 	hello.proto
 
-# brew install libressl
-cert:
-	/usr/local/opt/libressl/bin/openssl req -x509 \
-	-newkey rsa:4096 -keyout key.pem -out cert.pem \
-	-sha256 -days 365 -nodes \
-	-addext "subjectAltName = DNS:localhost" \
-	-subj "/C=HU/ST=Budapest/L=Budapest/O=Cisco/CN=localhost"
-
-curl:
-	grpcurl -plaintext -d '{"name":"Joska"}' localhost:1234 Greeter/SayHello
-
-run-server:
+.PHONY: run-server
+run-server: ## Run gRPC server
 	go run .
 
-run-client:
+.PHONY: run-client
+run-client: ## Run gRPC client
 	go run ./client
