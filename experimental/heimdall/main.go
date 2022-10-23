@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
@@ -28,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	klog "k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -112,6 +112,8 @@ func (db *ConfigMapClientDatabase) Lookup(ClientID string) (*Client, error) {
 }
 
 func main() {
+	logger := klog.TODO()
+
 	clientDb, err := NewConfigMapClientDatabase()
 	if err != nil {
 		panic(err)
@@ -134,16 +136,21 @@ func main() {
 			return
 		}
 
-		log.Printf("client with id %s is requesting config", configRequest.ClientID)
+		log := logger.WithValues("clientID", configRequest.ClientID)
+		log.Info("client requesting config")
+
+		unautherror := errors.New("invalid ClientID or ClientSecret")
 
 		client, err := clientDb.Lookup(configRequest.ClientID)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			log.Error(nil, "could not find client id")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": unautherror.Error()})
 			return
 		}
 
 		if client.ClientSecret != configRequest.ClientSecret {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			log.Error(nil, "client secret mismatch")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": unautherror.Error()})
 			return
 		}
 
