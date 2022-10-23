@@ -155,6 +155,9 @@ func main() {
 		}
 
 		client.Version = configRequest.Version
+		if client.ServiceAccountName == "" {
+			client.ServiceAccountName = "default"
+		}
 
 		var e IstioCAClientConfigAndEnvironment
 

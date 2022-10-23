@@ -2,11 +2,24 @@
 
 set -euo pipefail
 
+DIRECTORY=`dirname $(readlink -f $0)`
+
 function log() {
     echo -e "\n>>> ${1}\n"
 }
 
-DIRECTORY=`dirname $(readlink -f $0)`
+function create_and_label_namespace() {
+    if ! kubectl get namespace ${1} >/dev/null 2>&1; then
+    kubectl create namespace ${1}
+    fi
+    kubectl label namespace ${1} istio.io/rev=${2} --overwrite
+}
+
+function create_sa() {
+    if ! kubectl -n ${1} get sa ${2} >/dev/null 2>&1; then
+        kubectl -n ${1} create sa ${2}
+    fi
+}
 
 log "creating kind cluster"
 if ! $(kind create cluster --wait 5m --config ${DIRECTORY}/kind.yaml); then
@@ -27,31 +40,26 @@ helm upgrade --install --create-namespace --namespace=istio-system istio-operato
 kubectl apply --namespace istio-system -f ${DIRECTORY}/istio-controlplane.yaml
 
 log "waiting for istio controlplane to be available"
-# until https://github.com/kubernetes/kubectl/issues/1236 is fixed,
-# the icp needs to updated first, then the embedded status field appears
-kubectl wait --namespace istio-system \
-                --for=jsonpath='{.metadata.generation}'=2 \
-                --timeout=120s \
-                icp/icp-v115x
-
-kubectl wait --namespace istio-system \
-                --for=jsonpath='{.status.status}'="Available" \
-                --timeout=120s \
-                icp/icp-v115x
+while [ "$(kubectl get icp -n istio-system icp-v115x -o jsonpath='{.status.status}')" != "Available" ];
+do
+    sleep 2
+done
 
 log "build and load heimdall image"
 ${DIRECTORY}/build-heimdall-image.sh
 
 log "install heimdall"
-if ! kubectl get namespace heimdall >/dev/null 2>&1; then
-kubectl create namespace heimdall
-fi
-kubectl label namespace heimdall istio.io/rev=icp-v115x.istio-system --overwrite
+create_and_label_namespace heimdall icp-v115x.istio-system
 helm upgrade --install -n heimdall heimdall ${DIRECTORY}/../experimental/heimdall/charts/heimdall --wait --values ${DIRECTORY}/heimdall-values.yaml
 
 log "install echo service for testing"
-if ! kubectl get namespace testing >/dev/null 2>&1; then
-kubectl create namespace testing
-fi
-kubectl label namespace testing istio.io/rev=icp-v115x.istio-system
+create_and_label_namespace testing icp-v115x.istio-system
 kubectl apply --namespace testing -f ${DIRECTORY}/echo-service.yaml
+
+log "create external namespace"
+create_and_label_namespace external icp-v115x.istio-system
+
+log "create service accounts in namespace external"
+for saName in ios-mobile android-mobile http-client http-server tcp-client tcp-server grpc-client grpc-server; do
+    create_sa external ${saName}
+done
