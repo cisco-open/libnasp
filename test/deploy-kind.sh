@@ -25,6 +25,13 @@ helm install --create-namespace --namespace=istio-system istio-operator banzaicl
 kubectl apply --namespace istio-system -f ${DIRECTORY}/istio-controlplane.yaml
 
 log "waiting for istio controlplane to be available"
+# until https://github.com/kubernetes/kubectl/issues/1236 is fixed,
+# the icp needs to updated first, then the embedded status field appears
+kubectl wait --namespace istio-system \
+                --for=jsonpath='{.metadata.generation}'=2 \
+                --timeout=120s \
+                icp/icp-v115x
+
 kubectl wait --namespace istio-system \
                 --for=jsonpath='{.status.status}'="Available" \
                 --timeout=120s \
