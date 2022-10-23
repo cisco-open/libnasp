@@ -17,7 +17,7 @@ spec:
       terminationGracePeriodSeconds: 2
       containers:
         - name: echo-service
-          image: k8s.gcr.io/echoserver:1.10
+          image: quay.io/bugfest/echoserver:latest
           ports:
             - containerPort: 8080
           resources:
