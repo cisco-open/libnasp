@@ -1,0 +1,14 @@
+image:
+  repository: heimdall
+  pullPolicy: Never
+  tag: "test"
+
+istio:
+  controlPlane: icp-v115x
+  controlPlaneNamespace: istio-system
+  version: "1.15.2"
+  revision: icp-v115x.istio-system
+  clusterId: nasp-test-cluster
+  meshGateway:
+    enabled: true
+    nodePort: "16443"
