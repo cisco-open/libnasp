@@ -50,7 +50,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.2.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
@@ -66,7 +66,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sethvargo/go-envconfig v0.8.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
-	github.com/spf13/cobra v1.5.0 // indirect
+	github.com/spf13/cobra v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tidwall/gjson v1.9.3 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -108,5 +108,6 @@ require (
 replace (
 	github.com/banzaicloud/operator-tools => github.com/banzaicloud/operator-tools v0.28.8
 	github.com/cisco-open/nasp => ../..
+	github.com/spf13/cobra => github.com/spf13/cobra v1.6.0
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.12.2
 )
