@@ -18,11 +18,11 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
+      # - name: Setup upterm session
+      #   uses: lhotari/action-upterm@v1
+      #   with:
+      #     ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+      #     limit-access-to-actor: true
 
       - name: Setup Go
         uses: actions/setup-go@v2
