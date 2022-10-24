@@ -52,3 +52,8 @@ test: ## Run tests
     	-test.v \
     	-test.paniconexit0 \
     	-timeout 1h
+
+.PHONY: tidy
+tidy: ## Execute go mod tidy
+	go mod tidy
+	go mod download all
