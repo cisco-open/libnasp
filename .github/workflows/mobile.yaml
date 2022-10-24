@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "*"
+
+jobs:
+  build:
+    name: Mobile build
+    runs-on: macos-12
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Build ios framework
+        run: |
+          cd experimental/mobile
+          make ios
