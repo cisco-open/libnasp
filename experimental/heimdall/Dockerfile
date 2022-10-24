@@ -19,10 +19,6 @@ COPY ./go.sum /go/src/app/
 COPY experimental/heimdall/go.mod experimental/heimdall/go.mod
 COPY experimental/heimdall/go.sum experimental/heimdall/go.sum
 
-RUN if [ -n "${GITHUB_ACCESS_TOKEN}" ]; then \
-      git config --global url."https://${GITHUB_ACCESS_TOKEN}:@github.com/".insteadOf "https://github.com/"; \
-    fi
-
 # hadolint ignore=DL3059
 RUN go mod download
 
