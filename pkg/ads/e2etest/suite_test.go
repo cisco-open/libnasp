@@ -19,6 +19,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -334,10 +335,15 @@ var _ = Describe("The management server is running", func() {
 		resourceConfigCache  cache.SnapshotCache
 		managementServerPort uint
 		done                 context.CancelFunc
+
+		count     uint64 = 0
+		adsClient ads.Client
 	)
 
 	BeforeEach(func() {
-		managementServerPort = 18000
+		atomic.AddUint64(&count, 1)
+		// use unique port for management server per each test case in order to avoid port conflict
+		managementServerPort = 18000 + uint(count)
 		resourceConfigCache = cache.NewSnapshotCache(true, cache.IDHash{}, nil)
 	})
 
@@ -365,55 +371,7 @@ var _ = Describe("The management server is running", func() {
 		done()
 	})
 
-	Describe("the ADS client interacts with the management server using SotW protocol", func() {
-		var (
-			adsClientConfig *adsconfig.ClientConfig
-			adsClient       ads.Client
-		)
-		BeforeEach(func() {
-			clusterID := "waynz0r-0626-01"
-			md, _ := structpb.NewStruct(map[string]interface{}{
-				"NAMESPACE":     "demo",
-				"MESH_ID":       "mesh1",
-				"CLUSTER_ID":    clusterID,
-				"NETWORK":       "network1",
-				"ISTIO_VERSION": "1.13.5",
-			})
-
-			adsClientConfig = &adsconfig.ClientConfig{
-				ManagementServerAddress: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: int(managementServerPort)},
-				ClusterID:               clusterID,
-				NodeInfo: &adsconfig.NodeInfo{
-					Id:          "test-node-id",
-					ClusterName: "echo.demo",
-					Metadata:    md,
-				},
-				SearchDomains:         []string{"demo.svc.cluster.local", "svc.cluster.local", "cluster.local"},
-				IncrementalXDSEnabled: false,
-				ManagementServerCapabilities: &adsconfig.ManagementServerCapabilities{
-					SotWWildcardSubscriptionSupported:          false,
-					DeltaWildcardSubscriptionSupported:         false,
-					ClusterDiscoveryServiceProvided:            true,
-					EndpointDiscoveryServiceProvided:           true,
-					ListenerDiscoveryServiceProvided:           true,
-					RouteConfigurationDiscoveryServiceProvided: true,
-					NameTableDiscoveryServiceProvided:          false,
-				},
-			}
-		})
-		JustBeforeEach(func() {
-			var ctx context.Context
-			ctx, done = context.WithCancel(testSuiteContext)
-
-			var err error
-			adsClient, err = ads.Connect(ctx, adsClientConfig)
-			Expect(err).NotTo(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			done()
-		})
-
+	AssertADSClientAPI := func() {
 		It("the ADS client API should work fine", func() {
 			ctx, cancel := context.WithCancel(testSuiteContext)
 			defer cancel()
@@ -558,6 +516,110 @@ var _ = Describe("The management server is running", func() {
 			))
 
 		})
+
+	}
+
+	Describe("the ADS client interacts with the management server using SotW protocol", func() {
+		var (
+			adsClientConfig *adsconfig.ClientConfig
+		)
+		BeforeEach(func() {
+			clusterID := "waynz0r-0626-01"
+			md, _ := structpb.NewStruct(map[string]interface{}{
+				"NAMESPACE":     "demo",
+				"MESH_ID":       "mesh1",
+				"CLUSTER_ID":    clusterID,
+				"NETWORK":       "network1",
+				"ISTIO_VERSION": "1.13.5",
+			})
+
+			adsClientConfig = &adsconfig.ClientConfig{
+				ManagementServerAddress: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: int(managementServerPort)},
+				ClusterID:               clusterID,
+				NodeInfo: &adsconfig.NodeInfo{
+					Id:          "test-node-id",
+					ClusterName: "echo.demo",
+					Metadata:    md,
+				},
+				SearchDomains:         []string{"demo.svc.cluster.local", "svc.cluster.local", "cluster.local"},
+				IncrementalXDSEnabled: false,
+				ManagementServerCapabilities: &adsconfig.ManagementServerCapabilities{
+					SotWWildcardSubscriptionSupported:          false,
+					DeltaWildcardSubscriptionSupported:         false,
+					ClusterDiscoveryServiceProvided:            true,
+					EndpointDiscoveryServiceProvided:           true,
+					ListenerDiscoveryServiceProvided:           true,
+					RouteConfigurationDiscoveryServiceProvided: true,
+					NameTableDiscoveryServiceProvided:          false,
+				},
+			}
+		})
+		JustBeforeEach(func() {
+			var ctx context.Context
+			ctx, done = context.WithCancel(testSuiteContext)
+
+			var err error
+			adsClient, err = ads.Connect(ctx, adsClientConfig)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AssertADSClientAPI()
+
+		AfterEach(func() {
+			done()
+		})
+	})
+
+	Describe("the ADS client interacts with the management server using incremental xDS protocol", func() {
+		var (
+			adsClientConfig *adsconfig.ClientConfig
+		)
+
+		BeforeEach(func() {
+			clusterID := "waynz0r-0626-01"
+			md, _ := structpb.NewStruct(map[string]interface{}{
+				"NAMESPACE":     "demo",
+				"MESH_ID":       "mesh1",
+				"CLUSTER_ID":    clusterID,
+				"NETWORK":       "network1",
+				"ISTIO_VERSION": "1.13.5",
+			})
+
+			adsClientConfig = &adsconfig.ClientConfig{
+				ManagementServerAddress: &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: int(managementServerPort)},
+				ClusterID:               clusterID,
+				NodeInfo: &adsconfig.NodeInfo{
+					Id:          "test-node-id",
+					ClusterName: "echo.demo",
+					Metadata:    md,
+				},
+				SearchDomains:         []string{"demo.svc.cluster.local", "svc.cluster.local", "cluster.local"},
+				IncrementalXDSEnabled: true,
+				ManagementServerCapabilities: &adsconfig.ManagementServerCapabilities{
+					SotWWildcardSubscriptionSupported:          false,
+					DeltaWildcardSubscriptionSupported:         false,
+					ClusterDiscoveryServiceProvided:            true,
+					EndpointDiscoveryServiceProvided:           true,
+					ListenerDiscoveryServiceProvided:           true,
+					RouteConfigurationDiscoveryServiceProvided: true,
+					NameTableDiscoveryServiceProvided:          false,
+				},
+			}
+		})
+		JustBeforeEach(func() {
+			var ctx context.Context
+			ctx, done = context.WithCancel(testSuiteContext)
+
+			var err error
+			adsClient, err = ads.Connect(ctx, adsClientConfig)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			done()
+		})
+
+		AssertADSClientAPI()
 
 	})
 })
