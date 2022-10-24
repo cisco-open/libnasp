@@ -20,6 +20,7 @@ jobs:
           cd gomobile-cache
           go install ./cmd/gomobile
           go install ./cmd/gobind
+          echo "${GOPATH}/bin" >> $GITHUB_PATH
 
       - name: Build ios framework
         run: |
