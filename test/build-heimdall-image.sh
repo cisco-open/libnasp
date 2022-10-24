@@ -8,4 +8,4 @@ KIND_CLUSTER_NAME=${KIND_CLUSTER_NAME:-nasp-test-cluster}
 
 docker build "${DIRECTORY}/.." -f "${DIRECTORY}/../experimental/heimdall/Dockerfile" -t "${IMAGE}"
 
-kind load docker-image -n nasp-test-cluster "${IMAGE}"
+kind load docker-image -n ${KIND_CLUSTER_NAME} "${IMAGE}"
