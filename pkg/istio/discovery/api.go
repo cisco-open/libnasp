@@ -43,7 +43,7 @@ type ListenerProperties interface {
 }
 
 type ClientProperties interface {
-	Address() net.Addr
+	Address() (net.Addr, error)
 	UseTLS() bool
 	Permissive() bool
 	ServerName() string

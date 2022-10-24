@@ -55,7 +55,11 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 		} else {
 			tlsConfig.ServerName = prop.ServerName()
 		}
-		address = prop.Address().String()
+		if endpointAddr, err := prop.Address(); err != nil {
+			return nil, err
+		} else {
+			address = endpointAddr.String()
+		}
 	}
 
 	var conn net.Conn

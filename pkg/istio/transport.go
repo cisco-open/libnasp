@@ -48,10 +48,14 @@ func NewIstioHTTPRequestTransport(transport http.RoundTripper, caClient ca.Clien
 func (t *istioHTTPRequestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var tlsConfig *tls.Config
 
-	if prop, _ := t.discoveryClient.GetHTTPClientPropertiesByHost(context.Background(), req.URL.Host); prop != nil {
+	if prop, _ := t.discoveryClient.GetHTTPClientPropertiesByHost(context.Background(), req.URL.Host); prop != nil { //nolint:nestif
 		t.logger.V(3).Info("discovered overrides", "overrides", prop)
-		req.URL.Host = prop.Address().String()
-		t.logger.V(3).Info("address override", "address", req.URL.Host)
+		if endpointAddr, err := prop.Address(); err != nil {
+			return nil, err
+		} else {
+			req.URL.Host = endpointAddr.String()
+			t.logger.V(3).Info("address override", "address", req.URL.Host)
+		}
 
 		if prop.UseTLS() {
 			tlsConfig = t.getTLSconfig()
