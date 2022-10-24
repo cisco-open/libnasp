@@ -50,6 +50,7 @@ jobs:
           context: .
           file: experimental/heimdall/Dockerfile
           tags: heimdall:test
+          load: true
           push: false
           
       - name: Create kind cluster and load Heimdall image
