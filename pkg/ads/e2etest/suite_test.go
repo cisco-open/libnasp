@@ -477,7 +477,11 @@ var _ = Describe("The management server is running", func() {
 				Expect(tcpClientProps.UseTLS()).To(BeTrue())
 				Expect(tcpClientProps.ServerName()).To(Equal("outbound_.12050_._.echo.demo.svc.cluster.local"))
 
-				endpoints = append(endpoints, tcpClientProps.Address())
+				ep, err := tcpClientProps.Address()
+				Expect(err).NotTo(HaveOccurred())
+
+				endpoints = append(endpoints, ep)
+
 				return endpoints
 			}, 2*testPollDuration, testPollInterval).Should(ContainElements(
 				&net.TCPAddr{IP: net.ParseIP("10.20.164.172"), Port: 8080},
@@ -507,7 +511,10 @@ var _ = Describe("The management server is running", func() {
 				Expect(httpClientProps.UseTLS()).To(BeTrue())
 				Expect(httpClientProps.ServerName()).To(Equal("outbound_.80_._.echo.demo.svc.cluster.local"))
 
-				endpoints = append(endpoints, httpClientProps.Address())
+				ep, err := httpClientProps.Address()
+				Expect(err).NotTo(HaveOccurred())
+
+				endpoints = append(endpoints, ep)
 				return endpoints
 			}, 2*testPollDuration, testPollInterval).Should(ContainElements(
 				&net.TCPAddr{IP: net.ParseIP("10.20.164.172"), Port: 8080},
