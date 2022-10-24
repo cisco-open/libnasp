@@ -3,9 +3,9 @@ module github.com/cisco/nasp/mobile
 go 1.19
 
 require (
+	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
 	golang.org/x/mobile v0.0.0-20190719004257-d2bd2a29d028
 	k8s.io/klog/v2 v2.70.0
-	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -125,6 +125,6 @@ require (
 )
 
 replace (
-	mosn.io/proxy-wasm-go-host => github.com/banzaicloud/proxy-wasm-go-host v0.0.0-20221016152507-38b921ff1f31
 	github.com/cisco-open/nasp => ../..
+	mosn.io/proxy-wasm-go-host => github.com/banzaicloud/proxy-wasm-go-host v0.0.0-20221016152507-38b921ff1f31
 )

@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"os"
 
-	cluster_registry "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
 	"github.com/gin-gonic/gin"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,12 +31,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	cluster_registry "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
 	"github.com/cisco-open/nasp/pkg/environment"
 )
 
 func init() {
-	cluster_registry.AddToScheme(scheme.Scheme)
+	_ = cluster_registry.AddToScheme(scheme.Scheme)
 }
 
 var podNamespace = os.Getenv("POD_NAMESPACE")
@@ -47,6 +47,7 @@ var istioRevision = os.Getenv("NASP_ISTIO_REVISION")
 
 var ErrClientNotFound = errors.New("client not found in database")
 var ErrClusterIDNotFound = errors.New("clusterID not found")
+var ErrClientOrClientSecretInvalid = errors.New("invalid ClientID or ClientSecret")
 var ClientDatabaseConfigMap = types.NamespacedName{Namespace: podNamespace, Name: "heimdall-client-database"}
 
 type ConfigRequest struct {
@@ -92,14 +93,14 @@ func NewConfigMapClientDatabase() (ClientDatabase, error) {
 	return &ConfigMapClientDatabase{c: c}, nil
 }
 
-func (db *ConfigMapClientDatabase) Lookup(ClientID string) (*Client, error) {
+func (db *ConfigMapClientDatabase) Lookup(clientID string) (*Client, error) {
 	var configMap corev1.ConfigMap
 	err := db.c.Get(context.Background(), ClientDatabaseConfigMap, &configMap)
 	if err != nil {
 		return nil, err
 	}
 
-	if clientData, ok := configMap.Data[ClientID]; ok {
+	if clientData, ok := configMap.Data[clientID]; ok {
 		var client Client
 		err = json.Unmarshal([]byte(clientData), &client)
 		if err != nil {
@@ -139,18 +140,16 @@ func main() {
 		log := logger.WithValues("clientID", configRequest.ClientID)
 		log.Info("client requesting config")
 
-		unautherror := errors.New("invalid ClientID or ClientSecret")
-
 		client, err := clientDb.Lookup(configRequest.ClientID)
 		if err != nil {
 			log.Error(nil, "could not find client id")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": unautherror.Error()})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": ErrClientOrClientSecretInvalid.Error()})
 			return
 		}
 
 		if client.ClientSecret != configRequest.ClientSecret {
 			log.Error(nil, "client secret mismatch")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": unautherror.Error()})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": ErrClientOrClientSecretInvalid.Error()})
 			return
 		}
 
@@ -166,7 +165,7 @@ func main() {
 			Namespace: client.PodNamespace,
 		})
 		if err != nil {
-			c.AbortWithError(500, err)
+			_ = c.AbortWithError(500, err)
 			return
 		}
 
@@ -205,7 +204,9 @@ func main() {
 		c.JSON(http.StatusOK, e)
 	})
 
-	r.Run()
+	if err := r.Run(); err != nil {
+		panic(err)
+	}
 }
 
 func getClusterIDFromRegistry() (string, error) {
