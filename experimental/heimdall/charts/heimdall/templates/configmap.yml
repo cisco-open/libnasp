@@ -3,6 +3,66 @@ kind: ConfigMap
 metadata:
   name: heimdall-client-database
 data:
+  test-http-client-16362813-F46B-41AC-B191-A390DB1F6BDF: |
+    {
+    "ClientSecret": "16362813-F46B-41AC-B191-A390DB1F6BDF",
+    "WorkloadName": "test-http-client",
+    "PodNamespace": "external",
+    "Network": "network2",
+    "MeshID": "mesh1",
+    "ServiceAccountName": "http-client",
+    "ServiceName": "http-client"
+    }
+  test-http-server-16362813-F46B-41AC-B191-A390DB1F6BDF: |
+    {
+    "ClientSecret": "16362813-F46B-41AC-B191-A390DB1F6BDF",
+    "WorkloadName": "test-http-server",
+    "PodNamespace": "external",
+    "Network": "network2",
+    "MeshID": "mesh1",
+    "ServiceAccountName": "http-server",
+    "ServiceName": "http-server"
+    }
+  test-tcp-client-16362813-F46B-41AC-B191-A390DB1F6BDF: |
+    {
+    "ClientSecret": "16362813-F46B-41AC-B191-A390DB1F6BDF",
+    "WorkloadName": "test-tcp-client",
+    "PodNamespace": "external",
+    "Network": "network2",
+    "MeshID": "mesh1",
+    "ServiceAccountName": "tcp-client",
+    "ServiceName": "tcp-client"
+    }
+  test-tcp-server-16362813-F46B-41AC-B191-A390DB1F6BDF: |
+    {
+    "ClientSecret": "16362813-F46B-41AC-B191-A390DB1F6BDF",
+    "WorkloadName": "test-tcp-server",
+    "PodNamespace": "external",
+    "Network": "network2",
+    "MeshID": "mesh1",
+    "ServiceAccountName": "tcp-server",
+    "ServiceName": "tcp-server"
+    }
+  test-grpc-client-16362813-F46B-41AC-B191-A390DB1F6BDF: |
+    {
+    "ClientSecret": "16362813-F46B-41AC-B191-A390DB1F6BDF",
+    "WorkloadName": "test-grpc-client",
+    "PodNamespace": "external",
+    "Network": "network2",
+    "MeshID": "mesh1",
+    "ServiceAccountName": "grpc-client",
+    "ServiceName": "grpc-client"
+    }
+  test-grpc-server-16362813-F46B-41AC-B191-A390DB1F6BDF: |
+    {
+    "ClientSecret": "16362813-F46B-41AC-B191-A390DB1F6BDF",
+    "WorkloadName": "test-grpc-server",
+    "PodNamespace": "external",
+    "Network": "network2",
+    "MeshID": "mesh1",
+    "ServiceAccountName": "grpc-server",
+    "ServiceName": "grpc-server"
+    }
   16362813-F46B-41AC-B191-A390DB1F6BDF: |
     {
     "ClientSecret": "16362813-F46B-41AC-B191-A390DB1F6BDF",
@@ -12,7 +72,7 @@ data:
     "Network": "network2",
     "MeshID": "mesh1",
     "ServiceAccountName": "ios-mobile",
-    "Service": "ios-mobile"
+    "ServiceName": "ios-mobile"
     }
   45FD6A76-E415-4292-BED1-AA6FFAD0253D: |
     {
@@ -23,7 +83,7 @@ data:
     "Network": "network2",
     "MeshID": "mesh1",
     "ServiceAccountName": "ios-mobile",
-    "Service": "ios-mobile"
+    "ServiceName": "ios-mobile"
     }
   f09fa15157a1b985: |
     {
@@ -34,5 +94,5 @@ data:
     "Network": "network2",
     "MeshID": "mesh1",
     "ServiceAccountName": "android-mobile",
-    "Service": "android-mobile"
+    "ServiceName": "android-mobile"
     }

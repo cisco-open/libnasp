@@ -87,6 +87,29 @@ func (e *IstioEnvironment) GetDNSServiceDomain() string {
 	return e.PodNamespace + ".svc." + e.GetDNSDomain()
 }
 
+func (e *IstioEnvironment) Override(otherEnv IstioEnvironment) {
+	e.Type = otherEnv.Type
+	e.PodName = otherEnv.PodName
+	e.PodNamespace = otherEnv.PodNamespace
+	e.PodOwner = otherEnv.PodOwner
+	e.PodServiceAccount = otherEnv.PodServiceAccount
+	e.WorkloadName = otherEnv.WorkloadName
+	e.AppContainers = otherEnv.AppContainers
+	e.InstanceIPs = otherEnv.InstanceIPs
+	e.Labels = otherEnv.Labels
+	e.PlatformMetadata = otherEnv.PlatformMetadata
+	e.Network = otherEnv.Network
+	e.SearchDomains = otherEnv.SearchDomains
+
+	e.ClusterID = otherEnv.ClusterID
+	e.DNSDomain = otherEnv.DNSDomain
+	e.MeshID = otherEnv.MeshID
+
+	e.IstioCAAddress = otherEnv.IstioCAAddress
+	e.IstioRevision = otherEnv.IstioRevision
+	e.IstioVersion = otherEnv.IstioVersion
+}
+
 func (e *IstioEnvironment) GetNodePropertiesFromEnvironment() map[string]interface{} {
 	labels := map[string]interface{}{}
 	for k, v := range e.Labels {

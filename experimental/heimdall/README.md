@@ -4,7 +4,8 @@ A small microservice to allow external services to obtain an Istio configuration
 
 Heimdall is meant to run on Kubernetes.
 
-### Currently supported auth methods for clients
+## Currently supported auth methods for clients
+
 - Kubernetes ConfigMap database (ClientID/ClientSecret)
 - ...
 - TODO
@@ -37,6 +38,8 @@ A sample entry:
     "WorkloadName": "ios-mobile-app",
     "PodNamespace": "external",
     "Network": "network2",
-    "MeshID": "mesh1"
+    "MeshID": "mesh1",
+    "ServiceAccountName": "ios-mobile",
+    "Service": "ios-mobile"
     }
 ```

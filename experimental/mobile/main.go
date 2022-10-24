@@ -58,7 +58,7 @@ type HTTPResponse struct {
 func NewHTTPTransport(heimdallURL, clientID, clientSecret string) (*HTTPTransport, error) {
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret, "v1"),
 		PushgatewayConfig: &istio.PushgatewayConfig{
 			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
 			UseUniqueIDLabel: true,

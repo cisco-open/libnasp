@@ -4,12 +4,13 @@ go 1.19
 
 require (
 	github.com/cisco-open/cluster-registry-controller/api v0.2.5
+	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
 	github.com/gin-gonic/gin v1.8.1
 	k8s.io/api v0.24.2
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.24.2
+	k8s.io/klog/v2 v2.70.0
 	sigs.k8s.io/controller-runtime v0.12.3
-	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -97,7 +98,6 @@ require (
 	istio.io/istio v0.0.0-20220831174539-e3364ab424b7 // indirect
 	istio.io/pkg v0.0.0-20220815202617-8f42645c6e49 // indirect
 	k8s.io/apiextensions-apiserver v0.24.2 // indirect
-	k8s.io/klog/v2 v2.70.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20220627174259-011e075b9cb8 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
@@ -107,6 +107,6 @@ require (
 
 replace (
 	github.com/banzaicloud/operator-tools => github.com/banzaicloud/operator-tools v0.28.8
-	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.12.2
 	github.com/cisco-open/nasp => ../..
+	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.12.2
 )

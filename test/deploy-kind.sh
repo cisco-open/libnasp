@@ -2,14 +2,29 @@
 
 set -euo pipefail
 
+DIRECTORY=`dirname $(readlink -f $0)`
+
 function log() {
     echo -e "\n>>> ${1}\n"
 }
 
-DIRECTORY=`dirname $(readlink -f $0)`
+function create_and_label_namespace() {
+    if ! kubectl get namespace ${1} >/dev/null 2>&1; then
+    kubectl create namespace ${1}
+    fi
+    kubectl label namespace ${1} istio.io/rev=${2} --overwrite
+}
+
+function create_sa() {
+    if ! kubectl -n ${1} get sa ${2} >/dev/null 2>&1; then
+        kubectl -n ${1} create sa ${2}
+    fi
+}
 
 log "creating kind cluster"
-kind create cluster --wait 5m --config ${DIRECTORY}/kind.yaml
+if ! $(kind create cluster --wait 5m --config ${DIRECTORY}/kind.yaml); then
+    echo ""
+fi
 
 log "setup and update helm repositories"
 helm repo add metallb https://metallb.github.io/metallb
@@ -17,32 +32,34 @@ helm repo add banzaicloud-stable https://kubernetes-charts.banzaicloud.com
 helm repo update
 
 log "install metallb"
-helm install -n metallb-system --create-namespace metallb metallb/metallb --wait
+helm upgrade --install -n metallb-system --create-namespace metallb metallb/metallb --wait
 kubectl apply -f ${DIRECTORY}/metallb-config.yaml
 
 log "install istio"
-helm install --create-namespace --namespace=istio-system istio-operator banzaicloud-stable/istio-operator --wait
+helm upgrade --install --create-namespace --namespace=istio-system istio-operator banzaicloud-stable/istio-operator --wait
 kubectl apply --namespace istio-system -f ${DIRECTORY}/istio-controlplane.yaml
 
 log "waiting for istio controlplane to be available"
-# until https://github.com/kubernetes/kubectl/issues/1236 is fixed,
-# the icp needs to updated first, then the embedded status field appears
-kubectl wait --namespace istio-system \
-                --for=jsonpath='{.metadata.generation}'=2 \
-                --timeout=120s \
-                icp/icp-v115x
+while [ "$(kubectl get icp -n istio-system icp-v115x -o jsonpath='{.status.status}')" != "Available" ];
+do
+    sleep 2
+done
 
-kubectl wait --namespace istio-system \
-                --for=jsonpath='{.status.status}'="Available" \
-                --timeout=120s \
-                icp/icp-v115x
+log "build and load heimdall image"
+${DIRECTORY}/build-heimdall-image.sh
 
 log "install heimdall"
-kubectl create namespace heimdall
-kubectl label namespace heimdall istio.io/rev=icp-v115x.istio-system
-helm install -n heimdall heimdall ${DIRECTORY}/../experimental/heimdall/charts/heimdall --wait --set istio.meshGateway.enabled=true --set istio.meshGateway.nodePort=16443
+create_and_label_namespace heimdall icp-v115x.istio-system
+helm upgrade --install -n heimdall heimdall ${DIRECTORY}/../experimental/heimdall/charts/heimdall --wait --values ${DIRECTORY}/heimdall-values.yaml
 
 log "install echo service for testing"
-kubectl create namespace testing
-kubectl label namespace testing istio.io/rev=icp-v115x.istio-system
+create_and_label_namespace testing icp-v115x.istio-system
 kubectl apply --namespace testing -f ${DIRECTORY}/echo-service.yaml
+
+log "create external namespace"
+create_and_label_namespace external icp-v115x.istio-system
+
+log "create service accounts in namespace external"
+for saName in ios-mobile android-mobile http-client http-server tcp-client tcp-server grpc-client grpc-server; do
+    create_sa external ${saName}
+done

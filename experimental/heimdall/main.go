@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 
@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	klog "k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -51,15 +52,19 @@ var ClientDatabaseConfigMap = types.NamespacedName{Namespace: podNamespace, Name
 type ConfigRequest struct {
 	ClientID     string `binding:"required"`
 	ClientSecret string `binding:"required"`
+	Version      string
 }
 
 type Client struct {
-	ClientID     string
-	ClientSecret string
-	WorkloadName string
-	PodNamespace string
-	Network      string
-	MeshID       string
+	ClientID           string
+	ClientSecret       string
+	WorkloadName       string
+	PodNamespace       string
+	Network            string
+	MeshID             string
+	ServiceName        string
+	Version            string
+	ServiceAccountName string
 }
 
 type ClientDatabase interface {
@@ -107,6 +112,8 @@ func (db *ConfigMapClientDatabase) Lookup(ClientID string) (*Client, error) {
 }
 
 func main() {
+	logger := klog.TODO()
+
 	clientDb, err := NewConfigMapClientDatabase()
 	if err != nil {
 		panic(err)
@@ -129,29 +136,52 @@ func main() {
 			return
 		}
 
-		log.Printf("client with id %s is requesting config", configRequest.ClientID)
+		log := logger.WithValues("clientID", configRequest.ClientID)
+		log.Info("client requesting config")
+
+		unautherror := errors.New("invalid ClientID or ClientSecret")
 
 		client, err := clientDb.Lookup(configRequest.ClientID)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			log.Error(nil, "could not find client id")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": unautherror.Error()})
 			return
 		}
 
 		if client.ClientSecret != configRequest.ClientSecret {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			log.Error(nil, "client secret mismatch")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": unautherror.Error()})
 			return
 		}
 
-		// TODO generate a unique config for a given client
-		var e IstioCAClientConfigAndEnvironment
-
-		e.CAClientConfig, err = istio_ca.GetIstioCAClientConfig(clusterID, istioRevision)
-		if err != nil {
-			c.AbortWithError(500, err)
+		client.Version = configRequest.Version
+		if client.ServiceAccountName == "" {
+			client.ServiceAccountName = "default"
 		}
 
+		var e IstioCAClientConfigAndEnvironment
+
+		e.CAClientConfig, err = istio_ca.GetIstioCAClientConfigWithKubeConfig(clusterID, istioRevision, nil, &types.NamespacedName{
+			Name:      client.ServiceAccountName,
+			Namespace: client.PodNamespace,
+		})
+		if err != nil {
+			c.AbortWithError(500, err)
+			return
+		}
+
+		clientIP := c.ClientIP()
+		if clientIP == "::1" {
+			clientIP = "127.0.0.1"
+		}
+
+		e.Environment.IstioCAAddress = e.CAClientConfig.CAEndpoint
+		e.Environment.ClusterID = e.CAClientConfig.ClusterID
+		e.Environment.DNSDomain = "cluster.local"
 		e.Environment.Type = "sidecar"
-		e.Environment.InstanceIPs = []string{c.ClientIP()}
+		e.Environment.IstioVersion = istioVersion
+		e.Environment.IstioRevision = istioRevision
+		e.Environment.InstanceIPs = []string{clientIP}
 		e.Environment.WorkloadName = client.WorkloadName
 		e.Environment.PodName = client.WorkloadName + "-" + configRequest.ClientID
 		e.Environment.PodNamespace = client.PodNamespace
@@ -161,15 +191,16 @@ func main() {
 		e.Environment.SearchDomains = []string{"svc.cluster.local", "cluster.local"}
 		e.Environment.Labels = map[string]string{
 			"security.istio.io/tlsMode":           "istio",
-			"pod-template-hash":                   "efefefef",
 			"service.istio.io/canonical-revision": "latest",
 			"istio.io/rev":                        e.CAClientConfig.Revision,
 			"topology.istio.io/network":           e.Environment.Network,
 			"k8s-app":                             client.WorkloadName,
-			"service.istio.io/canonical-name":     client.WorkloadName,
+			"service.istio.io/canonical-name":     client.ServiceName,
 			"app":                                 client.WorkloadName,
-			"version":                             "v1",
+			"version":                             client.Version,
 		}
+		e.Environment.PodServiceAccount = client.ServiceAccountName
+		e.Environment.PodOwner = fmt.Sprintf("kubernetes://apis/v1/namespaces/%s/pods/%s", client.PodNamespace, client.WorkloadName)
 
 		c.JSON(http.StatusOK, e)
 	})
