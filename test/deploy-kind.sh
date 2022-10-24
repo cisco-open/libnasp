@@ -21,9 +21,11 @@ function create_sa() {
     fi
 }
 
-log "creating kind cluster"
-if ! $(kind create cluster --wait 5m --config ${DIRECTORY}/kind.yaml); then
-    echo ""
+if ! kind get kubeconfig --name nasp-test-cluster &> /dev/null; then
+    log "creating kind cluster"
+    kind create cluster --wait 5m --config ${DIRECTORY}/kind.yaml
+else
+    log "kind cluster already exists"
 fi
 
 log "setup and update helm repositories"
