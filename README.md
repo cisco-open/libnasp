@@ -1,5 +1,7 @@
 ## Nasp
 
+**THIS REPO IS CURRENTLY IN PREVIEW. THE API'S ARE NOT FINAL AND ARE SUBJECT TO CHANGE WITHOUT NOTICE.**
+
 Nasp is an **open-source, lightweight library** to expand service mesh capabilities to non-cloud environments by getting rid of the complexity of operating dedicated network proxies. It is not meant to be a complete service mesh replacement, but rather an extension. It integrates well with an Istio control plane, so applications using Nasp can be handled as standard Istio workloads.
 
 Nasp offers the most common functionality of a sidecar proxy, so it eases the developer burden for traffic management, observability, and security. Its range of capabilities includes:
@@ -33,16 +35,16 @@ Then, create and start an `IstioIntegrationHandler`:
 
 ```go
 istioHandlerConfig := &istio.IstioIntegrationHandlerConfig {
-	MetricsAddress: ":15090",
-	UseTLS:         true,
-	IstioCAConfigGetter: func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
-		return istio_ca.GetIstioCAClientConfig(clusterID, istioRevision)
-	},
+    MetricsAddress: ":15090",
+    UseTLS:         true,
+        IstioCAConfigGetter: func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
+        return istio_ca.GetIstioCAClientConfig(clusterID, istioRevision)
+    },
 }
 
 iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, klog.TODO())
 if err != nil {
-		panic(err)
+    panic(err)
 }
 
 iih.Run(ctx)
@@ -53,23 +55,22 @@ And finally, send an HTTP request through the Nasp transport layer:
 ```go
 transport, err := iih.GetHTTPTransport(http.DefaultTransport)
 if err != nil {
-	panic(err)
+    panic(err)
 }
 
 httpClient := &http.Client{
-	Transport: transport,
+    Transport: transport,
 }
 
 request, err := http.NewRequest("GET", url, nil)
 if err != nil {
-	return err
+    return err
 }
 
 response, err := httpClient.Do(request)
 if err != nil {
-	return err
+    return err
 }
-
 ```  
 
 ## Examples
