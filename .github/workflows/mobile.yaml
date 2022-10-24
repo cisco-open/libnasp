@@ -16,12 +16,9 @@ jobs:
 
       - name: Setup gomobile
         run: |
-          git clone --depth 1 -b set-work-dir https://github.com/aeddi/mobile gomobile-cache
-          cd gomobile-cache
-          go install ./cmd/gomobile
-          go install ./cmd/gobind
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-          sudo rm -rf ${TMPDIR}/build
 
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
