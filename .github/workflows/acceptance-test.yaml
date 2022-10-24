@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "*"
+
+env:
+  GO_VERSION: 1.19
+  GOFLAGS: -mod=readonly
+
+jobs:
+  build:
+    name: Acceptance test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go module dependencies
+        id: cache-go-module-dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-cache-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-mod-cache-${{ runner.os }}-${{ env.GO_VERSION }}
+            go-mod-cache-${{ runner.os }}
+            go-mod-cache
+
+      - name: Set Git refname
+        id: set-git-refname
+        run: echo "git_refname=$(echo "${{ github.ref }}" | sed -r 's@refs/(heads|pull|tags)/@@g')" >> $GITHUB_OUTPUT
+
+      - name: Build and load Heimdall Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: experimental/heimdall/Dockerfile
+          tags: heimdall:test
+          push: false
+
+      - name: Setup environment in kind
+        run: |
+          kind create cluster --wait 5m --config test/kind.yaml
+          kind load docker-image --name nasp-test-cluster heimdall
+          ./test/deploy-kind.sh
