@@ -38,16 +38,8 @@ jobs:
         id: set-git-refname
         run: echo "git_refname=$(echo "${{ github.ref }}" | sed -r 's@refs/(heads|pull|tags)/@@g')" >> $GITHUB_OUTPUT
 
-      - name: Build and load Heimdall Docker image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: experimental/heimdall/Dockerfile
-          tags: heimdall:test
-          push: false
-
       - name: Setup environment in kind
         run: |
           kind create cluster --wait 5m --config test/kind.yaml
-          kind load docker-image --name nasp-test-cluster heimdall:test
+          ./test/build-heimdall-image.sh
           ./test/deploy-kind.sh
