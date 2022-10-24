@@ -50,7 +50,10 @@ jobs:
         id: cache-licenses
         uses: actions/cache@v3
         with:
-          path: .licensei.cache
+          path: |
+            .licensei.cache
+            experimental/heimdall/.licensei.cache
+            experimental/mobile/.licensei.cache
           key: licensei-v1-${{ steps.set-git-refname.outputs.git_refname }}-${{ hashFiles('go.sum') }}
           restore-keys: |
             licensei-v1-${{ steps.set-git-refname.outputs.git_refname }}
@@ -59,7 +62,7 @@ jobs:
       - name: Download license information for dependencies
         env:
           GITHUB_TOKEN: ${{ github.token }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
-        run: make license-cache
+        run: make license-cache-all
 
       - name: List license information for dependencies
         env:
@@ -69,10 +72,10 @@ jobs:
       - name: Check dependency licenses
         env:
           GITHUB_TOKEN: ${{ github.token }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
-        run: make license-check
+        run: make license-check-all
 
       - name: Run unit tests
         run: make test
 
       - name: Run lint
-        run: make lint
+        run: make lint-all

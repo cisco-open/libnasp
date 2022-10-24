@@ -5,3 +5,5 @@ DerivedData/
 *.xcuserstate
 *.aar
 *.jar
+
+/.licensei.cache

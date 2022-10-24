@@ -89,7 +89,7 @@ func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error)
 		bodyReader = strings.NewReader(body)
 	}
 
-	request, err := http.NewRequest(method, url, bodyReader)
+	request, err := http.NewRequestWithContext(context.Background(), method, url, bodyReader)
 	if err != nil {
 		return nil, err
 	}
