@@ -1,8 +1,23 @@
 #!/bin/bash
 
+# Copyright (c) 2022 Cisco and/or its affiliates. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 set -euo pipefail
 
 DIRECTORY=`dirname $(readlink -f $0)`
+BUILD_IMAGE=${BUILD_IMAGE:-true}
 
 function log() {
     echo -e "\n>>> ${1}\n"
@@ -21,9 +36,11 @@ function create_sa() {
     fi
 }
 
-log "creating kind cluster"
-if ! $(kind create cluster --wait 5m --config ${DIRECTORY}/kind.yaml); then
-    echo ""
+if ! kind get kubeconfig --name nasp-test-cluster &> /dev/null; then
+    log "creating kind cluster"
+    kind create cluster --wait 5m --config ${DIRECTORY}/kind.yaml
+else
+    log "kind cluster already exists"
 fi
 
 log "setup and update helm repositories"
@@ -45,8 +62,11 @@ do
     sleep 2
 done
 
-log "build and load heimdall image"
-${DIRECTORY}/build-heimdall-image.sh
+if [ ${BUILD_IMAGE} == "true" ]; then
+    log "build and load heimdall image"
+    ${DIRECTORY}/../scripts/heimdall-image-build.sh
+    ${DIRECTORY}/../scripts/heimdall-image-load.sh
+fi
 
 log "install heimdall"
 create_and_label_namespace heimdall icp-v115x.istio-system
@@ -55,6 +75,9 @@ helm upgrade --install -n heimdall heimdall ${DIRECTORY}/../experimental/heimdal
 log "install echo service for testing"
 create_and_label_namespace testing icp-v115x.istio-system
 kubectl apply --namespace testing -f ${DIRECTORY}/echo-service.yaml
+
+log "waiting for echo service to be available"
+kubectl wait -n testing deployment/echo --for condition=Available=True --timeout=90s
 
 log "create external namespace"
 create_and_label_namespace external icp-v115x.istio-system
