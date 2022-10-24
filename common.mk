@@ -17,12 +17,13 @@ tidy: ## Execute go mod tidy
 	go mod download all
 
 ${REPO_ROOT}/bin/golangci-lint-${GOLANGCI_VERSION}:
+	@mkdir -p ${REPO_ROOT}/bin
 	@mkdir -p bin
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s -- -b ./bin/ v${GOLANGCI_VERSION}
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | bash -s v${GOLANGCI_VERSION}
 	@mv bin/golangci-lint $@
 
 ${REPO_ROOT}/bin/golangci-lint: ${REPO_ROOT}/bin/golangci-lint-${GOLANGCI_VERSION}
-	@ln -sf golangci-lint-${GOLANGCI_VERSION} bin/golangci-lint
+	@ln -sf golangci-lint-${GOLANGCI_VERSION} ${REPO_ROOT}/bin/golangci-lint
 
 .PHONY: lint
 lint: ${REPO_ROOT}/bin/golangci-lint ## Run linter
@@ -34,8 +35,14 @@ lint: ${REPO_ROOT}/bin/golangci-lint ## Run linter
 lint-fix: ${REPO_ROOT}/bin/golangci-lint ## Run linter
 	@${REPO_ROOT}/bin/golangci-lint run -c ${REPO_ROOT}/.golangci.yml --fix --timeout 2m
 
-${REPO_ROOT}/bin/licensei:
-	make -C ${REPO_ROOT} bin/licensei
+${REPO_ROOT}/bin/licensei: ${REPO_ROOT}/bin/licensei-${LICENSEI_VERSION}
+	@ln -sf licensei-${LICENSEI_VERSION} ${REPO_ROOT}/bin/licensei
+
+${REPO_ROOT}/bin/licensei-${LICENSEI_VERSION}:
+	@mkdir -p ${REPO_ROOT}/bin
+	@mkdir -p bin
+	curl -sfL https://raw.githubusercontent.com/goph/licensei/master/install.sh | bash -s v${LICENSEI_VERSION}
+	mv bin/licensei $@
 
 .PHONY: license-check
 license-check: ${REPO_ROOT}/bin/licensei ## Run license check

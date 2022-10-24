@@ -1,3 +1,4 @@
+REPO_ROOT=$(shell git rev-parse --show-toplevel)
 HEIMDALL_IMAGE ?= heimdall
 
 include common.mk
@@ -25,11 +26,11 @@ tidy-all:	## go mod tidy all go modules
 	./scripts/for_all_go_modules.sh --with-file Makefile -- make tidy
 
 .PHONY: license-cache-all
-license-cache-all: bin/licensei
+license-cache-all: ${REPO_ROOT}/bin/licensei
 	./scripts/for_all_go_modules.sh --with-file Makefile -- make license-cache
 
 .PHONY: license-check-all
-license-check-all: bin/licensei
+license-check-all: ${REPO_ROOT}/bin/licensei
 	./scripts/for_all_go_modules.sh --with-file Makefile -- make license-check
 
 .PHONY: fmt-all
@@ -41,11 +42,11 @@ vet-all:	## go vet all go modules
 	./scripts/for_all_go_modules.sh --with-file Makefile -- make vet
 
 .PHONY: lint-all
-lint-all: bin/golangci-lint ## lint the whole repo
+lint-all: ${REPO_ROOT}/bin/golangci-lint ## lint the whole repo
 	./scripts/for_all_go_modules.sh --parallel 1 -- make lint
 
 .PHONY: lint-fix-all
-lint-fix-all: bin/golangci-lint ## lint --fix the whole repo
+lint-fix-all: ${REPO_ROOT}/bin/golangci-lint ## lint --fix the whole repo
 	./scripts/for_all_go_modules.sh --parallel 1 -- make lint-fix
 
 .PHONY: mod-download-all
