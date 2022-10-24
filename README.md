@@ -1,6 +1,6 @@
 ## Nasp
 
-**THIS REPO IS CURRENTLY IN PREVIEW. THE API'S ARE NOT FINAL AND ARE SUBJECT TO CHANGE WITHOUT NOTICE.**
+**THIS REPO IS CURRENTLY IN PREVIEW. THE APIS ARE NOT FINAL AND ARE SUBJECT TO CHANGE WITHOUT NOTICE.**
 
 Nasp is an **open-source, lightweight library** to expand service mesh capabilities to non-cloud environments by getting rid of the complexity of operating dedicated network proxies. It is not meant to be a complete service mesh replacement, but rather an extension. It integrates well with an Istio control plane, so applications using Nasp can be handled as standard Istio workloads.
 
