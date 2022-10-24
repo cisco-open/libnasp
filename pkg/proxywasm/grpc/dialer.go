@@ -64,7 +64,11 @@ func (g *GRPCDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
 
 	if prop, _ := g.discoveryClient.GetHTTPClientPropertiesByHost(ctx, addr); prop != nil {
 		g.logger.V(3).Info("discovered overrides", "overrides", prop)
-		addr = prop.Address().String()
+		if endpointAddr, err := prop.Address(); err != nil {
+			return nil, err
+		} else {
+			addr = endpointAddr.String()
+		}
 		g.logger.V(3).Info("address override", "address", addr)
 		tlsConfig.ServerName = prop.ServerName()
 	}
