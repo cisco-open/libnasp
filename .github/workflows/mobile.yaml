@@ -28,6 +28,11 @@ jobs:
       #     ## limits ssh access and adds the ssh public key for the user which triggered the workflow
       #     limit-access-to-actor: true
 
+      - name: Build android framework
+        run: |
+          cd experimental/mobile
+          make android
+
       - name: Build ios framework
         run: |
           cd experimental/mobile
