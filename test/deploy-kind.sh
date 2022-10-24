@@ -3,6 +3,7 @@
 set -euo pipefail
 
 DIRECTORY=`dirname $(readlink -f $0)`
+BUILD_IMAGE=${BUILD_IMAGE:-true}
 
 function log() {
     echo -e "\n>>> ${1}\n"
@@ -47,8 +48,10 @@ do
     sleep 2
 done
 
-log "build and load heimdall image"
-${DIRECTORY}/build-heimdall-image.sh
+if [ ${BUILD_IMAGE} == "true" ]; then
+    log "build and load heimdall image"
+    ${DIRECTORY}/build-heimdall-image.sh
+fi
 
 log "install heimdall"
 create_and_label_namespace heimdall icp-v115x.istio-system
