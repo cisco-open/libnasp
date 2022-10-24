@@ -61,6 +61,9 @@ log "install echo service for testing"
 create_and_label_namespace testing icp-v115x.istio-system
 kubectl apply --namespace testing -f ${DIRECTORY}/echo-service.yaml
 
+log "waiting for echo service to be available"
+kubectl wait -n testing deployment/echo --for condition=Available=True --timeout=90s
+
 log "create external namespace"
 create_and_label_namespace external icp-v115x.istio-system
 

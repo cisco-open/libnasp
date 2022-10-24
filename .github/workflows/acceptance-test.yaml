@@ -52,7 +52,7 @@ jobs:
           tags: heimdall:test
           load: true
           push: false
-          
+
       - name: Create kind cluster and load Heimdall image
         run: |
           kind create cluster --wait 5m --config test/kind.yaml
