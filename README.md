@@ -33,16 +33,16 @@ Then, create and start an `IstioIntegrationHandler`:
 
 ```go
 istioHandlerConfig := &istio.IstioIntegrationHandlerConfig {
-	MetricsAddress: ":15090",
-	UseTLS:         true,
-	IstioCAConfigGetter: func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
-		return istio_ca.GetIstioCAClientConfig(clusterID, istioRevision)
-	},
+    MetricsAddress: ":15090",
+    UseTLS:         true,
+        IstioCAConfigGetter: func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
+        return istio_ca.GetIstioCAClientConfig(clusterID, istioRevision)
+    },
 }
 
 iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, klog.TODO())
 if err != nil {
-		panic(err)
+    panic(err)
 }
 
 iih.Run(ctx)
@@ -53,23 +53,22 @@ And finally, send an HTTP request through the Nasp transport layer:
 ```go
 transport, err := iih.GetHTTPTransport(http.DefaultTransport)
 if err != nil {
-	panic(err)
+    panic(err)
 }
 
 httpClient := &http.Client{
-	Transport: transport,
+    Transport: transport,
 }
 
 request, err := http.NewRequest("GET", url, nil)
 if err != nil {
-	return err
+    return err
 }
 
 response, err := httpClient.Do(request)
 if err != nil {
-	return err
+    return err
 }
-
 ```  
 
 ## Examples
