@@ -44,31 +44,11 @@ jobs:
         id: set-git-refname
         run: echo "git_refname=$(echo "${{ github.ref }}" | sed -r 's@refs/(heads|pull|tags)/@@g')" >> $GITHUB_OUTPUT
 
-      -
-        # Setting up Docker Buildx with docker-container driver is required
-        # at the moment to be able to use a subdirectory with Git context
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build Heimdall Docker image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: experimental/heimdall/Dockerfile
-          tags: heimdall:test
-          load: true
-          push: false
-
-      - name: Create kind cluster and load Heimdall image
-        run: |
-          kind create cluster --wait 5m --config test/kind.yaml
-          kind load docker-image --name nasp-test-cluster heimdall:test
-
       - name: Deploy to kind cluster
         run: |
           test/deploy-kind.sh
         env:
-          BUILD_IMAGE: false
+          DOCKER_BUILDKIT: "1"
 
       - name: Run simple go http client
         run: |
