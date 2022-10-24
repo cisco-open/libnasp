@@ -50,7 +50,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/lestrrat-go/backoff/v2 v2.0.8 // indirect
@@ -77,7 +77,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/sethvargo/go-envconfig v0.8.2 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/spf13/cobra v1.5.0 // indirect
+	github.com/spf13/cobra v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/tetratelabs/wazero v1.0.0-pre.1 // indirect
@@ -126,5 +126,7 @@ require (
 
 replace (
 	github.com/cisco-open/nasp => ../..
+	github.com/spf13/cobra => github.com/spf13/cobra v1.6.0
+	helm.sh/helm/v3 => helm.sh/helm/v3 v3.9.4
 	mosn.io/proxy-wasm-go-host => github.com/banzaicloud/proxy-wasm-go-host v0.0.0-20221016152507-38b921ff1f31
 )
