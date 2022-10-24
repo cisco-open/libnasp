@@ -346,7 +346,9 @@ func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, route 
 	} else {
 		// if unsupported LB policy is configured return first healthy endpoint from the list
 		endpoints := endpoint.Filter(cla.GetEndpoints(), endpoint.HasSocketAddress(), endpoint.WithHealthyStatus())
-		endpointAddress = endpoint.GetAddress(endpoints[0])
+		if len(endpoints) > 0 {
+			endpointAddress = endpoint.GetAddress(endpoints[0])
+		}
 	}
 
 	metadata := map[string]interface{}{
