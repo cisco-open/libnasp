@@ -16,14 +16,7 @@
 
 set -euo pipefail
 
-DIR=${!#}
-set -- "${@:1:$#-1}"
+KIND_CLUSTER_NAME=${KIND_CLUSTER_NAME:-nasp-test-cluster}
+IMAGE=${IMAGE:-heimdall:test}
 
-
-cd $DIR
-
-echo "[$DIR] Execute: $@"
-
-(
-  $@ 2>&1
-) | awk "{ print \"[$DIR] \" \$0 }"
+kind load docker-image -n "${KIND_CLUSTER_NAME}" "${IMAGE}"

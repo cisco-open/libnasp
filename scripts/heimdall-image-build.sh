@@ -16,14 +16,10 @@
 
 set -euo pipefail
 
-DIR=${!#}
-set -- "${@:1:$#-1}"
+DIRECTORY=`dirname $(readlink -f $0)`
+IMAGE="${IMAGE:-heimdall:test}"
 
-
-cd $DIR
-
-echo "[$DIR] Execute: $@"
-
-(
-  $@ 2>&1
-) | awk "{ print \"[$DIR] \" \$0 }"
+DOCKER_BUILDKIT=${DOCKER_BUILDKIT:-1} docker build "${DIRECTORY}/.." \
+    -f "${DIRECTORY}/../experimental/heimdall/Dockerfile" \
+    -t "${IMAGE}" \
+    --platform linux/amd64

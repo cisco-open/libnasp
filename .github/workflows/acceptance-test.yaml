@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "*"
+
+env:
+  GO_VERSION: 1.19
+  GOFLAGS: -mod=readonly
+
+jobs:
+  build:
+    name: Acceptance test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      # - name: Setup upterm session
+      #   uses: lhotari/action-upterm@v1
+      #   with:
+      #     ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+      #     limit-access-to-actor: true
+
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go module dependencies
+        id: cache-go-module-dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-cache-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-mod-cache-${{ runner.os }}-${{ env.GO_VERSION }}
+            go-mod-cache-${{ runner.os }}
+            go-mod-cache
+
+      - name: Set Git refname
+        id: set-git-refname
+        run: echo "git_refname=$(echo "${{ github.ref }}" | sed -r 's@refs/(heads|pull|tags)/@@g')" >> $GITHUB_OUTPUT
+
+      - name: Deploy to kind cluster
+        run: |
+          test/deploy-kind.sh
+        env:
+          DOCKER_BUILDKIT: "1"
+
+      - name: Run simple go http client
+        run: |
+          go run examples/http/main.go -mode=client -dump-client-response=1
