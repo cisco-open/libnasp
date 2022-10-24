@@ -21,6 +21,7 @@ jobs:
           go install ./cmd/gomobile
           go install ./cmd/gobind
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          sudo rm -rf ${TMPDIR}/build
 
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
