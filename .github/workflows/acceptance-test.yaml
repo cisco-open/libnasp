@@ -49,5 +49,5 @@ jobs:
       - name: Setup environment in kind
         run: |
           kind create cluster --wait 5m --config test/kind.yaml
-          kind load docker-image --name nasp-test-cluster heimdall
+          kind load docker-image --name nasp-test-cluster heimdall:test
           ./test/deploy-kind.sh
