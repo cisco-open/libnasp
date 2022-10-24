@@ -45,6 +45,21 @@ func (e *HostNotFoundError) Is(target error) bool {
 	return t.HostName == e.HostName
 }
 
+// NoEndpointFoundError is returned when no service endpoint can be selected
+// either due to there is no healthy endpoint or according to the load balancing weight
+// no endpoint that accepts traffic can be selected
+type NoEndpointFoundError struct{}
+
+func (e *NoEndpointFoundError) Error() string {
+	return "no healthy endpoint available"
+}
+
+func (e *NoEndpointFoundError) Is(target error) bool {
+	//nolint:errorlint
+	_, ok := target.(*NoEndpointFoundError)
+	return ok
+}
+
 // Client knows how to interact with a Management server through ADS API over gRPC stream using either SotW or the
 // incremental variant (see: https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol#four-variants)
 // of the xDS protocol to provide resource configurations received from the management server to consumer applications.
@@ -96,7 +111,7 @@ type ClientPropertiesResponse interface {
 // ClientProperties represents the properties for a workload to connect to a target service
 type ClientProperties interface {
 	// Address returns the address of the endpoint
-	Address() net.Addr
+	Address() (net.Addr, error)
 
 	// UseTLS returns true if the target service accept TLS traffic
 	UseTLS() bool

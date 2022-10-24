@@ -60,8 +60,11 @@ func (p *clientProperties) ServerName() string {
 	return p.serverName
 }
 
-func (p *clientProperties) Address() net.Addr {
-	return p.address
+func (p *clientProperties) Address() (net.Addr, error) {
+	if p.address == nil {
+		return nil, &NoEndpointFoundError{}
+	}
+	return p.address, nil
 }
 
 func (p *clientProperties) Metadata() map[string]interface{} {
@@ -70,8 +73,8 @@ func (p *clientProperties) Metadata() map[string]interface{} {
 
 func (p *clientProperties) String() string {
 	addr := ""
-	if p.Address() != nil {
-		addr = p.Address().String()
+	if epAddr, _ := p.Address(); epAddr != nil {
+		addr = epAddr.String()
 	}
 	return fmt.Sprintf("{serverName=%s, useTLS=%t, permissive=%t, address=%s}", p.ServerName(), p.UseTLS(), p.Permissive(), addr)
 }
