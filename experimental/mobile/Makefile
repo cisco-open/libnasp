@@ -1,3 +1,5 @@
+include ../../common.mk
+
 ios:
 	gomobile bind -target ios -v -cache ${TMPDIR}/build/ios -o examples/ios-istio/Istio.xcframework	
 
