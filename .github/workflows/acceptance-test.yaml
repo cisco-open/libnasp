@@ -63,3 +63,7 @@ jobs:
           test/deploy-kind.sh
         env:
           BUILD_IMAGE: false
+
+      - name: Run simple go http client
+        run: |
+          go run examples/http/main.go -mode=client -dump-client-response=1
