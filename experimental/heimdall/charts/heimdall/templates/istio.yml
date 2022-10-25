@@ -17,6 +17,9 @@ spec:
   runAsRoot: false
   service:
     externalTrafficPolicy: Local
+    metadata:
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: nlb
     ports:
     - name: https
       port: 443

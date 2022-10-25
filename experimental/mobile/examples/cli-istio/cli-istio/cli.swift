@@ -18,7 +18,7 @@ import ArgumentParser
 @main
 struct CliIstio: ParsableCommand {
     @Option
-    var heimdallURL = "https://af001efbdd27f4badba8b5e791d7417c-9dcfb5194711f057.elb.eu-central-1.amazonaws.com/config"
+    var heimdallURL = "https://a2ee965a005324185b398968d6cc7fae-859cb095d9ee0179.elb.eu-central-1.amazonaws.com/config"
     
     @Option
     var clientID = "9dcfb5194711f057"
