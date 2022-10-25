@@ -5,6 +5,10 @@ on:
     branches:
       - "*"
 
+env:
+  GO_VERSION: 1.19
+  GOFLAGS: -mod=readonly
+
 jobs:
   build:
     name: Mobile build
@@ -14,11 +18,15 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Setup gomobile
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup gomobile # echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
           go install golang.org/x/mobile/cmd/gobind@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
       - name: Setup upterm session
         uses: lhotari/action-upterm@v1
