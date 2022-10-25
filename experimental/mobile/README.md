@@ -12,13 +12,11 @@ It's worth to have a look at the official Go mobile wiki to have the initatial u
 
 ### Prepare gomobile first
 
-First we need to setup a custom Go mobile which has build cache-support to avoid suffering from very-long build times (this is optional, you can use the upstream version as well, and this should arrive upstrea as well): https://github.com/golang/go/issues/37902
+First we need to setup `gomobile` and `gobind` from the Go mobile project:
 
 ```bash
-git clone -b set-work-dir https://github.com/aeddi/mobile gomobile-cache
-cd gomobile-cache
-go install ./cmd/gomobile
-go install ./cmd/gobind
+go install golang.org/x/mobile/cmd/gomobile@latest
+go install golang.org/x/mobile/cmd/gobind@latest
 ```
 
 ### Compile the library to a specific mobile platform library
