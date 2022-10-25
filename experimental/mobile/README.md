@@ -43,3 +43,10 @@ make android
 
 There are two basic mobile applications in the `expermental/mobile/examples` directory for each aforementioned platform.
 It is a basic application, which can connect to an existing Istio cluster via getting the initial Istio configuration through [Heimdall](../heimdall).
+
+You need to create the Kubernetes ServiceAccounts for the mobile application after installing Heimdall, like:
+
+```bash
+kubectl create serviceaccount -n external ios-mobile
+kubectl create serviceaccount -n external android-mobile
+```
