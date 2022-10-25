@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: bin/
-          key: build-deps-v2-${{ steps.set-git-refname.outputs.git_refname }}-{{ hashFiles('scripts/download-deps.sh') }}
+          key: build-deps-v2-${{ steps.set-git-refname.outputs.git_refname }}-{{ hashFiles('common.mk') }}
           restore-keys: |
             build-deps-v2-${{ steps.set-git-refname.outputs.git_refname }}
             build-deps-v2

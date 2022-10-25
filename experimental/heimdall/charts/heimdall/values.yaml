@@ -1,10 +1,10 @@
 replicaCount: 1
 
 image:
-  repository: bonifaido/heimdall # ghcr.io/cisco-open/nasp-heimdall
+  repository: ghcr.io/cisco-open/nasp-heimdall
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+  tag: "main"
 
 imagePullSecrets: []
 nameOverride: ""
