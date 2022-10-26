@@ -50,3 +50,23 @@ You need to create the Kubernetes ServiceAccounts for the mobile application aft
 kubectl create serviceaccount -n external ios-mobile
 kubectl create serviceaccount -n external android-mobile
 ```
+
+#### Mobile mesh metrics with Prometheus (optional)
+
+In order to ship the mesh stats from the mobile application to Prometheus we use Pushgateway currently, which is required to be available on the target cluster (and inside the same mesh) that the mobile application talks to.
+
+Install the Pushgateway with Helm:
+
+```bash
+# Prepare the pushgateway namespace with istio enabled
+kubectl create namespace prometheus-pushgateway
+kubectl label namespace prometheus-pushgateway istio.io/rev=icp-v115x.istio-system
+
+# Install pushgateway into it
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm upgrade --install push-gw -n prometheus-pushgateway prometheus-community/prometheus-pushgateway
+
+# Create a ServiceMonitor to collect data from the Pushgateway (expects Prometheus operator)
+kubectl apply -f experimental/mobile/deploy/servicemonitor.yaml
+```
