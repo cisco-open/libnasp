@@ -21,5 +21,4 @@ IMAGE="${IMAGE:-heimdall:test}"
 
 DOCKER_BUILDKIT=${DOCKER_BUILDKIT:-1} docker build "${DIRECTORY}/.." \
     -f "${DIRECTORY}/../experimental/heimdall/Dockerfile" \
-    -t "${IMAGE}" \
-    --platform linux/amd64
+    -t "${IMAGE}"
