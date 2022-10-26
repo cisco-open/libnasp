@@ -3,8 +3,7 @@ name: Docker image [Heimdall]
 on:
   push:
     branches:
-      - '*'
-#      - 'main'
+      - 'main'
 
 env:
   PLATFORMS: linux/amd64,linux/arm64
