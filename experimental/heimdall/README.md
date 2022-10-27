@@ -43,3 +43,11 @@ A sample entry:
     "Service": "ios-mobile"
     }
 ```
+
+## Create the identity service account of the workload
+
+Create the service account referenced in the client entry in the pod namespace.
+
+```bash
+kubectl create sa -n external ios-mobile
+```
