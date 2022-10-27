@@ -430,8 +430,15 @@ func (c *client) handleResponse(ctx context.Context, response proto.Message) err
 func (c *client) handleSotWResponse(_ context.Context, resp *discovery_v3.DiscoveryResponse) error {
 	if r := c.resources[resp.GetTypeUrl()]; r != nil {
 		switch resp.GetTypeUrl() {
-		case resource_v3.ClusterType, resource_v3.EndpointType, resource_v3.ListenerType, resource_v3.RouteType:
-			err := r.SetResources(resp.GetTypeUrl(), resp.GetResources())
+		case resource_v3.ClusterType, resource_v3.ListenerType:
+			// In the SotW protocol variant the server includes the complete state of the world for
+			// Listener and Cluster resource types, thus we replace internal state with the received resources list
+			err := r.SetResources(resp.GetTypeUrl(), resp.GetResources(), true)
+			if err != nil {
+				return err
+			}
+		case resource_v3.EndpointType, resource_v3.RouteType:
+			err := r.SetResources(resp.GetTypeUrl(), resp.GetResources(), false)
 			if err != nil {
 				return err
 			}
