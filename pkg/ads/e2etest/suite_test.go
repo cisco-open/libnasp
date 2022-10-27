@@ -555,6 +555,47 @@ var _ = Describe("The management server is running", func() {
 			Expect(httpClientProps.ServerName()).To(Equal("outbound_.80_._.nginx-service.demo.svc.cluster.local"))
 			Expect(httpClientProps.Address()).To(Equal(&net.TCPAddr{IP: net.ParseIP("10.20.177.35"), Port: 80}))
 
+			// --- load config_v3.json which has the 'ngnix' workload added in config_v2 removed
+			err = protojson.Unmarshal(configV3, &config)
+			Expect(err).NotTo(HaveOccurred())
+
+			snapshot, err = createSnapshot("v3", &config)
+			Expect(err).NotTo(HaveOccurred())
+			err = snapshot.Consistent()
+			Expect(err).NotTo(HaveOccurred())
+
+			err = resourceConfigCache.SetSnapshot(ctx, "test-node-id", snapshot)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verify that http client properties are not returned for the removed HTTP workload listening at 10.10.104.42:80")
+			// Wait until Listener and Cluster resources corresponding to 10.10.104.42:80 gets deleted
+			Eventually(func() (ads.ClientProperties, error) {
+				httpResp, err = adsClient.GetHTTPClientPropertiesByHost(ctx, "10.10.104.42:80")
+				Expect(err).NotTo(HaveOccurred())
+				for {
+					select {
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					case r := <-httpResp:
+						return r.ClientProperties(), nil
+					}
+				}
+			}, testPollDuration, testPollInterval).Should(BeNil())
+
+			// Ensure that Listener and Cluster resources corresponding to 10.10.104.42:80 remain deleted
+			Consistently(func() (ads.ClientProperties, error) {
+				httpResp, err = adsClient.GetHTTPClientPropertiesByHost(ctx, "10.10.104.42:80")
+				Expect(err).NotTo(HaveOccurred())
+				for {
+					select {
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					case r := <-httpResp:
+						return r.ClientProperties(), nil
+					}
+				}
+			}, testPollDuration, testPollInterval).Should(BeNil())
+
 		})
 
 	}
