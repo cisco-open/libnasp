@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/url"
 	"reflect"
 	"strconv"
 
@@ -99,10 +100,12 @@ type tcpClientPropertiesObservable struct {
 }
 
 func (c *client) GetTCPClientPropertiesByHost(ctx context.Context, address string) (<-chan ClientPropertiesResponse, error) {
-	host, port, err := net.SplitHostPort(address)
+	url, err := url.Parse("tcp://" + address)
 	if err != nil {
 		return nil, err
 	}
+	host := url.Hostname()
+	port := url.Port()
 	if host == "" {
 		return nil, errors.New("missing host")
 	}

@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/url"
 	"reflect"
 	"strconv"
 
@@ -81,10 +82,12 @@ type listenerPropertiesObservable struct {
 // The caller must signal through the passed in Context when it's not interested in changes any more and the channel
 // can be closed. The channel is closed on ctx.Done()
 func (c *client) GetListenerProperties(ctx context.Context, address string) (<-chan ListenerPropertiesResponse, error) {
-	host, port, err := net.SplitHostPort(address)
+	url, err := url.Parse("tcp://" + address)
 	if err != nil {
 		return nil, err
 	}
+	host := url.Hostname()
+	port := url.Port()
 	if host == "" {
 		host = "0.0.0.0"
 	}
