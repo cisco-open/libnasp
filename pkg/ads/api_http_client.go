@@ -17,6 +17,7 @@ package ads
 import (
 	"context"
 	"net"
+	"net/url"
 	"reflect"
 	"strconv"
 
@@ -55,10 +56,12 @@ type httpClientPropertiesObservable struct {
 }
 
 func (c *client) GetHTTPClientPropertiesByHost(ctx context.Context, address string) (<-chan HTTPClientPropertiesResponse, error) {
-	host, port, err := net.SplitHostPort(address)
+	url, err := url.Parse("http://" + address)
 	if err != nil {
 		return nil, err
 	}
+	host := url.Hostname()
+	port := url.Port()
 	if host == "" {
 		return nil, errors.New("missing host or IP")
 	}
