@@ -61,7 +61,7 @@ type Instance struct {
 	moduleCtx context.Context
 	ctx       context.Context
 
-	hostModules map[string]wazero.ModuleBuilder
+	hostModules map[string]wazero.HostModuleBuilder
 
 	startFunctions []string
 
@@ -87,7 +87,7 @@ func NewWazeroInstance(ctx context.Context, r wazero.Runtime, options ...Instanc
 		r:              r,
 		lock:           sync.Mutex{},
 		ctx:            ctx,
-		hostModules:    make(map[string]wazero.ModuleBuilder),
+		hostModules:    make(map[string]wazero.HostModuleBuilder),
 		startFunctions: []string{"_start", "_initialize"},
 	}
 	ins.stopCond = sync.NewCond(&ins.lock)
@@ -217,10 +217,10 @@ func (w *Instance) RegisterFunc(namespace string, funcName string, f interface{}
 	}
 
 	if _, ok := w.hostModules[namespace]; !ok {
-		w.hostModules[namespace] = w.r.NewModuleBuilder(namespace)
+		w.hostModules[namespace] = w.r.NewHostModuleBuilder(namespace)
 	}
 
-	w.hostModules[namespace].ExportFunction(funcName, f)
+	w.hostModules[namespace].NewFunctionBuilder().WithFunc(f).Export(funcName)
 
 	return nil
 }
