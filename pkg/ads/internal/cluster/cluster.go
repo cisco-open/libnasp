@@ -161,7 +161,7 @@ func GetTlsServerName(cluster *envoy_config_cluster_v3.Cluster) string {
 	return ""
 }
 
-// UsesTls returns true if the endpoints in the given selectedCluster accepts TLS traffic
+// UsesTls returns true if the endpoints in the given cluster accepts TLS traffic
 func UsesTls(cluster *envoy_config_cluster_v3.Cluster) bool {
 	if cluster.GetTransportSocketMatches() != nil {
 		for _, tsm := range cluster.GetTransportSocketMatches() {
@@ -176,7 +176,7 @@ func UsesTls(cluster *envoy_config_cluster_v3.Cluster) bool {
 	return cluster.GetTransportSocket().GetName() == wellknown.TransportSocketTLS
 }
 
-// IsPermissive returns true if the endpoints in the given selectedCluster can accept both plaintext and mutual TLS traffic
+// IsPermissive returns true if the endpoints in the given cluster can accept both plaintext and mutual TLS traffic
 func IsPermissive(cluster *envoy_config_cluster_v3.Cluster) bool {
 	if cluster.GetTransportSocketMatches() != nil {
 		tlsTransportSocket := false
@@ -191,7 +191,7 @@ func IsPermissive(cluster *envoy_config_cluster_v3.Cluster) bool {
 		}
 
 		// If there are transport socket matches for both tls and raw_buffer than the
-		// endpoints in the given selectedCluster can accept both plaintext and mutual TLS traffic
+		// endpoints in the given cluster can accept both plaintext and mutual TLS traffic
 		return tlsTransportSocket && rawBufferTransportSocket
 	}
 

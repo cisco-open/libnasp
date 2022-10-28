@@ -522,6 +522,80 @@ var _ = Describe("The management server is running", func() {
 				&net.TCPAddr{IP: net.ParseIP("10.20.166.2"), Port: 8080},
 			))
 
+			// --- load config_v2.json which contains a newly added workload named 'ngnix' in the demo namespace compared to config_v1
+			err = protojson.Unmarshal(configV2, &config)
+			Expect(err).NotTo(HaveOccurred())
+
+			snapshot, err = createSnapshot("v2", &config)
+			Expect(err).NotTo(HaveOccurred())
+			err = snapshot.Consistent()
+			Expect(err).NotTo(HaveOccurred())
+
+			err = resourceConfigCache.SetSnapshot(ctx, "test-node-id", snapshot)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verify that correct http client properties are returned for the newly added HTTP workload listening at 10.10.104.42:80")
+			httpResp, err = adsClient.GetHTTPClientPropertiesByHost(ctx, "10.10.104.42:80")
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() error {
+				for {
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case r := <-httpResp:
+						httpClientProps = r.ClientProperties()
+						return r.Error()
+					}
+				}
+			}, testPollDuration, testPollInterval).Should(Succeed())
+
+			Expect(httpClientProps.Permissive()).To(BeTrue())
+			Expect(httpClientProps.UseTLS()).To(BeTrue())
+			Expect(httpClientProps.ServerName()).To(Equal("outbound_.80_._.nginx-service.demo.svc.cluster.local"))
+			Expect(httpClientProps.Address()).To(Equal(&net.TCPAddr{IP: net.ParseIP("10.20.177.35"), Port: 80}))
+
+			// --- load config_v3.json which has the 'ngnix' workload added in config_v2 removed
+			err = protojson.Unmarshal(configV3, &config)
+			Expect(err).NotTo(HaveOccurred())
+
+			snapshot, err = createSnapshot("v3", &config)
+			Expect(err).NotTo(HaveOccurred())
+			err = snapshot.Consistent()
+			Expect(err).NotTo(HaveOccurred())
+
+			err = resourceConfigCache.SetSnapshot(ctx, "test-node-id", snapshot)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verify that http client properties are not returned for the removed HTTP workload listening at 10.10.104.42:80")
+			// Wait until Listener and Cluster resources corresponding to 10.10.104.42:80 gets deleted
+			Eventually(func() (ads.ClientProperties, error) {
+				httpResp, err = adsClient.GetHTTPClientPropertiesByHost(ctx, "10.10.104.42:80")
+				Expect(err).NotTo(HaveOccurred())
+				for {
+					select {
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					case r := <-httpResp:
+						return r.ClientProperties(), nil
+					}
+				}
+			}, testPollDuration, testPollInterval).Should(BeNil())
+
+			// Ensure that Listener and Cluster resources corresponding to 10.10.104.42:80 remain deleted
+			Consistently(func() (ads.ClientProperties, error) {
+				httpResp, err = adsClient.GetHTTPClientPropertiesByHost(ctx, "10.10.104.42:80")
+				Expect(err).NotTo(HaveOccurred())
+				for {
+					select {
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					case r := <-httpResp:
+						return r.ClientProperties(), nil
+					}
+				}
+			}, testPollDuration, testPollInterval).Should(BeNil())
+
 		})
 
 	}

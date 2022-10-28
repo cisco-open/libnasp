@@ -24,4 +24,12 @@ var (
 	// contains three echo endpoints in the demo namespace as the 'echo' deployment has been scaled up to three replicas
 	//go:embed config_v1.json
 	configV1 []byte
+
+	// contains a newly added workload named 'ngnix' in the demo namespace compared to config_v1
+	//go:embed config_v2.json
+	configV2 []byte
+
+	// has the 'ngnix' workload added in config_v2 removed
+	//go:embed config_v3.json
+	configV3 []byte
 )

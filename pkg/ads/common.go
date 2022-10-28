@@ -270,14 +270,19 @@ func (s *resourceCache) AddIstioResources(resourceType resource_v3.Type, resourc
 }
 
 // SetResources unmarshals the given resources collection into typed objects
-// and assigns it to the internal state
-func (s *resourceCache) SetResources(resourceType resource_v3.Type, resources []*ptypes.Any) error {
+// and assigns it to/updates with - the internal state. If replace is set to true than internal state
+// is replaced with the provided resources collection
+func (s *resourceCache) SetResources(resourceType resource_v3.Type, resources []*ptypes.Any, replace bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if len(resources) == 0 {
 		s.resources = nil
 		return nil
+	}
+
+	if replace {
+		s.resources = nil
 	}
 
 	typedResources := make(map[string]proto.Message, len(resources))
@@ -308,6 +313,7 @@ func (s *resourceCache) SetResources(resourceType resource_v3.Type, resources []
 
 		// ignore resources we are not interested in case of explicit resource subscription
 		if !s.IsSubscribedFor(name) {
+			delete(s.resources, name)
 			continue
 		}
 
