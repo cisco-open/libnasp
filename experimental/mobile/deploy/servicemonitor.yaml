@@ -25,12 +25,7 @@ spec:
       targetLabel: destination_cluster_id
     path: /metrics
     port: http
-    scheme: https
-    tlsConfig:
-      caFile: /etc/istio-certs/root-cert.pem
-      certFile: /etc/istio-certs/cert-chain.pem
-      insecureSkipVerify: true
-      keyFile: /etc/istio-certs/key.pem
+    scheme: http
   namespaceSelector:
     matchNames:
     - prometheus-pushgateway
