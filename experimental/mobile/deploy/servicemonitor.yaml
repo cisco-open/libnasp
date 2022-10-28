@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pushgateway
+  namespace: prometheus-pushgateway
+spec:
+  endpoints:
+  - interval: 10s
+    metricRelabelings:
+    - action: replace
+      sourceLabels:
+      - source_cluster
+      targetLabel: source_cluster_name
+    - action: replace
+      sourceLabels:
+      - destination_cluster
+      targetLabel: destination_cluster_name
+    - action: replace
+      sourceLabels:
+      - source_cluster
+      targetLabel: source_cluster_id
+    - action: replace
+      sourceLabels:
+      - destination_cluster
+      targetLabel: destination_cluster_id
+    path: /metrics
+    port: http
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - prometheus-pushgateway
+  selector:
+    matchLabels:
+      app: prometheus-pushgateway
+      release: push-gw
