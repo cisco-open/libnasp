@@ -154,7 +154,7 @@ func (c *client) getHTTPClientPropertiesByHost(input getHTTPClientPropertiesByHo
 
 	cluster, route, err := c.getHttpClientTargetCluster(input.host, int(input.port))
 	if err != nil {
-		return nil, errors.WrapIf(err, "couldn't get target selectedCluster")
+		return nil, errors.WrapIf(err, "couldn't get target cluster")
 	}
 
 	clientProps, err := c.newClientProperties(cluster, route)
