@@ -30,7 +30,7 @@ type wazeroVM struct {
 }
 
 func NewVM(ctx context.Context, logger logr.Logger) api.WasmRuntime {
-	runtime := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithWasmCore2())
+	runtime := wazero.NewRuntime(ctx)
 
 	return &wazeroVM{
 		runtime: runtime,
@@ -50,7 +50,7 @@ func (vm *wazeroVM) Runtime() wazero.Runtime {
 }
 
 func (vm *wazeroVM) NewModule(wasmBytes []byte) api.WasmModule {
-	compiledModule, err := vm.runtime.CompileModule(context.Background(), wasmBytes, wazero.NewCompileConfig())
+	compiledModule, err := vm.runtime.CompileModule(context.Background(), wasmBytes)
 	if err != nil {
 		vm.logger.Error(err, "could not compile module")
 		return nil
