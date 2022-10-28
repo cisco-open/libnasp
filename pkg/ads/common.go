@@ -373,6 +373,7 @@ func (s *resourceCache) SetIstioResources(resourceType resource_v3.Type, resourc
 				}
 				// ignore resources we are not interested in case of explicit resource subscription
 				if !s.IsSubscribedFor(name) {
+					delete(s.resources, name)
 					continue
 				}
 
