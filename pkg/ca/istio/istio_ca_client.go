@@ -20,29 +20,28 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"emperror.dev/errors"
+	"github.com/go-logr/logr"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/structpb"
+	"k8s.io/klog/v2"
 
 	pb "istio.io/api/security/v1alpha1"
 	"istio.io/istio/pkg/security"
 	"istio.io/istio/security/pkg/nodeagent/caclient"
-	"istio.io/pkg/log"
 )
 
 const (
 	bearerTokenPrefix = "Bearer "
 )
-
-var citadelClientLog = log.RegisterScope("citadelclient", "citadel client debugging", 0)
 
 type CitadelClient struct {
 	// It means enable tls connection to Citadel if this is not nil.
@@ -52,6 +51,7 @@ type CitadelClient struct {
 	provider  *caclient.TokenProvider
 	opts      *security.Options
 	usingMtls *atomic.Bool
+	logger    logr.Logger
 }
 
 type TLSOptions struct {
@@ -60,19 +60,24 @@ type TLSOptions struct {
 	CertPEM     []byte
 }
 
+func init() {
+	// clear zaplogger set by istio log package
+	klog.ClearLogger()
+}
+
 // NewCitadelClient create a CA client for Citadel.
-func NewCitadelClient(opts *security.Options, tlsOpts *TLSOptions) (*CitadelClient, error) {
+func NewCitadelClient(opts *security.Options, tlsOpts *TLSOptions, logger logr.Logger) (*CitadelClient, error) {
 	c := &CitadelClient{
 		tlsOpts:   tlsOpts,
 		opts:      opts,
 		provider:  caclient.NewCATokenProvider(opts),
 		usingMtls: atomic.NewBool(false),
+		logger:    logger.WithName("citadel-client"),
 	}
 
 	conn, err := c.buildConnection()
 	if err != nil {
-		citadelClientLog.Errorf("Failed to connect to endpoint %s: %v", opts.CAEndpoint, err)
-		return nil, fmt.Errorf("failed to connect to endpoint %s", opts.CAEndpoint)
+		return nil, errors.WrapIfWithDetails(err, "failed to connect to endpoint", "endpoint", opts.CAEndpoint)
 	}
 	c.conn = conn
 	c.client = pb.NewIstioCertificateServiceClient(conn)
@@ -118,7 +123,7 @@ func (c *CitadelClient) CSRSign(csrPEM []byte, certValidTTLInSec int64) ([]strin
 }
 
 func (c *CitadelClient) getTLSDialOption() (grpc.DialOption, error) {
-	certPool, err := getRootCertificate(c.tlsOpts.RootCertPEM)
+	certPool, err := c.getRootCertificate(c.tlsOpts.RootCertPEM)
 	if err != nil {
 		return nil, err
 	}
@@ -130,11 +135,12 @@ func (c *CitadelClient) getTLSDialOption() (grpc.DialOption, error) {
 				var isExpired bool
 				isExpired, err = c.isCertExpired(cert)
 				if err != nil {
-					citadelClientLog.Warnf("cannot parse the cert chain, using token instead: %v", err)
+					err = errors.WrapIf(err, "cannot parse the cert chain, using token instead")
+					c.logger.V(1).Info(err.Error())
 					return &certificate, nil
 				}
 				if isExpired {
-					citadelClientLog.Warnf("cert expired, using token instead")
+					c.logger.V(1).Info("cert expired, using token instead")
 					return &certificate, nil
 				}
 
@@ -163,14 +169,14 @@ func (c *CitadelClient) getTLSDialOption() (grpc.DialOption, error) {
 	return grpc.WithTransportCredentials(transportCreds), nil
 }
 
-func getRootCertificate(rootCertPEM []byte) (*x509.CertPool, error) {
+func (c *CitadelClient) getRootCertificate(rootCertPEM []byte) (*x509.CertPool, error) {
 	if rootCertPEM == nil {
 		// No explicit certificate - assume the citadel-compatible server uses a public cert
 		certPool, err := x509.SystemCertPool()
 		if err != nil {
 			return nil, err
 		}
-		citadelClientLog.Info("Citadel client using system cert")
+		c.logger.Info("citadel client using system cert")
 		return certPool, nil
 	}
 
@@ -179,7 +185,7 @@ func getRootCertificate(rootCertPEM []byte) (*x509.CertPool, error) {
 	if !ok {
 		return nil, fmt.Errorf("failed to append certificates")
 	}
-	citadelClientLog.Info("Citadel client using custom root certs")
+	c.logger.Info("citadel client using custom root certs")
 	return certPool, nil
 }
 
@@ -215,8 +221,7 @@ func (c *CitadelClient) buildConnection() (*grpc.ClientConn, error) {
 		grpc.WithPerRPCCredentials(c.provider),
 		security.CARetryInterceptor())
 	if err != nil {
-		citadelClientLog.Errorf("Failed to connect to endpoint %s: %v", c.opts.CAEndpoint, err)
-		return nil, fmt.Errorf("failed to connect to endpoint %s", c.opts.CAEndpoint)
+		return nil, errors.WrapIfWithDetails(err, "failed to connect to endpoint", "endpoint", c.opts.CAEndpoint)
 	}
 
 	return conn, nil
@@ -243,7 +248,7 @@ func (c *CitadelClient) reconnectIfNeeded() error {
 	}
 	c.conn = conn
 	c.client = pb.NewIstioCertificateServiceClient(conn)
-	citadelClientLog.Errorf("recreated connection")
+	c.logger.V(1).Info("recreated connection")
 	return nil
 }
 
