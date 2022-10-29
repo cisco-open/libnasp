@@ -99,7 +99,7 @@ func (c *IstioCAClient) GetCertificate(hostname string, ttl time.Duration) (ca.C
 		},
 	}, &TLSOptions{
 		RootCertPEM: c.config.CApem,
-	})
+	}, c.logger)
 	if err != nil {
 		return nil, err
 	}
