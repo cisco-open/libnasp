@@ -152,7 +152,7 @@ func (s *stream) HandleHTTPRequest(req api.HTTPRequest) error {
 	s.Set("request.body", body)
 	req.SetBody(io.NopCloser(body))
 
-	buf := make([]byte, 5)
+	buf := make([]byte, 4096)
 	var endOfStream int32
 	for {
 		nr, err := originalBody.Read(buf)
