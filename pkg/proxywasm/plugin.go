@@ -20,9 +20,9 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
-
 	proxywasm "mosn.io/proxy-wasm-go-host/proxywasm/v1"
 
+	"github.com/cisco-open/nasp/pkg/dotn"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 )
 
@@ -43,6 +43,10 @@ type wasmPlugin struct {
 	borrowedInstances      map[api.WasmInstance]uint32
 
 	lock sync.RWMutex
+
+	filterContexts     map[api.WasmInstance]*sync.Map
+	filterContextsLock sync.RWMutex
+	instanceContexts   *sync.Map
 }
 
 func (p *wasmPlugin) InstanceCount() uint32 {
@@ -240,7 +244,13 @@ func (p *wasmPlugin) getPluginConfig() (content []byte, size int) {
 	return
 }
 
-func (p *wasmPlugin) getABIContext(instance api.WasmInstance) proxywasm.ContextHandler {
+func (p *wasmPlugin) GetWasmInstanceContext(instance api.WasmInstance) api.WasmInstanceContext {
+	if v, ok := p.instanceContexts.Load(instance); ok {
+		if iwc, ok := v.(api.WasmInstanceContext); ok {
+			return iwc
+		}
+	}
+
 	hostOptions := []HostFunctionsOption{
 		SetHostFunctionsLogger(p.logger),
 	}
@@ -251,23 +261,44 @@ func (p *wasmPlugin) getABIContext(instance api.WasmInstance) proxywasm.ContextH
 		}
 	}
 
-	return &proxywasm.ABIContext{
-		Imports:  NewHostFunctions(p.ctx, hostOptions...),
+	instanceProperties := NewPropertyHolderWrapper(dotn.New(), p.ctx)
+
+	ctx := &proxywasm.ABIContext{
+		Imports:  NewHostFunctions(instanceProperties, hostOptions...),
 		Instance: instance,
 	}
+
+	RootABIContextProperty(instanceProperties).Set(ctx)
+
+	iwc := &instanceContext{
+		instance:       instance,
+		properties:     instanceProperties,
+		contextHandler: ctx,
+	}
+
+	p.instanceContexts.Store(instance, iwc)
+
+	return iwc
 }
 
 func (p *wasmPlugin) stopInstance(instance api.WasmInstance) error {
-	ctx := p.getABIContext(instance)
+	ctx := p.GetWasmInstanceContext(instance).GetABIContext()
 
 	instance.Lock(ctx)
 	defer instance.Unlock()
 
-	return StopWasmContext(p.ctx.ID(), ctx, p.logger)
+	if err := StopWasmContext(p.ctx.ID(), ctx, p.logger); err != nil {
+		return err
+	}
+
+	p.removeInstanceFromfilterContexts(instance)
+	p.instanceContexts.Delete(instance)
+
+	return nil
 }
 
 func (p *wasmPlugin) startInstance(instance api.WasmInstance) error {
-	ctx := p.getABIContext(instance)
+	ctx := p.GetWasmInstanceContext(instance).GetABIContext()
 
 	instance.Lock(ctx)
 	defer instance.Unlock()
@@ -296,4 +327,72 @@ func (p *wasmPlugin) startInstance(instance api.WasmInstance) error {
 	}
 
 	return nil
+}
+
+func (p *wasmPlugin) RegisterFilterContext(instance api.WasmInstance, filterContext api.FilterContext) {
+	p.filterContextsLock.Lock()
+	defer p.filterContextsLock.Unlock()
+
+	if _, ok := p.filterContexts[instance]; !ok {
+		p.filterContexts[instance] = &sync.Map{}
+	}
+
+	p.logger.V(2).Info("register filter context", "id", filterContext.ID())
+
+	p.filterContexts[instance].Store(filterContext.ID(), filterContext)
+}
+
+func (p *wasmPlugin) UnregisterFilterContext(instance api.WasmInstance, filterContext api.FilterContext) {
+	p.filterContextsLock.Lock()
+	defer p.filterContextsLock.Unlock()
+
+	if _, ok := p.filterContexts[instance]; !ok {
+		return
+	}
+
+	p.logger.V(2).Info("unregister filter context", "id", filterContext.ID())
+
+	p.filterContexts[instance].Delete(filterContext.ID())
+}
+
+func (p *wasmPlugin) GetFilterContext(instance api.WasmInstance, id int32) (api.FilterContext, bool) {
+	p.filterContextsLock.RLock()
+	defer p.filterContextsLock.RUnlock()
+
+	if _, ok := p.filterContexts[instance]; !ok {
+		return nil, false
+	}
+
+	if v, ok := p.filterContexts[instance].Load(id); !ok {
+		return nil, false
+	} else if fc, ok := v.(api.FilterContext); ok {
+		return fc, true
+	}
+
+	return nil, false
+}
+
+func (p *wasmPlugin) removeInstanceFromfilterContexts(instance api.WasmInstance) {
+	p.filterContextsLock.Lock()
+	defer p.filterContextsLock.Unlock()
+
+	delete(p.filterContexts, instance)
+}
+
+type instanceContext struct {
+	instance       api.WasmInstance
+	properties     api.PropertyHolder
+	contextHandler proxywasm.ContextHandler
+}
+
+func (iwc *instanceContext) GetInstance() api.WasmInstance {
+	return iwc.instance
+}
+
+func (iwc *instanceContext) GetProperties() api.PropertyHolder {
+	return iwc.properties
+}
+
+func (iwc *instanceContext) GetABIContext() proxywasm.ContextHandler {
+	return iwc.contextHandler
 }

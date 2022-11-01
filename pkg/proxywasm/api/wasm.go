@@ -24,6 +24,12 @@ type WasmResult = v1.WasmResult
 
 type WasmInstance = common.WasmInstance
 
+type WasmInstanceContext interface {
+	GetInstance() common.WasmInstance
+	GetProperties() PropertyHolder
+	GetABIContext() v1.ContextHandler
+}
+
 type WasmModule interface {
 	Init()
 	NewInstance() (WasmInstance, error)

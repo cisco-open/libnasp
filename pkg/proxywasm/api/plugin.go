@@ -46,6 +46,12 @@ type WasmPlugin interface { //nolint:interfacebloat // we don't care
 	VM() WasmVM
 	Context() Context
 	Logger() logr.Logger
+
+	RegisterFilterContext(instance WasmInstance, filterContext FilterContext)
+	UnregisterFilterContext(instance WasmInstance, filterContext FilterContext)
+	GetFilterContext(instance WasmInstance, id int32) (FilterContext, bool)
+
+	GetWasmInstanceContext(instance WasmInstance) WasmInstanceContext
 }
 
 type WasmPluginManager interface {

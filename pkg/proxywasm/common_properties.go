@@ -1,0 +1,87 @@
+// Copyright (c) 2022 Cisco and/or its affiliates. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//       https://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
+package proxywasm
+
+import (
+	v1 "mosn.io/proxy-wasm-go-host/proxywasm/v1"
+
+	"github.com/cisco-open/nasp/pkg/proxywasm/api"
+)
+
+type tickerDoneChannelProperty struct {
+	api.PropertyHolder
+}
+
+func TickerDoneChannelProperty(p api.PropertyHolder) tickerDoneChannelProperty {
+	return tickerDoneChannelProperty{p}
+}
+
+func (p tickerDoneChannelProperty) Get() (chan bool, bool) {
+	if v, ok := p.PropertyHolder.Get("ticker.done_channel"); ok {
+		if done, ok := v.(chan bool); ok {
+			done <- true
+		}
+	}
+
+	return nil, false
+}
+
+func (p tickerDoneChannelProperty) Set(done chan bool) {
+	p.PropertyHolder.Set("ticker.done_channel", done)
+}
+
+type pluginProperty struct {
+	api.PropertyHolder
+}
+
+func PluginProperty(p api.PropertyHolder) pluginProperty {
+	return pluginProperty{p}
+}
+
+func (p pluginProperty) Get() (api.WasmPlugin, bool) {
+	if v, ok := p.PropertyHolder.Get("plugin"); ok {
+		if plugin, ok := v.(api.WasmPlugin); ok {
+			return plugin, true
+		}
+	}
+
+	return nil, false
+}
+
+func (p pluginProperty) Set(plugin api.WasmPlugin) {
+	p.PropertyHolder.Set("plugin", plugin)
+}
+
+type rootABIContextProperty struct {
+	api.PropertyHolder
+}
+
+func RootABIContextProperty(p api.PropertyHolder) rootABIContextProperty {
+	return rootABIContextProperty{p}
+}
+
+func (p rootABIContextProperty) Get() (v1.ContextHandler, bool) {
+	if v, ok := p.PropertyHolder.Get("root_abi_context"); ok {
+		if ctx, ok := v.(v1.ContextHandler); ok {
+			return ctx, true
+		}
+	}
+
+	return nil, false
+}
+
+func (p rootABIContextProperty) Set(ctx v1.ContextHandler) {
+	p.PropertyHolder.Set("root_abi_context", ctx)
+}
