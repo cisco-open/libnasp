@@ -58,7 +58,7 @@ shift
 
 collectAllModules() {
   echo .
-  find */* -name go.mod  | sed 's?/go.mod$??'
+  find . -name go.mod  | sed 's?/go.mod$??'
   if [ -n "${ADDITIONAL_TARGETS}" ]; then
     for T in ${ADDITIONAL_TARGETS}; do
       echo $T
