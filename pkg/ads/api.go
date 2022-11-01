@@ -20,11 +20,13 @@ import (
 	"net"
 	"time"
 
-	"github.com/cisco-open/nasp/pkg/ads/config"
-
 	"emperror.dev/errors"
 	backoffv4 "github.com/cenkalti/backoff/v4"
 	"github.com/go-logr/logr"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/cisco-open/nasp/pkg/ads/config"
 )
 
 // HostNotFoundError is returned when the given host name is not found in Istio's NDS
@@ -165,7 +167,7 @@ func Connect(ctx context.Context, config *config.ClientConfig) (Client, error) {
 		backoffv4.Retry(func() error {
 			err := apiClient.connectToStream(ctx)
 			if err != nil {
-				if errors.Is(err, context.Canceled) {
+				if errors.Is(err, context.Canceled) || status.Code(err) == codes.Canceled {
 					return nil // exiting as the context has been cancelled
 				}
 				log.Error(err, "connection to stream broken, retrying ...")
