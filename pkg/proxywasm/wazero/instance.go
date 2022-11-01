@@ -44,7 +44,8 @@ var (
 	ErrPutData                     = errors.New("could not put data to memory")
 	ErrGetData                     = errors.New("could not get data to memory")
 	ErrGetExportsMemNotImplemented = errors.New("GetExportsMem not implemented")
-	ErrMalloc                      = errors.New("could not malloc")
+	ErrMallocFunctionNotFound      = errors.New("could not find memory allocate function")
+	ErrMalloc                      = errors.New("could not allocate memory")
 )
 
 type Instance struct {
@@ -63,7 +64,8 @@ type Instance struct {
 
 	hostModules map[string]wazero.HostModuleBuilder
 
-	startFunctions []string
+	startFunctions  []string
+	mallocFunctions []string
 
 	logger logr.Logger
 }
@@ -76,6 +78,12 @@ func StartFunctionsOption(names ...string) InstanceOptions {
 	}
 }
 
+func MallocFunctionsOption(names ...string) InstanceOptions {
+	return func(instance *Instance) {
+		instance.mallocFunctions = names
+	}
+}
+
 func SetLoggerOption(logger logr.Logger) InstanceOptions {
 	return func(instance *Instance) {
 		instance.logger = logger
@@ -84,11 +92,12 @@ func SetLoggerOption(logger logr.Logger) InstanceOptions {
 
 func NewWazeroInstance(ctx context.Context, r wazero.Runtime, options ...InstanceOptions) *Instance {
 	ins := &Instance{
-		r:              r,
-		lock:           sync.Mutex{},
-		ctx:            ctx,
-		hostModules:    make(map[string]wazero.HostModuleBuilder),
-		startFunctions: []string{"_start", "_initialize"},
+		r:               r,
+		lock:            sync.Mutex{},
+		ctx:             ctx,
+		hostModules:     make(map[string]wazero.HostModuleBuilder),
+		startFunctions:  []string{"_start", "_initialize"},
+		mallocFunctions: []string{"proxy_on_memory_allocate", "malloc"},
 	}
 	ins.stopCond = sync.NewCond(&ins.lock)
 
@@ -230,9 +239,25 @@ func (w *Instance) Malloc(size int32) (uint64, error) {
 		return 0, ErrInstanceNotStart
 	}
 
-	malloc, err := w.GetExportsFunc("malloc")
-	if err != nil {
-		return 0, err
+	var f api.Function
+	mallocFuncNames := w.mallocFunctions
+	for _, fn := range mallocFuncNames {
+		if f == nil {
+			f = w.module.ExportedFunction(fn)
+		}
+		if f != nil {
+			break
+		}
+	}
+
+	if f == nil {
+		return 0, ErrMallocFunctionNotFound
+	}
+
+	malloc := &Call{
+		Function: f,
+
+		logger: w.logger,
 	}
 
 	addr, err := malloc.Call(size)
