@@ -19,6 +19,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	klog "k8s.io/klog/v2"
@@ -215,7 +216,102 @@ func (f *HostFunctions) SendHttpResp(respCode int32, respCodeDetail common.IoBuf
 	return v1.WasmResultNotFound
 }
 
+func (f *HostFunctions) SetEffectiveContextID(contextID int32) v1.WasmResult {
+	var rootContext v1.ContextHandler
+	if ctx, ok := RootABIContextProperty(f.properties).Get(); ok {
+		rootContext = ctx
+	}
+	if rootContext == nil {
+		return v1.WasmResultInternalFailure
+	}
+
+	var plugin api.WasmPlugin
+	if plug, ok := PluginProperty(f.properties).Get(); ok {
+		plugin = plug
+	}
+	if plugin == nil {
+		return v1.WasmResultInternalFailure
+	}
+
+	// root context
+	if contextID == plugin.Context().ID() {
+		rootContext.GetInstance().SetData(rootContext)
+
+		return v1.WasmResultOk
+	}
+
+	// filter context
+	fc, found := plugin.GetFilterContext(rootContext.GetInstance(), contextID)
+	if found {
+		rootContext.GetInstance().SetData(fc.GetABIContext())
+
+		return v1.WasmResultOk
+	}
+
+	return v1.WasmResultNotFound
+}
+
 func (f *HostFunctions) SetTickPeriodMilliseconds(tickPeriodMilliseconds int32) v1.WasmResult {
+	var rootContext v1.ContextHandler
+	if ctx, ok := RootABIContextProperty(f.properties).Get(); ok {
+		rootContext = ctx
+	}
+	if rootContext == nil {
+		return v1.WasmResultInternalFailure
+	}
+
+	var plugin api.WasmPlugin
+	if plug, ok := PluginProperty(f.properties).Get(); ok {
+		plugin = plug
+	}
+	if plugin == nil {
+		return v1.WasmResultInternalFailure
+	}
+
+	logger := f.logger.WithValues("contextID", plugin.Context().ID())
+
+	go func() {
+		period := time.Duration(tickPeriodMilliseconds) * time.Millisecond
+		ticker := time.NewTicker(period)
+		defer func() {
+			logger.V(2).Info("stop ticker")
+			ticker.Stop()
+		}()
+
+		logger.V(2).Info("start ticker", "period", period)
+
+		done := make(chan bool)
+		TickerDoneChannelProperty(f.properties).Set(done)
+
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				func() {
+					rootContext.GetInstance().Lock(rootContext)
+					defer func() {
+						rootContext.GetInstance().Unlock()
+					}()
+
+					if err := rootContext.GetExports().ProxyOnTick(plugin.Context().ID()); err != nil {
+						logger.Error(err, "error at proxy_on_tick")
+					}
+				}()
+			}
+		}
+	}()
+
+	return v1.WasmResultOk
+}
+
+func (f *HostFunctions) Done() v1.WasmResult {
+	if wph, ok := f.properties.(api.WrappedPropertyHolder); ok {
+		if done, ok := TickerDoneChannelProperty(wph.Properties()).Get(); ok {
+			done <- true
+		}
+	}
+
 	return v1.WasmResultOk
 }
 

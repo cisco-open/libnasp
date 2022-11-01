@@ -93,6 +93,9 @@ func (m *wasmPluginManager) Add(config api.WasmPluginConfig) (api.WasmPlugin, er
 		logger: m.logger.WithName("wasmPlugin").WithName(config.Name),
 
 		borrowedInstances: make(map[api.WasmInstance]uint32),
+
+		filterContexts:   map[api.WasmInstance]*sync.Map{},
+		instanceContexts: &sync.Map{},
 	}
 
 	if plugin.config.InstanceCount <= 0 {
@@ -119,6 +122,8 @@ func (m *wasmPluginManager) Add(config api.WasmPluginConfig) (api.WasmPlugin, er
 	plugin.ctx.Set("plugin_root_id", config.RootID)
 	plugin.ctx.Set("plugin_vm_id", config.VMConfig.ID)
 	plugin.ctx.Set("plugin_name", config.Name)
+
+	PluginProperty(plugin.ctx).Set(plugin)
 
 	if err := plugin.setPluginConfig(); err != nil {
 		return nil, err

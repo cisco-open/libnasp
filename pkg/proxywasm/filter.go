@@ -37,11 +37,10 @@ func NewFilterContext(plugin api.WasmPlugin, properties api.PropertyHolder) (api
 		return nil, errors.WithStack(err)
 	}
 
-	rootCtx := plugin.Context()
-
 	hostOptions := []HostFunctionsOption{
 		SetHostFunctionsLogger(plugin.Logger()),
 	}
+
 	if val, ok := GetBaseContext().Get("metric.handler"); ok {
 		if mh, ok := val.(api.MetricHandler); ok {
 			hostOptions = append(hostOptions, SetHostFunctionsMetricHandler(mh))
@@ -51,14 +50,14 @@ func NewFilterContext(plugin api.WasmPlugin, properties api.PropertyHolder) (api
 	context := &filterContext{
 		ABIContext: &proxywasm.ABIContext{
 			Imports: NewHostFunctions(
-				NewPropertyHolderWrapper(properties, rootCtx),
+				NewPropertyHolderWrapper(properties, plugin.GetWasmInstanceContext(instance).GetProperties()),
 				hostOptions...,
 			),
 			Instance: instance,
 		},
 		logger:      plugin.Logger(),
-		id:          rootCtx.NewContextID(),
-		rootContext: rootCtx,
+		id:          plugin.Context().NewContextID(),
+		rootContext: plugin.Context(),
 		plugin:      plugin,
 	}
 
@@ -69,7 +68,13 @@ func NewFilterContext(plugin api.WasmPlugin, properties api.PropertyHolder) (api
 		return nil, errors.WrapIfWithDetails(err, "could not create context", "id", context.ID)
 	}
 
+	plugin.RegisterFilterContext(instance, context)
+
 	return context, nil
+}
+
+func (c *filterContext) GetABIContext() proxywasm.ContextHandler {
+	return c.ABIContext
 }
 
 func (c *filterContext) Logger() logr.Logger {
@@ -87,6 +92,7 @@ func (c *filterContext) Unlock() {
 func (c *filterContext) Close() {
 	c.Unlock()
 	c.plugin.ReleaseInstance(c.ABIContext.Instance)
+	c.plugin.UnregisterFilterContext(c.ABIContext.Instance, c)
 }
 
 func (c *filterContext) ID() int32 {

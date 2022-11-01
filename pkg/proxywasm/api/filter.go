@@ -28,4 +28,5 @@ type FilterContext interface {
 	Close()
 	ID() int32
 	RootContext() Context
+	GetABIContext() v1.ContextHandler
 }

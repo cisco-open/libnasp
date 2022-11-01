@@ -32,6 +32,12 @@ func StopWasmContext(contextID int32, abiContext v1.ContextHandler, logger logr.
 		logger.V(3).Info("ProxyOnDone has run successfully", "contextID", contextID)
 	}
 
+	if res := abiContext.GetImports().Done(); res != v1.WasmResultOk {
+		return errors.NewWithDetails("unknown error at Done", "contextID", contextID)
+	} else {
+		logger.V(3).Info("Done has run successfully", "contextID", contextID)
+	}
+
 	if err := abiContext.GetExports().ProxyOnLog(contextID); err != nil {
 		return errors.WrapIfWithDetails(err, "error at ProxyOnLog", "contextID", contextID)
 	} else {
