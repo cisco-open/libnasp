@@ -21,15 +21,23 @@ import (
 )
 
 type propertyHolderWrapper struct {
-	parent     api.PropertyHolder
-	properties api.PropertyHolder
+	parentProperties api.PropertyHolder
+	properties       api.PropertyHolder
 }
 
-func NewPropertyHolderWrapper(properties api.PropertyHolder, parent api.PropertyHolder) api.PropertyHolder {
+func NewPropertyHolderWrapper(properties api.PropertyHolder, parentProperties api.PropertyHolder) api.WrappedPropertyHolder {
 	return &propertyHolderWrapper{
-		properties: properties,
-		parent:     parent,
+		properties:       properties,
+		parentProperties: parentProperties,
 	}
+}
+
+func (w *propertyHolderWrapper) Properties() api.PropertyHolder {
+	return w.properties
+}
+
+func (w *propertyHolderWrapper) ParentProperties() api.PropertyHolder {
+	return w.parentProperties
 }
 
 func (w *propertyHolderWrapper) Get(key string) (interface{}, bool) {
@@ -37,8 +45,8 @@ func (w *propertyHolderWrapper) Get(key string) (interface{}, bool) {
 		return v, found
 	}
 
-	if w.parent != nil {
-		return w.parent.Get(key)
+	if w.parentProperties != nil {
+		return w.parentProperties.Get(key)
 	}
 
 	return nil, false

@@ -34,6 +34,12 @@ type MetricHandler interface {
 	IncrementMetric(metricID int32, offset int64) error
 }
 
+type WrappedPropertyHolder interface {
+	PropertyHolder
+	Properties() PropertyHolder
+	ParentProperties() PropertyHolder
+}
+
 type PropertyHolder interface {
 	Get(key string) (interface{}, bool)
 	Set(key string, value interface{})
