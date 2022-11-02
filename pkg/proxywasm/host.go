@@ -288,16 +288,13 @@ func (f *HostFunctions) SetTickPeriodMilliseconds(tickPeriodMilliseconds int32) 
 			case <-done:
 				return
 			case <-ticker.C:
-				func() {
-					rootContext.GetInstance().Lock(rootContext)
-					defer func() {
-						rootContext.GetInstance().Unlock()
-					}()
+				rootContext.GetInstance().Lock(rootContext)
 
-					if err := rootContext.GetExports().ProxyOnTick(plugin.Context().ID()); err != nil {
-						logger.Error(err, "error at proxy_on_tick")
-					}
-				}()
+				if err := rootContext.GetExports().ProxyOnTick(plugin.Context().ID()); err != nil {
+					logger.Error(err, "error at proxy_on_tick")
+				}
+
+				rootContext.GetInstance().Unlock()
 			}
 		}
 	}()
