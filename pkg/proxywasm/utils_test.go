@@ -22,7 +22,7 @@ import (
 	"github.com/cisco-open/nasp/pkg/proxywasm"
 )
 
-func TestJoska(t *testing.T) {
+func TestStringify(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
