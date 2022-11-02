@@ -22,14 +22,15 @@ import (
 
 type tickerDoneChannelProperty struct {
 	api.PropertyHolder
+	key string
 }
 
 func TickerDoneChannelProperty(p api.PropertyHolder) tickerDoneChannelProperty {
-	return tickerDoneChannelProperty{p}
+	return tickerDoneChannelProperty{p, "ticker.done_channel"}
 }
 
 func (p tickerDoneChannelProperty) Get() (chan bool, bool) {
-	if v, ok := p.PropertyHolder.Get("ticker.done_channel"); ok {
+	if v, ok := p.PropertyHolder.Get(p.key); ok {
 		if done, ok := v.(chan bool); ok {
 			done <- true
 		}
@@ -39,19 +40,20 @@ func (p tickerDoneChannelProperty) Get() (chan bool, bool) {
 }
 
 func (p tickerDoneChannelProperty) Set(done chan bool) {
-	p.PropertyHolder.Set("ticker.done_channel", done)
+	p.PropertyHolder.Set(p.key, done)
 }
 
 type pluginProperty struct {
 	api.PropertyHolder
+	key string
 }
 
 func PluginProperty(p api.PropertyHolder) pluginProperty {
-	return pluginProperty{p}
+	return pluginProperty{p, "plugin"}
 }
 
 func (p pluginProperty) Get() (api.WasmPlugin, bool) {
-	if v, ok := p.PropertyHolder.Get("plugin"); ok {
+	if v, ok := p.PropertyHolder.Get(p.key); ok {
 		if plugin, ok := v.(api.WasmPlugin); ok {
 			return plugin, true
 		}
@@ -61,19 +63,20 @@ func (p pluginProperty) Get() (api.WasmPlugin, bool) {
 }
 
 func (p pluginProperty) Set(plugin api.WasmPlugin) {
-	p.PropertyHolder.Set("plugin", plugin)
+	p.PropertyHolder.Set(p.key, plugin)
 }
 
 type rootABIContextProperty struct {
 	api.PropertyHolder
+	key string
 }
 
 func RootABIContextProperty(p api.PropertyHolder) rootABIContextProperty {
-	return rootABIContextProperty{p}
+	return rootABIContextProperty{p, "root_abi_context"}
 }
 
 func (p rootABIContextProperty) Get() (v1.ContextHandler, bool) {
-	if v, ok := p.PropertyHolder.Get("root_abi_context"); ok {
+	if v, ok := p.PropertyHolder.Get(p.key); ok {
 		if ctx, ok := v.(v1.ContextHandler); ok {
 			return ctx, true
 		}
@@ -83,5 +86,5 @@ func (p rootABIContextProperty) Get() (v1.ContextHandler, bool) {
 }
 
 func (p rootABIContextProperty) Set(ctx v1.ContextHandler) {
-	p.PropertyHolder.Set("root_abi_context", ctx)
+	p.PropertyHolder.Set(p.key, ctx)
 }
