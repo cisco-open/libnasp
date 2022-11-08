@@ -17,6 +17,7 @@ package istio
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -115,4 +116,52 @@ func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error)
 
 func (t *HTTPTransport) Close() {
 	t.cancel()
+}
+
+type HttpHandler interface {
+	ServeHTTP(NaspResponseWriter, *NaspHttpRequest)
+}
+
+// type NaspHttpRequestInterface interface {
+// 	Method() string
+// 	URI() string
+// }
+
+type NaspHttpRequest struct {
+	req *http.Request
+}
+
+func (r *NaspHttpRequest) Method() string {
+	return r.req.Method
+}
+
+func (r *NaspHttpRequest) URI() string {
+	return r.req.URL.RequestURI()
+}
+
+func (r *NaspHttpRequest) Headers() []byte {
+	hjson, err := json.Marshal(r.req.Header)
+	if err != nil {
+		panic(err)
+	}
+	return hjson
+}
+
+type NaspResponseWriter interface {
+	Write([]byte) (int, error)
+	WriteHeader(statusCode int)
+}
+
+type NaspHttpHandler struct {
+	handler HttpHandler
+}
+
+func (h *NaspHttpHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	h.handler.ServeHTTP(resp, &NaspHttpRequest{req: req})
+}
+
+var _ http.Handler = &NaspHttpHandler{}
+
+func (t *HTTPTransport) ListenAndServe(address string, handler HttpHandler) error {
+	return t.iih.ListenAndServe(context.Background(), address, &NaspHttpHandler{handler: handler})
 }
