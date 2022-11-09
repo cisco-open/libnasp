@@ -22,7 +22,7 @@ public class NaspServerHttpRequest extends AbstractServerHttpRequest {
 
     static HttpHeaders parseHeaders(NaspHttpRequest request) {
         try {
-            return JSON.readValue(request.headers(), HttpHeaders.class);
+            return JSON.readValue(request.header(), HttpHeaders.class);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

@@ -1,5 +1,6 @@
 package com.ciscoopen.nasp;
 
+import istio.Header;
 import istio.NaspResponseWriter;
 import org.reactivestreams.Publisher;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -40,12 +41,17 @@ public class NaspServerHttpResponse extends AbstractServerHttpResponse {
 
     @Override
     protected void applyStatusCode() {
-
     }
 
     @Override
     protected void applyHeaders() {
+        Header header = responseWriter.header();
+        getHeaders().forEach((key, values) -> values.forEach(value -> header.add(key, value)));
 
+        Integer status = getRawStatusCode();
+        if (status != null) {
+            this.responseWriter.writeHeader(status);
+        }
     }
 
     @Override

@@ -134,7 +134,7 @@ func (r *NaspHttpRequest) URI() string {
 	return r.req.URL.RequestURI()
 }
 
-func (r *NaspHttpRequest) Headers() []byte {
+func (r *NaspHttpRequest) Header() []byte {
 	hjson, err := json.Marshal(r.req.Header)
 	if err != nil {
 		panic(err)
@@ -148,9 +148,42 @@ func (r *NaspHttpRequest) Body() Body {
 	return r.req.Body
 }
 
+type Header struct {
+	h http.Header
+}
+
+func (h *Header) Get(key string) string {
+	return h.h.Get(key)
+}
+
+func (h *Header) Set(key, value string) {
+	h.h.Set(key, value)
+}
+
+func (h *Header) Add(key, value string) {
+	h.h.Add(key, value)
+}
+
 type NaspResponseWriter interface {
 	Write([]byte) (int, error)
 	WriteHeader(statusCode int)
+	Header() *Header
+}
+
+type naspResponseWriter struct {
+	resp http.ResponseWriter
+}
+
+func (rw *naspResponseWriter) Write(b []byte) (int, error) {
+	return rw.resp.Write(b)
+}
+
+func (rw *naspResponseWriter) WriteHeader(statusCode int) {
+	rw.resp.WriteHeader(statusCode)
+}
+
+func (rw *naspResponseWriter) Header() *Header {
+	return &Header{rw.resp.Header()}
 }
 
 type NaspHttpHandler struct {
@@ -158,7 +191,7 @@ type NaspHttpHandler struct {
 }
 
 func (h *NaspHttpHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	h.handler.ServeHTTP(resp, &NaspHttpRequest{req: req})
+	h.handler.ServeHTTP(&naspResponseWriter{resp}, &NaspHttpRequest{req})
 }
 
 var _ http.Handler = &NaspHttpHandler{}
