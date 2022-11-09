@@ -122,11 +122,6 @@ type HttpHandler interface {
 	ServeHTTP(NaspResponseWriter, *NaspHttpRequest)
 }
 
-// type NaspHttpRequestInterface interface {
-// 	Method() string
-// 	URI() string
-// }
-
 type NaspHttpRequest struct {
 	req *http.Request
 }
@@ -145,6 +140,12 @@ func (r *NaspHttpRequest) Headers() []byte {
 		panic(err)
 	}
 	return hjson
+}
+
+type Body io.ReadCloser
+
+func (r *NaspHttpRequest) Body() Body {
+	return r.req.Body
 }
 
 type NaspResponseWriter interface {
