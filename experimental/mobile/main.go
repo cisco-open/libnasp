@@ -16,7 +16,6 @@ package istio
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -116,6 +115,19 @@ func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error)
 	}, nil
 }
 
+func (t *HTTPTransport) ListenAndServe(address string, handler HttpHandler) error {
+	var err error
+	go func() {
+		err = t.iih.ListenAndServe(t.ctx, address, &NaspHttpHandler{handler: handler})
+	}()
+	time.Sleep(1 * time.Second)
+	return err
+}
+
+func (t *HTTPTransport) Await() {
+	<-t.ctx.Done()
+}
+
 func (t *HTTPTransport) Close() {
 	t.cancel()
 }
@@ -194,19 +206,4 @@ type NaspHttpHandler struct {
 
 func (h *NaspHttpHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	h.handler.ServeHTTP(&naspResponseWriter{resp}, &NaspHttpRequest{req})
-}
-
-var _ http.Handler = &NaspHttpHandler{}
-
-func (t *HTTPTransport) ListenAndServe(address string, handler HttpHandler) error {
-	var err error
-	go func() {
-		err = t.iih.ListenAndServe(t.ctx, address, &NaspHttpHandler{handler: handler})
-	}()
-	time.Sleep(1 * time.Second)
-	return err
-}
-
-func (t *HTTPTransport) Await() {
-	<-t.ctx.Done()
 }
