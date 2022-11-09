@@ -8,10 +8,12 @@ import org.springframework.http.server.reactive.HttpHandler;
 
 public class NaspWebServer implements WebServer {
     private HTTPTransport transport;
+    private final NaspConfiguration configuration;
     private final int port;
     private final NaspHttpHandler httpHandler;
 
-    public NaspWebServer(int port, HttpHandler httpHandler) {
+    public NaspWebServer(NaspConfiguration configuration, int port, HttpHandler httpHandler) {
+        this.configuration = configuration;
         this.port = port;
         this.httpHandler = new NaspHttpHandler(httpHandler);
     }
@@ -19,7 +21,7 @@ public class NaspWebServer implements WebServer {
     @Override
     public void start() throws WebServerException {
         try {
-            transport = Istio.newHTTPTransport("https://localhost:16443/config", "test-http-16362813-F46B-41AC-B191-A390DB1F6BDF", "16362813-F46B-41AC-B191-A390DB1F6BDF");
+            transport = Istio.newHTTPTransport(configuration.getHeimdallURL(), configuration.getHeimdallClientID(), configuration.getHeimdallClientSecret());
         } catch (Exception e) {
             throw new WebServerException("failed to create nasp transport", e);
         }

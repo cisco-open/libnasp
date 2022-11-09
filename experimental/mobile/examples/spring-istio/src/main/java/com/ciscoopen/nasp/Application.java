@@ -12,7 +12,7 @@ public class Application {
     }
 
     @Bean
-    public ConfigurableReactiveWebServerFactory webServerFactory() {
-        return new NaspWebServerFactory();
+    public ConfigurableReactiveWebServerFactory webServerFactory(NaspConfiguration configuration) {
+        return new NaspWebServerFactory(configuration);
     }
 }
