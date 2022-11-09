@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	_ "golang.org/x/mobile/bind"
 
@@ -34,6 +35,7 @@ var logger = klog.NewKlogr()
 type HTTPTransport struct {
 	iih    *istio.IstioIntegrationHandler
 	client *http.Client
+	ctx    context.Context
 	cancel context.CancelFunc
 }
 
@@ -81,7 +83,7 @@ func NewHTTPTransport(heimdallURL, clientID, clientSecret string) (*HTTPTranspor
 		Transport: transport,
 	}
 
-	return &HTTPTransport{iih: iih, client: client, cancel: cancel}, nil
+	return &HTTPTransport{iih: iih, client: client, ctx: ctx, cancel: cancel}, nil
 }
 
 func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error) {
@@ -197,5 +199,14 @@ func (h *NaspHttpHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request)
 var _ http.Handler = &NaspHttpHandler{}
 
 func (t *HTTPTransport) ListenAndServe(address string, handler HttpHandler) error {
-	return t.iih.ListenAndServe(context.Background(), address, &NaspHttpHandler{handler: handler})
+	var err error
+	go func() {
+		err = t.iih.ListenAndServe(t.ctx, address, &NaspHttpHandler{handler: handler})
+	}()
+	time.Sleep(1 * time.Second)
+	return err
+}
+
+func (t *HTTPTransport) Await() {
+	<-t.ctx.Done()
 }

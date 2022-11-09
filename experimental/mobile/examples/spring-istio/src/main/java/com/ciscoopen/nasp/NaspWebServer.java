@@ -29,6 +29,25 @@ public class NaspWebServer implements WebServer {
         } catch (Exception e) {
             throw new WebServerException("failed to listen on nasp transport", e);
         }
+
+        startDaemonAwaitThread(transport);
+    }
+
+    private void startDaemonAwaitThread(HTTPTransport transport) {
+        Thread awaitThread = new Thread("server") {
+
+            @Override
+            public void run() {
+                try {
+                    transport.await();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+        awaitThread.setContextClassLoader(getClass().getClassLoader());
+        awaitThread.setDaemon(false);
+        awaitThread.start();
     }
 
     @Override
