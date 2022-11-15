@@ -40,6 +40,13 @@ class GoError(ctypes.Structure):
 class NewHTTPTransportReturn(ctypes.Structure):
     _fields_ = [("r0", ctypes.c_ulonglong), ("r1", ctypes.POINTER(GoError))]
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.r1:
+            nasp.free_go_error(self.r1)
+
     # id of the created HTTP transport
     @property
     def id(self):
@@ -110,6 +117,16 @@ class GoHttpResponse(ctypes.Structure):
 class SendHTTPRequestReturn(ctypes.Structure):
     _fields_ = [("r0", ctypes.POINTER(GoHttpResponse)), ("r1", ctypes.POINTER(GoError))]
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.r0:
+            nasp.free_go_http_response(self.r0)
+
+        if self.r1:
+            nasp.free_go_error(self.r1)
+
     @property
     def response(self):
         return self.r0
@@ -162,32 +179,27 @@ class NaspHTTPTransportAdapter(requests.adapters.BaseAdapter):
     def send(self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None):
         response = requests.Response()
 
-        ret = send_http_request(self.http_transport_id, request.method, request.url, request.body)
+        with send_http_request(self.http_transport_id, request.method, request.url, request.body) as ret:
+            raw = urllib3.HTTPResponse(
+                body=io.BytesIO(ret.response.contents.response_body) if ret.response else "",
+                headers=ret.response.contents.headers_dict if ret.response else {},
+                request_method=request.method,
+                request_url=request.url,
+                preload_content=False,
+                status=ret.response.contents.status if ret.response else 0,
+            )
 
-        raw = urllib3.HTTPResponse(
-            body=io.BytesIO(ret.response.contents.response_body) if ret.response else "",
-            headers=ret.response.contents.headers_dict if ret.response else {},
-            request_method=request.method,
-            request_url=request.url,
-            preload_content=False,
-            status=ret.response.contents.status if ret.response else 0,
-        )
+            if ret.error:
+                raw.reason = ret.error.contents.msg
 
-        if ret.error:
-            raw.reason = ret.error.contents.msg
-            nasp.free_go_error(ret.error)
-
-        if ret.response:
-            nasp.free_go_http_response(ret.response)
-
-        response.raw = raw
-        response.url = request.url
-        response.headers = requests.structures.CaseInsensitiveDict(raw.headers)
-        response.encoding = requests.utils.get_encoding_from_headers(response.headers or {})
-        response.request = request
-        response.connection = self
-        response.status_code = raw.status
-        response.reason = raw.reason
+            response.raw = raw
+            response.url = request.url
+            response.headers = requests.structures.CaseInsensitiveDict(raw.headers)
+            response.encoding = requests.utils.get_encoding_from_headers(response.headers or {})
+            response.request = request
+            response.connection = self
+            response.status_code = raw.status
+            response.reason = raw.reason
 
         return response
 
@@ -218,12 +230,10 @@ def main(argv):
     client_id = "test-http-16362813-F46B-41AC-B191-A390DB1F6BDF"
     client_secret = "16362813-F46B-41AC-B191-A390DB1F6BDF"
 
-    result = new_http_transport(heimdall_url, client_id, client_secret)
-    if result.error:
-        err_msg = result.error.contents.msg
-        nasp.free_go_error(result.error)
-
-        sys.exit(err_msg)
+    with new_http_transport(heimdall_url, client_id, client_secret) as result:
+        if result.error:
+            err_msg = result.error.contents.msg
+            sys.exit(err_msg)
 
     with requests.Session() as s:
         s.mount("http://", NaspHTTPTransportAdapter(result.id))

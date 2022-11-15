@@ -20,6 +20,16 @@ import (
 	"hash/fnv"
 	"k8s.io/klog/v2"
 	"strconv"
+
+	"context"
+	"emperror.dev/errors"
+	"io"
+	"net/http"
+	"strings"
+	"sync"
+	"unsafe"
+
+	"github.com/cisco-open/nasp/pkg/istio"
 )
 
 /*
@@ -95,18 +105,6 @@ inline void free_http_headers(struct GoHttpHeader *headers, unsigned int size) {
 
 */
 import "C"
-
-import (
-	"context"
-	"emperror.dev/errors"
-	"io"
-	"net/http"
-	"strings"
-	"sync"
-	"unsafe"
-
-	"github.com/cisco-open/nasp/pkg/istio"
-)
 
 var logger = klog.NewKlogr()
 
