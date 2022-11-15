@@ -19,13 +19,11 @@
 import ctypes, sys
 import getopt
 import io
-import multiprocessing
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
 import urllib3
-from urllib3._collections import HTTPHeaderDict
 
 
 class GoError(ctypes.Structure):
