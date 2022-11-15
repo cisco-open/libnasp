@@ -1,0 +1,1 @@
+The Andoroid library placeholder for the built AAR file.
