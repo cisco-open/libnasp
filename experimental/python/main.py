@@ -20,6 +20,7 @@ import ctypes, sys
 import getopt
 import io
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -140,7 +141,7 @@ nasp = ctypes.cdll.LoadLibrary("./nasp.so")
 
 nasp.FreeGoError.argtypes = [ctypes.POINTER(GoError)]
 
-nasp.NewHTTPTransport.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]
+nasp.NewHTTPTransport.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_bool, ctypes.c_char_p]
 nasp.NewHTTPTransport.restype = NewHTTPTransportReturn
 
 nasp.SendHTTPRequest.argtypes = [ctypes.c_ulonglong, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]
@@ -155,9 +156,14 @@ def free_go_error(err: ctypes.POINTER(GoError)):
     nasp.FreeGoError(err)
 
 
-def new_http_transport(heimdall_url: str, client_id: str, client_secret: str):
-    return nasp.NewHTTPTransport(heimdall_url.encode("utf-8"), client_id.encode("utf-8"),
-                                 client_secret.encode("utf-8"))
+def new_http_transport(heimdall_url: str, client_id: str, client_secret: str, use_push_gateway: bool,
+                       push_gateway_address: str):
+    return nasp.NewHTTPTransport(
+        heimdall_url.encode("utf-8"),
+        client_id.encode("utf-8"),
+        client_secret.encode("utf-8"),
+        ctypes.c_bool(use_push_gateway),
+        push_gateway_address.encode("utf-8"))
 
 
 def send_http_request(http_transport_id: ctypes.c_ulonglong,
@@ -216,13 +222,19 @@ class NaspHTTPTransportAdapter(requests.adapters.BaseAdapter):
 
 
 def main(argv):
-    request_url = "http://catalog.demo.svc.cluster.local:8080"
+    request_url = "http://echo.testing:80"
     request_count = 5
-    heimdall_url = "https://52.59.158.146:443/config"
+    heimdall_url = "https://localhost:16443/config"
+    use_push_gateway = None
+    push_gateway_address = "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091"
+    client_sleep_seconds = 0
+
     try:
-        opts, args = getopt.getopt(argv, "h:", ["request-url=", "request-count=", "heimdall-url="])
+        opts, args = getopt.getopt(argv, "h:", ["request-url=", "request-count=", "heimdall-url=",
+                                                "use-push-gateway", "push-gateway-address=", "client-sleep="])
     except getopt.GetoptError:
-        print('main.py --request-url <request-url> --request-count <request-count> --heimdall-url <heimdall-url>')
+        print('main.py --request-url <request-url> --request-count <request-count> --heimdall-url <heimdall-url>'
+              '--use-push-gateway --push-gateway-address <push-gateway-address> --client-sleep <seconds>')
         sys.exit(2)
 
     for opt, arg in opts:
@@ -232,13 +244,20 @@ def main(argv):
             request_url = arg
         elif opt == "--request-count":
             request_count = int(arg)
+        elif opt == "--client-sleep":
+            client_sleep_seconds = int(arg)
         elif opt == "--heimdall-url":
             heimdall_url = arg
+        elif opt == "--push-gateway-address":
+            push_gateway_address = arg
+        elif opt == "--use-push-gateway":
+            use_push_gateway = arg
 
     client_id = "test-http-16362813-F46B-41AC-B191-A390DB1F6BDF"
     client_secret = "16362813-F46B-41AC-B191-A390DB1F6BDF"
 
-    with new_http_transport(heimdall_url, client_id, client_secret) as http_transport:
+    with new_http_transport(heimdall_url, client_id, client_secret,
+                            use_push_gateway is not None, push_gateway_address) as http_transport:
         if http_transport.error:
             err_msg = http_transport.error.contents.msg
             sys.exit(err_msg)
@@ -253,6 +272,8 @@ def main(argv):
 
                 for i in range(request_count):
                     executor.submit(http_get)
+
+        time.sleep(client_sleep_seconds)
 
 
 if __name__ == "__main__":

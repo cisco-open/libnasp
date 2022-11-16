@@ -154,7 +154,7 @@ struct NewHTTPTransport_return {
 	unsigned long long r0;
 	struct GoError* r1;
 };
-extern struct NewHTTPTransport_return NewHTTPTransport(char* heimdallURLPtr, char* clientIDPtr, char* clientSecretPtr);
+extern struct NewHTTPTransport_return NewHTTPTransport(char* heimdallURLPtr, char* clientIDPtr, char* clientSecretPtr, _Bool usePushGateWay, char* pushGatewayAddressPtr);
 
 /* Return type for SendHTTPRequest */
 struct SendHTTPRequest_return {

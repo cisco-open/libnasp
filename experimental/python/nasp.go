@@ -113,7 +113,8 @@ var logger = klog.NewKlogr()
 var httpTransportPool = httpTransportPoolManager{}
 
 //export NewHTTPTransport
-func NewHTTPTransport(heimdallURLPtr, clientIDPtr, clientSecretPtr *C.char) (C.ulonglong, *C.struct_GoError) {
+func NewHTTPTransport(heimdallURLPtr, clientIDPtr, clientSecretPtr *C.char,
+	usePushGateWay C._Bool, pushGatewayAddressPtr *C.char) (C.ulonglong, *C.struct_GoError) {
 	heimdallURL := C.GoString(heimdallURLPtr)
 	clientID := C.GoString(clientIDPtr)
 	clientSecret := C.GoString(clientSecretPtr)
@@ -131,13 +132,18 @@ func NewHTTPTransport(heimdallURLPtr, clientIDPtr, clientSecretPtr *C.char) (C.u
 		return C.ulonglong(httpTransportID), nil
 	}
 
+	var pgwConfig *istio.PushgatewayConfig
+	if bool(usePushGateWay) {
+		logger.Info("use pgw", "address", C.GoString(pushGatewayAddressPtr))
+		pgwConfig = &istio.PushgatewayConfig{
+			Address:          C.GoString(pushGatewayAddressPtr),
+			UseUniqueIDLabel: true,
+		}
+	}
 	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
 		UseTLS:              true,
 		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret, "v1"),
-		PushgatewayConfig: &istio.PushgatewayConfig{
-			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
-			UseUniqueIDLabel: true,
-		},
+		PushgatewayConfig:   pgwConfig,
 	}
 
 	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, logger)
