@@ -27,7 +27,7 @@ function create_and_label_namespace() {
     if ! kubectl get namespace ${1} >/dev/null 2>&1; then
     kubectl create namespace ${1}
     fi
-    kubectl label namespace ${1} istio.io/rev=${2} --overwrite
+    kubectl label namespace ${1} istio.io/rev=icp-v115x.istio-system --overwrite
 }
 
 function create_sa() {
@@ -46,6 +46,7 @@ fi
 log "setup and update helm repositories"
 helm repo add metallb https://metallb.github.io/metallb
 helm repo add banzaicloud-stable https://kubernetes-charts.banzaicloud.com
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 
 log "install metallb"
@@ -69,20 +70,24 @@ if [ ${BUILD_IMAGE} == "true" ]; then
 fi
 
 log "install heimdall"
-create_and_label_namespace heimdall icp-v115x.istio-system
+create_and_label_namespace heimdall
 helm upgrade --install -n heimdall heimdall ${DIRECTORY}/../experimental/heimdall/charts/heimdall --wait --values ${DIRECTORY}/heimdall-values.yaml
 
 log "install echo service for testing"
-create_and_label_namespace testing icp-v115x.istio-system
+create_and_label_namespace testing
 kubectl apply --namespace testing -f ${DIRECTORY}/echo-service.yaml
 
 log "waiting for echo service to be available"
 kubectl wait -n testing deployment/echo --for condition=Available=True --timeout=90s
 
 log "create external namespace"
-create_and_label_namespace external icp-v115x.istio-system
+create_and_label_namespace external
 
 log "create service accounts in namespace external"
 for saName in ios-mobile android-mobile test-http test-tcp test-grpc; do
     create_sa external ${saName}
 done
+
+log "install pushgateway"
+create_and_label_namespace prometheus-pushgateway
+helm upgrade --install push-gw -n prometheus-pushgateway prometheus-community/prometheus-pushgateway
