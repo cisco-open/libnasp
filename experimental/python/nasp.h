@@ -19,7 +19,7 @@ typedef struct { const char *p; ptrdiff_t n; } _GoString_;
 /* Start of preamble from import "C" comments.  */
 
 
-#line 35 "nasp.go"
+#line 37 "nasp.go"
 
 #include <stdlib.h>
 
@@ -36,27 +36,27 @@ inline struct GoError *create_go_error(char *error_msg) {
 	return p;
 };
 
-struct GoHttpHeader {
+struct GoHTTPHeaderItem {
 	char *key;
 	char *value;
 };
 
-struct GoHttpHeaders {
-	struct GoHttpHeader *items;
-	unsigned int len;
+struct GoHTTPHeaders {
+	struct GoHTTPHeaderItem *items;
+	unsigned int size;
 };
 
-struct GoHttpResponse {
+struct GoHTTPResponse {
 	int status_code;
 	char *version;
-	struct GoHttpHeaders headers;
+	struct GoHTTPHeaders headers;
     char *body;
 };
 
-inline struct GoHttpResponse *create_go_http_response(int status_code, char *version, struct GoHttpHeaders headers, char *body) {
-	struct GoHttpResponse *p;
+inline struct GoHTTPResponse *create_go_http_response(int status_code, char *version, struct GoHTTPHeaders headers, char *body) {
+	struct GoHTTPResponse *p;
 
-	p = malloc(sizeof(struct GoHttpResponse));
+	p = malloc(sizeof(struct GoHTTPResponse));
 	p->status_code = status_code;
 	p->version = version;
 	p->headers = headers;
@@ -65,20 +65,20 @@ inline struct GoHttpResponse *create_go_http_response(int status_code, char *ver
 	return p;
 };
 
-inline struct GoHttpHeader *new_http_headers(unsigned int count) {
-	struct GoHttpHeader *p;
+inline struct GoHTTPHeaderItem *new_http_headers(unsigned int count) {
+	struct GoHTTPHeaderItem *p;
 
-	p = malloc(sizeof(struct GoHttpHeader) * count);
+	p = malloc(sizeof(struct GoHTTPHeaderItem) * count);
 
 	return p;
 };
 
 
-inline void set_http_header_at(struct GoHttpHeader *headers, struct GoHttpHeader header, unsigned int index) {
+inline void set_http_header_at(struct GoHTTPHeaderItem *headers, struct GoHTTPHeaderItem header, unsigned int index) {
 	headers[index] = header;
 };
 
-inline void free_http_headers(struct GoHttpHeader *headers, unsigned int size) {
+inline void free_http_headers(struct GoHTTPHeaderItem *headers, unsigned int size) {
 	if(headers == NULL) {
 		return;
 	}
@@ -158,13 +158,13 @@ extern struct NewHTTPTransport_return NewHTTPTransport(char* heimdallURLPtr, cha
 
 /* Return type for SendHTTPRequest */
 struct SendHTTPRequest_return {
-	struct GoHttpResponse* r0;
+	struct GoHTTPResponse* r0;
 	struct GoError* r1;
 };
 extern struct SendHTTPRequest_return SendHTTPRequest(unsigned long long httpTransportID, char* method, char* url, char* body);
 extern void CloseHTTPTransport(unsigned long long httpTransportID);
-extern void free_go_error(struct GoError* p);
-extern void free_go_http_response(struct GoHttpResponse* p);
+extern void FreeGoError(struct GoError* p);
+extern void FreeGoHTTPResponse(struct GoHTTPResponse* p);
 
 #ifdef __cplusplus
 }

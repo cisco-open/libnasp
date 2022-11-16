@@ -18,16 +18,18 @@ import "C"
 import (
 	"fmt"
 	"hash/fnv"
-	"k8s.io/klog/v2"
 	"strconv"
 
+	"k8s.io/klog/v2"
+
 	"context"
-	"emperror.dev/errors"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"unsafe"
+
+	"emperror.dev/errors"
 
 	"github.com/cisco-open/nasp/pkg/istio"
 )
@@ -48,27 +50,27 @@ inline struct GoError *create_go_error(char *error_msg) {
 	return p;
 };
 
-struct GoHttpHeader {
+struct GoHTTPHeaderItem {
 	char *key;
 	char *value;
 };
 
-struct GoHttpHeaders {
-	struct GoHttpHeader *items;
-	unsigned int len;
+struct GoHTTPHeaders {
+	struct GoHTTPHeaderItem *items;
+	unsigned int size;
 };
 
-struct GoHttpResponse {
+struct GoHTTPResponse {
 	int status_code;
 	char *version;
-	struct GoHttpHeaders headers;
+	struct GoHTTPHeaders headers;
     char *body;
 };
 
-inline struct GoHttpResponse *create_go_http_response(int status_code, char *version, struct GoHttpHeaders headers, char *body) {
-	struct GoHttpResponse *p;
+inline struct GoHTTPResponse *create_go_http_response(int status_code, char *version, struct GoHTTPHeaders headers, char *body) {
+	struct GoHTTPResponse *p;
 
-	p = malloc(sizeof(struct GoHttpResponse));
+	p = malloc(sizeof(struct GoHTTPResponse));
 	p->status_code = status_code;
 	p->version = version;
 	p->headers = headers;
@@ -77,20 +79,20 @@ inline struct GoHttpResponse *create_go_http_response(int status_code, char *ver
 	return p;
 };
 
-inline struct GoHttpHeader *new_http_headers(unsigned int count) {
-	struct GoHttpHeader *p;
+inline struct GoHTTPHeaderItem *new_http_headers(unsigned int count) {
+	struct GoHTTPHeaderItem *p;
 
-	p = malloc(sizeof(struct GoHttpHeader) * count);
+	p = malloc(sizeof(struct GoHTTPHeaderItem) * count);
 
 	return p;
 };
 
 
-inline void set_http_header_at(struct GoHttpHeader *headers, struct GoHttpHeader header, unsigned int index) {
+inline void set_http_header_at(struct GoHTTPHeaderItem *headers, struct GoHTTPHeaderItem header, unsigned int index) {
 	headers[index] = header;
 };
 
-inline void free_http_headers(struct GoHttpHeader *headers, unsigned int size) {
+inline void free_http_headers(struct GoHTTPHeaderItem *headers, unsigned int size) {
 	if(headers == NULL) {
 		return;
 	}
@@ -123,7 +125,9 @@ func NewHTTPTransport(heimdallURLPtr, clientIDPtr, clientSecretPtr *C.char) (C.u
 	httpTransportIDHex := fmt.Sprintf("%x", hash.Sum(nil))
 	httpTransportID, _ := strconv.ParseUint(httpTransportIDHex, 16, 64)
 
-	if _, ok := httpTransportPool.Get(httpTransportID); ok {
+	if httpTransport, ok := httpTransportPool.Get(httpTransportID); ok {
+		httpTransport.refCount++
+
 		return C.ulonglong(httpTransportID), nil
 	}
 
@@ -154,17 +158,17 @@ func NewHTTPTransport(heimdallURLPtr, clientIDPtr, clientSecretPtr *C.char) (C.u
 		Transport: transport,
 	}
 
-	httpTransport := &HTTPTransport{iih: iih, client: client, cancel: cancel}
+	httpTransport := &HTTPTransport{iih: iih, client: client, cancel: cancel, refCount: 1}
 	httpTransportPool.Set(httpTransportID, httpTransport)
 
 	return C.ulonglong(httpTransportID), nil
 }
 
 //export SendHTTPRequest
-func SendHTTPRequest(httpTransportID C.ulonglong, method, url, body *C.char) (*C.struct_GoHttpResponse, *C.struct_GoError) {
+func SendHTTPRequest(httpTransportID C.ulonglong, method, url, body *C.char) (*C.struct_GoHTTPResponse, *C.struct_GoError) {
 	httpTransport, ok := httpTransportPool.Get(uint64(httpTransportID))
 	if !ok {
-		return cGoInternalServerErrorHttpResponse(), cGoError(errors.NewPlain("transport not found"))
+		return cGoInternalServerErrorHTTPResponse(), cGoError(errors.NewPlain("transport not found"))
 	}
 
 	httpResp, err := httpTransport.Request(
@@ -173,49 +177,40 @@ func SendHTTPRequest(httpTransportID C.ulonglong, method, url, body *C.char) (*C
 		C.GoString(body))
 
 	if err != nil {
-		return cGoInternalServerErrorHttpResponse(), cGoError(err)
+		return cGoInternalServerErrorHTTPResponse(), cGoError(err)
 	}
 
 	var headers map[string]string
-	if httpResp.Headers != nil && httpResp.Headers != nil && len(httpResp.Headers.header) > 0 {
-		headers = make(map[string]string, len(httpResp.Headers.header))
-		for k, v := range httpResp.Headers.header {
+	if len(httpResp.Headers) > 0 {
+		headers = make(map[string]string, len(httpResp.Headers))
+		for k, v := range httpResp.Headers {
 			headers[k] = strings.Join(v, ",")
 		}
 	}
 
-	return cGoHttpResponse(httpResp.StatusCode, httpResp.Version, headers, httpResp.Body), nil
+	return cGoHTTPResponse(httpResp.StatusCode, httpResp.Version, headers, httpResp.Body), nil
 }
 
 //export CloseHTTPTransport
 func CloseHTTPTransport(httpTransportID C.ulonglong) {
 	if httpTransport, ok := httpTransportPool.GetAndDelete(uint64(httpTransportID)); ok {
-		httpTransport.Close()
+		if httpTransport.refCount <= 0 {
+			httpTransport.Close()
+		}
 	}
 }
 
 type HTTPTransport struct {
-	iih    *istio.IstioIntegrationHandler
-	client *http.Client
-	cancel context.CancelFunc
-}
-
-type HTTPHeader struct {
-	header http.Header
-}
-
-func (h *HTTPHeader) Get(key string) string {
-	return h.header.Get(key)
-}
-
-func (h *HTTPHeader) Set(key, value string) {
-	h.header.Set(key, value)
+	iih      *istio.IstioIntegrationHandler
+	client   *http.Client
+	cancel   context.CancelFunc
+	refCount uint32
 }
 
 type HTTPResponse struct {
 	StatusCode int
 	Version    string
-	Headers    *HTTPHeader
+	Headers    http.Header
 	Body       []byte
 }
 
@@ -244,7 +239,7 @@ func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error)
 	return &HTTPResponse{
 		StatusCode: response.StatusCode,
 		Version:    response.Proto,
-		Headers:    &HTTPHeader{response.Header},
+		Headers:    response.Header,
 		Body:       bodyBytes,
 	}, nil
 }
@@ -272,7 +267,10 @@ func (m *httpTransportPoolManager) GetAndDelete(id uint64) (*HTTPTransport, bool
 
 	httpTransport, ok := m.pool[id]
 	if ok {
-		delete(m.pool, id)
+		httpTransport.refCount--
+		if httpTransport.refCount <= 0 {
+			delete(m.pool, id)
+		}
 	}
 	return httpTransport, ok
 }
@@ -293,8 +291,8 @@ func cGoError(err error) *C.struct_GoError {
 	return goErr
 }
 
-//export free_go_error
-func free_go_error(p *C.struct_GoError) {
+//export FreeGoError
+func FreeGoError(p *C.struct_GoError) {
 	ptr := unsafe.Pointer(p)
 	if ptr != nil {
 		C.free(unsafe.Pointer(p.error_msg))
@@ -303,14 +301,14 @@ func free_go_error(p *C.struct_GoError) {
 	C.free(ptr)
 }
 
-func cGoHttpResponse(statusCode int, version string, httpHeaders map[string]string, body []byte) *C.struct_GoHttpResponse {
-	var headers *C.struct_GoHttpHeader
+func cGoHTTPResponse(statusCode int, version string, httpHeaders map[string]string, body []byte) *C.struct_GoHTTPResponse {
+	var headers *C.struct_GoHTTPHeaderItem
 	count := 0
 
 	if len(httpHeaders) > 0 {
 		headers = C.new_http_headers(C.uint(len(httpHeaders)))
 		for k, v := range httpHeaders {
-			hdr := C.struct_GoHttpHeader{
+			hdr := C.struct_GoHTTPHeaderItem{
 				key:   C.CString(k),
 				value: C.CString(v),
 			}
@@ -323,9 +321,9 @@ func cGoHttpResponse(statusCode int, version string, httpHeaders map[string]stri
 	httpResponse := C.create_go_http_response(
 		C.int(statusCode),
 		C.CString(version),
-		C.struct_GoHttpHeaders{
+		C.struct_GoHTTPHeaders{
 			items: headers,
-			len:   C.uint(count),
+			size:  C.uint(count),
 		},
 		C.CString(string(body)),
 	)
@@ -333,16 +331,16 @@ func cGoHttpResponse(statusCode int, version string, httpHeaders map[string]stri
 	return httpResponse
 }
 
-func cGoInternalServerErrorHttpResponse() *C.struct_GoHttpResponse {
-	return cGoHttpResponse(http.StatusInternalServerError, "", nil, nil)
+func cGoInternalServerErrorHTTPResponse() *C.struct_GoHTTPResponse {
+	return cGoHTTPResponse(http.StatusInternalServerError, "", nil, nil)
 }
 
-//export free_go_http_response
-func free_go_http_response(p *C.struct_GoHttpResponse) {
+//export FreeGoHTTPResponse
+func FreeGoHTTPResponse(p *C.struct_GoHTTPResponse) {
 	ptr := unsafe.Pointer(p)
 	if ptr != nil {
 		C.free(unsafe.Pointer(p.version))
-		C.free_http_headers(p.headers.items, p.headers.len)
+		C.free_http_headers(p.headers.items, p.headers.size)
 		C.free(unsafe.Pointer(p.body))
 	}
 

@@ -45,7 +45,7 @@ class NewHTTPTransportReturn(ctypes.Structure):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.r1:
-            nasp.free_go_error(self.r1)
+            free_go_error(self.r1)
 
     # id of the created HTTP transport
     @property
@@ -58,7 +58,7 @@ class NewHTTPTransportReturn(ctypes.Structure):
         return self.r1
 
 
-class GoHttpHeader(ctypes.Structure):
+class GoHTTPHeaderItem(ctypes.Structure):
     _fields_ = [("key", ctypes.c_char_p), ("value", ctypes.c_char_p)]
 
     @property
@@ -76,12 +76,12 @@ class GoHttpHeader(ctypes.Structure):
         return None
 
 
-class GoHttpHeaders(ctypes.Structure):
-    _fields_ = [("items", ctypes.POINTER(GoHttpHeader)), ("len", ctypes.c_uint)]
+class GoHTTPHeaders(ctypes.Structure):
+    _fields_ = [("items", ctypes.POINTER(GoHTTPHeaderItem)), ("size", ctypes.c_uint)]
 
 
-class GoHttpResponse(ctypes.Structure):
-    _fields_ = [("status_code", ctypes.c_int), ("version", ctypes.c_char_p), ("headers", GoHttpHeaders),
+class GoHTTPResponse(ctypes.Structure):
+    _fields_ = [("status_code", ctypes.c_int), ("version", ctypes.c_char_p), ("headers", GoHTTPHeaders),
                 ("body", ctypes.c_char_p)]
 
     @property
@@ -96,10 +96,10 @@ class GoHttpResponse(ctypes.Structure):
         return None
 
     @property
-    def headers_dict(self):
+    def http_headers(self):
         if self.headers:
             d = {}
-            for i in range(self.headers.len):
+            for i in range(self.headers.size):
                 d[self.headers.items[i].name] = self.headers.items[i].val
 
             return d
@@ -115,17 +115,17 @@ class GoHttpResponse(ctypes.Structure):
 
 
 class SendHTTPRequestReturn(ctypes.Structure):
-    _fields_ = [("r0", ctypes.POINTER(GoHttpResponse)), ("r1", ctypes.POINTER(GoError))]
+    _fields_ = [("r0", ctypes.POINTER(GoHTTPResponse)), ("r1", ctypes.POINTER(GoError))]
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.r0:
-            nasp.free_go_http_response(self.r0)
+            free_go_http_response(self.r0)
 
         if self.r1:
-            nasp.free_go_error(self.r1)
+            free_go_error(self.r1)
 
     @property
     def response(self):
@@ -138,7 +138,7 @@ class SendHTTPRequestReturn(ctypes.Structure):
 
 nasp = ctypes.cdll.LoadLibrary("./nasp.so")
 
-nasp.free_go_error.argtypes = [ctypes.POINTER(GoError)]
+nasp.FreeGoError.argtypes = [ctypes.POINTER(GoError)]
 
 nasp.NewHTTPTransport.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]
 nasp.NewHTTPTransport.restype = NewHTTPTransportReturn
@@ -146,9 +146,13 @@ nasp.NewHTTPTransport.restype = NewHTTPTransportReturn
 nasp.SendHTTPRequest.argtypes = [ctypes.c_ulonglong, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]
 nasp.SendHTTPRequest.restype = SendHTTPRequestReturn
 
-nasp.free_go_http_response.argtypes = [ctypes.POINTER(GoHttpResponse)]
+nasp.FreeGoHTTPResponse.argtypes = [ctypes.POINTER(GoHTTPResponse)]
 
 nasp.CloseHTTPTransport.argtypes = [ctypes.c_ulonglong]
+
+
+def free_go_error(err: ctypes.POINTER(GoError)):
+    nasp.FreeGoError(err)
 
 
 def new_http_transport(heimdall_url: str, client_id: str, client_secret: str):
@@ -170,6 +174,10 @@ def close_http_transport(http_transport_id: ctypes.c_ulonglong):
     nasp.CloseHTTPTransport(http_transport_id)
 
 
+def free_go_http_response(resp: ctypes.POINTER(GoHTTPResponse)):
+    nasp.FreeGoHTTPResponse(resp)
+
+
 class NaspHTTPTransportAdapter(requests.adapters.BaseAdapter):
     def __init__(self, http_transport_id):
         super().__init__()
@@ -182,7 +190,7 @@ class NaspHTTPTransportAdapter(requests.adapters.BaseAdapter):
         with send_http_request(self.http_transport_id, request.method, request.url, request.body) as ret:
             raw = urllib3.HTTPResponse(
                 body=io.BytesIO(ret.response.contents.response_body) if ret.response else "",
-                headers=ret.response.contents.headers_dict if ret.response else {},
+                headers=ret.response.contents.http_headers if ret.response else {},
                 request_method=request.method,
                 request_url=request.url,
                 preload_content=False,
@@ -230,21 +238,21 @@ def main(argv):
     client_id = "test-http-16362813-F46B-41AC-B191-A390DB1F6BDF"
     client_secret = "16362813-F46B-41AC-B191-A390DB1F6BDF"
 
-    with new_http_transport(heimdall_url, client_id, client_secret) as result:
-        if result.error:
-            err_msg = result.error.contents.msg
+    with new_http_transport(heimdall_url, client_id, client_secret) as http_transport:
+        if http_transport.error:
+            err_msg = http_transport.error.contents.msg
             sys.exit(err_msg)
 
-    with requests.Session() as s:
-        s.mount("http://", NaspHTTPTransportAdapter(result.id))
+        with requests.Session() as s:
+            s.mount("http://", NaspHTTPTransportAdapter(http_transport.id))
 
-        with ThreadPoolExecutor() as executor:
-            def http_get():
-                with s.get(request_url) as resp:
-                    print("thread[", threading.get_native_id(), "]\t", resp.status_code, "\t", resp.text)
+            with ThreadPoolExecutor() as executor:
+                def http_get():
+                    with s.get(request_url) as resp:
+                        print("thread[", threading.get_native_id(), "]\t", resp.status_code, "\t", resp.text)
 
-            for i in range(request_count):
-                executor.submit(http_get)
+                for i in range(request_count):
+                    executor.submit(http_get)
 
 
 if __name__ == "__main__":
