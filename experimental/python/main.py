@@ -37,11 +37,11 @@ def main(argv):
     client_sleep_seconds = 0
 
     try:
-        opts, args = getopt.getopt(argv, "h:", ["request-url=", "request-count=", "heimdall-url=",
+        opts, args = getopt.getopt(argv, "h", ["help", "request-url=", "request-count=", "heimdall-url=",
                                                 "use-push-gateway", "push-gateway-address=", "client-sleep="])
     except getopt.GetoptError:
         print('main.py --request-url <request-url> --request-count <request-count> --heimdall-url <heimdall-url>'
-              '--use-push-gateway --push-gateway-address <push-gateway-address> --client-sleep <seconds>')
+              ' --use-push-gateway --push-gateway-address <push-gateway-address> --client-sleep <seconds>')
         sys.exit(2)
 
     for opt, arg in opts:
