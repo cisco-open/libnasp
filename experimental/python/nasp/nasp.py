@@ -146,7 +146,7 @@ class SendHTTPRequestReturn(ctypes.Structure):
         return self.r1
 
 
-nasp = ctypes.cdll.LoadLibrary("./nasp.so")
+nasp = ctypes.cdll.LoadLibrary("./nasp/lib/nasp.so")
 
 nasp.FreeGoError.argtypes = [ctypes.POINTER(GoError)]
 
