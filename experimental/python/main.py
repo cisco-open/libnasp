@@ -64,7 +64,7 @@ def main(argv):
     client_secret = "16362813-F46B-41AC-B191-A390DB1F6BDF"
 
     with nasp.new_http_transport(heimdall_url, client_id, client_secret,
-                            use_push_gateway is not None, push_gateway_address) as http_transport:
+                                 use_push_gateway is not None, push_gateway_address) as http_transport:
         if http_transport.error:
             err_msg = http_transport.error.contents.msg
             sys.exit(err_msg)
