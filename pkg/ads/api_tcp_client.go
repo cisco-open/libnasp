@@ -255,7 +255,7 @@ func (c *client) getTCPClientTargetCluster(host string, port int) (*envoy_config
 	}
 
 	if clusterName == "" {
-		return nil, errors.Errorf("no cluster found for for outbound traffic for address: %s:%d", host, port)
+		return nil, errors.Errorf("no cluster found for outbound traffic for address: %s:%d", host, port)
 	}
 
 	cluster, err := c.getCluster(clusterName)
