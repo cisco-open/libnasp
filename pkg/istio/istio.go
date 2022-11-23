@@ -44,6 +44,7 @@ import (
 	pwhttp "github.com/cisco-open/nasp/pkg/proxywasm/http"
 	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
 	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
+	"github.com/cisco-open/nasp/pkg/proxywasm/wasmtime"
 	"github.com/cisco-open/nasp/pkg/proxywasm/wazero"
 	unifiedtls "github.com/cisco-open/nasp/pkg/tls"
 )
@@ -173,6 +174,9 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 	runtimeCreators := proxywasm.NewRuntimeCreatorStore()
 	runtimeCreators.Set("wazero", func() api.WasmRuntime {
 		return wazero.NewVM(context.Background(), logger)
+	})
+	runtimeCreators.Set("wasmtime", func() api.WasmRuntime {
+		return wasmtime.NewVM(context.Background(), logger)
 	})
 	if getWasmerRuntime != nil {
 		runtimeCreators.Set("wasmer", func() api.WasmRuntime {
@@ -355,7 +359,7 @@ func (h *IstioIntegrationHandler) defaultClientFilters() []api.WasmPluginConfig 
 			Name:   "istio-metadata-exchange",
 			RootID: "",
 			VMConfig: api.WasmVMConfig{
-				Runtime: "wazero",
+				Runtime: "wasmtime",
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "metadata-exchange-filter.wasm"),
 			},
@@ -368,7 +372,7 @@ func (h *IstioIntegrationHandler) defaultClientFilters() []api.WasmPluginConfig 
 			Name:   "istio-stats-outbound",
 			RootID: "stats_outbound",
 			VMConfig: api.WasmVMConfig{
-				Runtime: "wazero",
+				Runtime: "wasmtime",
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "stats-filter.wasm"),
 			},
@@ -386,7 +390,7 @@ func (h *IstioIntegrationHandler) defaultServerFilters() []api.WasmPluginConfig 
 			Name:   "istio-metadata-exchange",
 			RootID: "",
 			VMConfig: api.WasmVMConfig{
-				Runtime: "wazero",
+				Runtime: "wasmtime",
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "metadata-exchange-filter.wasm"),
 			},
@@ -399,7 +403,7 @@ func (h *IstioIntegrationHandler) defaultServerFilters() []api.WasmPluginConfig 
 			Name:   "istio-stats-inbound",
 			RootID: "stats_inbound",
 			VMConfig: api.WasmVMConfig{
-				Runtime: "wazero",
+				Runtime: "wasmtime",
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "stats-filter.wasm"),
 			},
@@ -518,7 +522,7 @@ func (h *IstioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConf
 			Name:   "tcp-metadata-exchange",
 			RootID: "tcp-metadata-exchange",
 			VMConfig: api.WasmVMConfig{
-				Runtime: "wazero",
+				Runtime: "wasmtime",
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "tcp-metadata-exchange-filter.wasm"),
 			},
@@ -528,7 +532,7 @@ func (h *IstioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConf
 			Name:   "istio-stats-outbound",
 			RootID: "stats_outbound",
 			VMConfig: api.WasmVMConfig{
-				Runtime: "wazero",
+				Runtime: "wasmtime",
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "stats-filter.wasm"),
 			},
@@ -546,7 +550,7 @@ func (h *IstioIntegrationHandler) defaultTCPServerFilters() []api.WasmPluginConf
 			Name:   "tcp-metadata-exchange",
 			RootID: "tcp-metadata-exchange",
 			VMConfig: api.WasmVMConfig{
-				Runtime: "wazero",
+				Runtime: "wasmtime",
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "tcp-metadata-exchange-filter.wasm"),
 			},
@@ -556,7 +560,7 @@ func (h *IstioIntegrationHandler) defaultTCPServerFilters() []api.WasmPluginConf
 			Name:   "istio-stats-inbound",
 			RootID: "stats_inbound",
 			VMConfig: api.WasmVMConfig{
-				Runtime: "wazero",
+				Runtime: "wasmtime",
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "stats-filter.wasm"),
 			},

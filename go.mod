@@ -3,6 +3,7 @@ module github.com/cisco-open/nasp
 go 1.18
 
 replace (
+	github.com/bytecodealliance/wasmtime-go/v3 => ../../bonifaido/wasmtime-go
 	github.com/spf13/cobra => github.com/spf13/cobra v1.6.0
 	helm.sh/helm/v3 => helm.sh/helm/v3 v3.9.4
 	mosn.io/proxy-wasm-go-host => github.com/banzaicloud/proxy-wasm-go-host v0.0.0-20221016152507-38b921ff1f31
@@ -10,6 +11,7 @@ replace (
 
 require (
 	emperror.dev/errors v0.8.1
+	github.com/bytecodealliance/wasmtime-go v1.0.0
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/cncf/xds/go v0.0.0-20220520190051-1e77728a1eaa
 	github.com/envoyproxy/go-control-plane v0.10.3-0.20220719090109-b024c36d9935
