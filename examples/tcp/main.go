@@ -41,7 +41,7 @@ func getIIH() (*istio.IstioIntegrationHandler, error) {
 	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
 		MetricsAddress:      ":15090",
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, "test-grpc-16362813-F46B-41AC-B191-A390DB1F6BDF", "16362813-F46B-41AC-B191-A390DB1F6BDF", "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, "test-tcp-16362813-F46B-41AC-B191-A390DB1F6BDF", "16362813-F46B-41AC-B191-A390DB1F6BDF", "v1"),
 	}
 
 	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, klog.TODO())
@@ -123,6 +123,8 @@ func client() {
 		panic(err)
 	}
 
+	defer conn.Close()
+
 	bytes := []byte("hello\n")
 	fmt.Printf("request: %s", bytes)
 
@@ -136,8 +138,6 @@ func client() {
 	if err != nil {
 		panic(err)
 	}
-
-	conn.Close()
 
 	fmt.Printf("response: %s", reply[:n])
 }
