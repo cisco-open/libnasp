@@ -14,10 +14,21 @@ public class WrappedInputStream extends InputStream {
 
     @Override
     public int read() throws IOException {
-        byte[] buffer = new byte[1];
+        byte[] buff = new byte[1];
+        return read(buff, 0, 0);
+    }
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException {
         try {
-            Long len = this.conn.read(buffer);
-            return buffer[0];
+            if (b.length < len ) {
+                throw new IOException("Buffer size is not big enough");
+            } else if (b.length == len ){
+                return (int)this.conn.read(b);
+            } else {
+                byte[] buffer = new byte[len];
+                System.arraycopy(b, 0, buffer, 0, len);
+                return (int)this.conn.read(buffer);
+            }
         } catch (Exception e) {
             if ("EOF".equals(e.getMessage())) {
                 return -1;
@@ -25,14 +36,5 @@ public class WrappedInputStream extends InputStream {
             throw new IOException(e);
         }
     }
-
-//    @Override
-//    public int read(byte b[]) throws IOException {
-//        try {
-//            return (int)this.conn.read(b);
-//        }catch (Exception e) {
-//            throw new IOException("could not read from nasps socket");
-//        }
-//    }
 
 }

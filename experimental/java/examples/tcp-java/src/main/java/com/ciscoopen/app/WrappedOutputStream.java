@@ -16,19 +16,17 @@ public class WrappedOutputStream extends OutputStream {
     @Override
     public void write(int b) throws IOException {
         final byte[] buffer = new byte[]{(byte)b};
-        try {
-            this.conn.write(buffer);
-        } catch (Exception e) {
-            throw new IOException("could not write to nasps socket");
-        }
+        write(buffer, 0, 1);
     }
 
     @Override
-    public void write(byte b[]) throws IOException {
+    public void write(byte[] b, int off, int len) throws IOException {
         try {
-            this.conn.write(b);
-        }catch (Exception e) {
-            throw new IOException("could not write to nasps socket");
+            byte[] buffer = new byte[b.length];
+            if (len >= 0) System.arraycopy(b, 0, buffer, 0, len);
+            this.conn.write(buffer);
+        } catch (Exception e) {
+            throw new IOException("could not write to nasp socket");
         }
     }
     

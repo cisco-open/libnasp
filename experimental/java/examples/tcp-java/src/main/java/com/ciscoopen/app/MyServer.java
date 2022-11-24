@@ -16,7 +16,6 @@ public class MyServer {
             
             Scanner scanner = new Scanner(inputToServer, "UTF-8");
             PrintWriter serverPrintOut = new PrintWriter(new OutputStreamWriter(outputFromServer, "UTF-8"), true);
-//            serverPrintOut.println("Hello java go poc");
 
             boolean done = false;
 

@@ -80,10 +80,7 @@ func (l *TCPListener) Accept() (*Connection, error) {
 }
 
 func (c *Connection) Read(b []byte) (int, error) {
-	println("Read", len(b))
-	length, err := c.conn.Read(b)
-	println("Lenght", length)
-	return length, err
+	return c.conn.Read(b)
 }
 
 func (c *Connection) Write(b []byte) (int, error) {
