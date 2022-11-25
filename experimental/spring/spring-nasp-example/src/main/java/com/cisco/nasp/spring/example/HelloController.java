@@ -1,4 +1,4 @@
-package example;
+package com.cisco.nasp.spring.example;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;

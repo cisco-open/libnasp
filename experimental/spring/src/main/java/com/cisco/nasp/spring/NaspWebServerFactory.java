@@ -3,7 +3,9 @@ package com.cisco.nasp.spring;
 import org.springframework.boot.web.reactive.server.AbstractReactiveWebServerFactory;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.http.server.reactive.HttpHandler;
+import org.springframework.stereotype.Component;
 
+@Component
 public class NaspWebServerFactory extends AbstractReactiveWebServerFactory {
 
     private final NaspConfiguration configuration;
