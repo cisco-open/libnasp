@@ -13,7 +13,6 @@
 
     <groupId>com.cisco.nasp</groupId>
     <artifactId>spring-nasp</artifactId>
-    <packaging>pom</packaging>
     <version>1.0-SNAPSHOT</version>
 
     <properties>
@@ -65,5 +64,13 @@
             </plugin>
         </plugins>
     </build>
+
+    <distributionManagement>
+        <repository>
+            <id>github-nasp</id>
+            <name>GitHub Nasp Apache Maven Packages</name>
+            <url>https://maven.pkg.github.com/cisco-open/nasp</url>
+        </repository>
+    </distributionManagement>
 
 </project>
