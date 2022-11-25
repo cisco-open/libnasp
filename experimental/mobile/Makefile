@@ -8,6 +8,3 @@ android:
 
 mac:
 	gomobile bind -target macos -v -o examples/cli-istio/Istio.xcframework
-
-java:
-	gomobile bind -target java/arm64,java/amd64 -v -o examples/spring-istio/lib/istio.jar

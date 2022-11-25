@@ -1,4 +1,4 @@
-package com.ciscoopen.nasp;
+package com.cisco.nasp.spring;
 
 import org.springframework.boot.web.reactive.server.AbstractReactiveWebServerFactory;
 import org.springframework.boot.web.server.WebServer;

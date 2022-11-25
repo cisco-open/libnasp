@@ -1,7 +1,7 @@
-package com.ciscoopen.nasp;
+package com.cisco.nasp.spring;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import istio.NaspHttpRequest;
+import nasp.NaspHttpRequest;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
@@ -56,7 +56,7 @@ public class NaspServerHttpRequest extends AbstractServerHttpRequest {
     @Override
     public Flux<DataBuffer> getBody() {
         return DataBufferUtils.readInputStream(() -> new InputStream() {
-            final istio.Body body = request.body();
+            final nasp.Body body = request.body();
             final byte[] buffer = new byte[1];
 
             @Override

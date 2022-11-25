@@ -1,4 +1,4 @@
-package com.ciscoopen.nasp;
+package com.cisco.nasp.spring;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

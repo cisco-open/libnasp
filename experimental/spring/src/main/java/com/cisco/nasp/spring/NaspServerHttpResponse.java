@@ -1,7 +1,7 @@
-package com.ciscoopen.nasp;
+package com.cisco.nasp.spring;
 
-import istio.Header;
-import istio.NaspResponseWriter;
+import nasp.Header;
+import nasp.NaspResponseWriter;
 import org.reactivestreams.Publisher;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
@@ -12,7 +12,7 @@ public class NaspServerHttpResponse extends AbstractServerHttpResponse {
 
     private final NaspResponseWriter responseWriter;
 
-    public NaspServerHttpResponse(istio.NaspResponseWriter responseWriter) {
+    public NaspServerHttpResponse(NaspResponseWriter responseWriter) {
         super(DefaultDataBufferFactory.sharedInstance);
         this.responseWriter = responseWriter;
     }
