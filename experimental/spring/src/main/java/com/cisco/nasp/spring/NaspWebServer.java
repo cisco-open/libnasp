@@ -1,7 +1,7 @@
-package com.ciscoopen.nasp;
+package com.cisco.nasp.spring;
 
-import istio.HTTPTransport;
-import istio.Istio;
+import nasp.HTTPTransport;
+import nasp.Nasp;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.boot.web.server.WebServerException;
 import org.springframework.http.server.reactive.HttpHandler;
@@ -21,7 +21,7 @@ public class NaspWebServer implements WebServer {
     @Override
     public void start() throws WebServerException {
         try {
-            transport = Istio.newHTTPTransport(configuration.getHeimdallURL(), configuration.getHeimdallClientID(), configuration.getHeimdallClientSecret());
+            transport = Nasp.newHTTPTransport(configuration.getHeimdallURL(), configuration.getHeimdallClientID(), configuration.getHeimdallClientSecret());
         } catch (Exception e) {
             throw new WebServerException("failed to create nasp transport", e);
         }

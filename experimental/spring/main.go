@@ -12,13 +12,15 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-package istio
+package nasp
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	_ "golang.org/x/mobile/bind"
 
@@ -113,10 +115,95 @@ func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error)
 	}, nil
 }
 
+func (t *HTTPTransport) ListenAndServe(address string, handler HttpHandler) error {
+	var err error
+	go func() {
+		err = t.iih.ListenAndServe(t.ctx, address, &NaspHttpHandler{handler: handler})
+	}()
+	time.Sleep(1 * time.Second)
+	return err
+}
+
 func (t *HTTPTransport) Await() {
 	<-t.ctx.Done()
 }
 
 func (t *HTTPTransport) Close() {
 	t.cancel()
+}
+
+type HttpHandler interface {
+	ServeHTTP(NaspResponseWriter, *NaspHttpRequest)
+}
+
+type NaspHttpRequest struct {
+	req *http.Request
+}
+
+func (r *NaspHttpRequest) Method() string {
+	return r.req.Method
+}
+
+func (r *NaspHttpRequest) URI() string {
+	return r.req.URL.RequestURI()
+}
+
+func (r *NaspHttpRequest) Header() []byte {
+	hjson, err := json.Marshal(r.req.Header)
+	if err != nil {
+		panic(err)
+	}
+	return hjson
+}
+
+type Body io.ReadCloser
+
+func (r *NaspHttpRequest) Body() Body {
+	return r.req.Body
+}
+
+type Header struct {
+	h http.Header
+}
+
+func (h *Header) Get(key string) string {
+	return h.h.Get(key)
+}
+
+func (h *Header) Set(key, value string) {
+	h.h.Set(key, value)
+}
+
+func (h *Header) Add(key, value string) {
+	h.h.Add(key, value)
+}
+
+type NaspResponseWriter interface {
+	Write([]byte) (int, error)
+	WriteHeader(statusCode int)
+	Header() *Header
+}
+
+type naspResponseWriter struct {
+	resp http.ResponseWriter
+}
+
+func (rw *naspResponseWriter) Write(b []byte) (int, error) {
+	return rw.resp.Write(b)
+}
+
+func (rw *naspResponseWriter) WriteHeader(statusCode int) {
+	rw.resp.WriteHeader(statusCode)
+}
+
+func (rw *naspResponseWriter) Header() *Header {
+	return &Header{rw.resp.Header()}
+}
+
+type NaspHttpHandler struct {
+	handler HttpHandler
+}
+
+func (h *NaspHttpHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	h.handler.ServeHTTP(&naspResponseWriter{resp}, &NaspHttpRequest{req})
 }

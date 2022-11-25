@@ -1,10 +1,10 @@
-package com.ciscoopen.nasp;
+package com.cisco.nasp.spring;
 
-import istio.NaspHttpRequest;
-import istio.NaspResponseWriter;
+import nasp.NaspHttpRequest;
+import nasp.NaspResponseWriter;
 import org.springframework.http.server.reactive.HttpHandler;
 
-public class NaspHttpHandler implements istio.HttpHandler {
+public class NaspHttpHandler implements nasp.HttpHandler {
 
     private final HttpHandler httpHandler;
 

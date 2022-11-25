@@ -1,8 +1,10 @@
-package com.ciscoopen.nasp;
+package example;
 
+import com.cisco.nasp.spring.NaspConfiguration;
+import com.cisco.nasp.spring.NaspWebServerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.web.reactive.server.ConfigurableReactiveWebServerFactory;
+import org.springframework.boot.web.reactive.server.ReactiveWebServerFactory;
 import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
@@ -10,9 +12,9 @@ public class Application {
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
     }
-
+    
     @Bean
-    public ConfigurableReactiveWebServerFactory webServerFactory(NaspConfiguration configuration) {
+    public ReactiveWebServerFactory webServerFactory(NaspConfiguration configuration) {
         return new NaspWebServerFactory(configuration);
     }
 }
