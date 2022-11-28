@@ -1,6 +1,6 @@
 REPO_ROOT=$(shell git rev-parse --show-toplevel)
 
-LICENSEI_VERSION = 0.5.0
+LICENSEI_VERSION = 0.6.1
 GOLANGCI_VERSION = 1.50.1
 
 .PHONY: fmt
