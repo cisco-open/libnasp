@@ -49,7 +49,7 @@ func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, e
 		return nil, err
 	}
 
-	listener, err := net.Listen("tcp", ":10000")
+	listener, err := net.Listen("tcp", "localhost:10000")
 	if err != nil {
 		return nil, err
 	}
