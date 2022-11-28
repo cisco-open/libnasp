@@ -20,7 +20,6 @@ import (
 
 	"github.com/cisco-open/nasp/pkg/istio"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
-	_ "golang.org/x/mobile/bind"
 	"k8s.io/klog/v2"
 )
 
