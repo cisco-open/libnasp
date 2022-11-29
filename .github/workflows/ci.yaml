@@ -61,17 +61,17 @@ jobs:
 
       - name: Download license information for dependencies
         env:
-          GITHUB_TOKEN: ${{ github.token }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
         run: make license-cache-all
 
       - name: List license information for dependencies
         env:
-          GITHUB_TOKEN: ${{ github.token }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
         run: ./bin/licensei list
 
       - name: Check dependency licenses
         env:
-          GITHUB_TOKEN: ${{ github.token }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
         run: make license-check-all
 
       - name: Run unit tests
