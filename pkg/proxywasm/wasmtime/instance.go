@@ -308,23 +308,6 @@ type Call struct {
 }
 
 func (c *Call) Call(args ...interface{}) (interface{}, error) {
-	params := make([]uint64, 0)
-	for _, ff := range args {
-		switch v := ff.(type) {
-		case uint64:
-			params = append(params, v)
-		case uint32:
-			params = append(params, uint64(v))
-		case int:
-			params = append(params, uint64(v))
-		case int64:
-			params = append(params, uint64(v))
-		case int32:
-			params = append(params, uint64(v))
-		default:
-		}
-	}
-
 	c.logger.V(3).Info(fmt.Sprintf("call module function %s", c.name))
 
 	ret, err := c.Func.Call(c.store, args...)
