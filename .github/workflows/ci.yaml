@@ -46,28 +46,29 @@ jobs:
             build-deps-v2-${{ steps.set-git-refname.outputs.git_refname }}
             build-deps-v2
 
-      - name: Cache licenses
-        id: cache-licenses
-        uses: actions/cache@v3
-        with:
-          path: |
-            .licensei.cache
-            experimental/heimdall/.licensei.cache
-            experimental/mobile/.licensei.cache
-          key: licensei-v1-${{ steps.set-git-refname.outputs.git_refname }}-${{ hashFiles('go.sum') }}
-          restore-keys: |
-            licensei-v1-${{ steps.set-git-refname.outputs.git_refname }}
-            licensei-v1
+      # - name: Cache licenses
+      #   id: cache-licenses
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       .licensei.cache
+      #       experimental/heimdall/.licensei.cache
+      #       experimental/mobile/.licensei.cache
+      #       experimental/java/.licensei.cache
+      #     key: licensei-v2-${{ steps.set-git-refname.outputs.git_refname }}-${{ hashFiles('go.sum') }}
+      #     restore-keys: |
+      #       licensei-v2-${{ steps.set-git-refname.outputs.git_refname }}
+      #       licensei-v2
 
-      - name: Download license information for dependencies
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
-        run: make license-cache-all
+      # - name: Download license information for dependencies
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
+      #   run: make license-cache-all
 
-      - name: List license information for dependencies
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
-        run: ./bin/licensei list
+      # - name: List license information for dependencies
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
+      #   run: ./bin/licensei list
 
       - name: Check dependency licenses
         env:
