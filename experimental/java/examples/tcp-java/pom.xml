@@ -14,13 +14,20 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>github-nasp</id>
+            <url>https://maven.pkg.github.com/cisco-open/nasp</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
     <dependencies>
         <dependency>
-            <groupId>nasp</groupId>
+            <groupId>com.cisco.nasp</groupId>
             <artifactId>nasp</artifactId>
-            <version>1.0</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/lib/nasp.jar</systemPath>
+            <version>1.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
 

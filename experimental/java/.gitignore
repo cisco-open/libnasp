@@ -1,4 +1,5 @@
 build/
+target/
 xcuserdata/
 DerivedData/
 *.xcframework
@@ -6,4 +7,5 @@ DerivedData/
 *.aar
 *.jar
 
+dependency-reduced-pom.xml
 /.licensei.cache

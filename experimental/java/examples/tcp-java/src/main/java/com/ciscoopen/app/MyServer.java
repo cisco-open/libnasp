@@ -9,8 +9,8 @@ import java.util.Scanner;
 
 public class MyServer {
     public static void main(String[] args) {
-//        initializeServer();
-        initializeClient();
+        initializeServer();
+//        initializeClient();
     }
     public static void initializeClient() {
         try (WrappedClientSocket wrappedSocket = new WrappedClientSocket()) {
