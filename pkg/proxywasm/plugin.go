@@ -30,10 +30,9 @@ type wasmPlugin struct {
 	config api.WasmPluginConfig
 	logger logr.Logger
 
-	module    api.WasmModule
-	wasmBytes []byte
-	vm        api.WasmVM
-	ctx       api.Context
+	module api.WasmModule
+	vm     api.WasmVM
+	ctx    api.Context
 
 	instanceCount  uint32
 	instances      []api.WasmInstance
