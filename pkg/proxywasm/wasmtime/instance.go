@@ -57,12 +57,10 @@ type Instance struct {
 	// user-defined data
 	data interface{}
 
-	store     *wasmtime.Store
-	module    *wasmtime.Module
-	instance  *wasmtime.Instance
-	memory    *wasmtime.Memory
-	moduleCtx context.Context
-	ctx       context.Context
+	store    *wasmtime.Store
+	module   *wasmtime.Module
+	instance *wasmtime.Instance
+	memory   *wasmtime.Memory
 
 	hostModules map[string][]hostFunc
 
@@ -97,7 +95,6 @@ func NewWasmtimeInstance(ctx context.Context, engine *wasmtime.Engine, module *w
 		store:           wasmtime.NewStore(engine),
 		module:          module,
 		lock:            sync.Mutex{},
-		ctx:             ctx,
 		hostModules:     make(map[string][]hostFunc),
 		startFunctions:  []string{"_start", "_initialize"},
 		mallocFunctions: []string{"proxy_on_memory_allocate", "malloc"},
