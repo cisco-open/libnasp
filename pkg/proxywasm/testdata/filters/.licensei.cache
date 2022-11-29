@@ -1,0 +1,7 @@
+
+[[dependencies]]
+  confidence = 0.0
+  license = ""
+  name = "github.com/tetratelabs/proxy-wasm-go-sdk"
+  revision = "v0.20.0"
+  type = "gomod"
