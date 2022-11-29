@@ -3,7 +3,6 @@ module github.com/cisco-open/nasp
 go 1.18
 
 replace (
-	github.com/bytecodealliance/wasmtime-go/v3 => ../../bonifaido/wasmtime-go
 	github.com/spf13/cobra => github.com/spf13/cobra v1.6.0
 	helm.sh/helm/v3 => helm.sh/helm/v3 v3.9.4
 	mosn.io/proxy-wasm-go-host => github.com/banzaicloud/proxy-wasm-go-host v0.0.0-20221016152507-38b921ff1f31

@@ -1,0 +1,11 @@
+FROM golang
+
+RUN apt-get update && apt-get install default-jdk -y
+
+RUN git clone --branch plainjava https://github.com/bonifaido/mobile.git
+
+WORKDIR mobile
+
+RUN go install ./cmd/gomobile
+RUN go install ./cmd/gobind
+
