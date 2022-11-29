@@ -20,6 +20,7 @@ import (
 
 	"github.com/cisco-open/nasp/pkg/istio"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
+
 	"k8s.io/klog/v2"
 )
 
@@ -68,7 +69,6 @@ func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, e
 		ctx:      ctx,
 		cancel:   cancel,
 	}, nil
-
 }
 
 func (l *TCPListener) Accept() (*Connection, error) {
