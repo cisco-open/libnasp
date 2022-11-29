@@ -109,12 +109,12 @@ func (m *wasmPluginManager) Add(config api.WasmPluginConfig) (api.WasmPlugin, er
 
 	plugin.vm.Acquire(plugin)
 
-	plugin.wasmBytes, err = config.VMConfig.Code.Get()
+	wasmBytes, err := config.VMConfig.Code.Get()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	plugin.module = plugin.vm.NewModule(plugin.wasmBytes)
+	plugin.module = plugin.vm.NewModule(wasmBytes)
 	plugin.module.SetLogger(plugin.logger.WithName("wasm"))
 
 	plugin.ctx = GetBaseContext().GetOrCreateContext(plugin.config.RootID)
