@@ -1,4 +1,4 @@
-# Spring web-server support
+# NASP java library
 
 ## Build
 
@@ -11,10 +11,9 @@ go install ./cmd/gomobile
 go install ./cmd/gobind
 ```
 
-In the NASP project root:
+Build the glue code using gomobile:
 
 ```
-cd experimental/spring
 make java
 ```
 
