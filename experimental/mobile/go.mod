@@ -80,7 +80,7 @@ require (
 	github.com/spf13/cobra v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
-	github.com/tetratelabs/wazero v1.0.0-pre.3 // indirect
+	github.com/tetratelabs/wazero v1.0.0-pre.4 // indirect
 	github.com/wasmerio/wasmer-go v1.0.4 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
