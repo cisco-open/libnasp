@@ -36,23 +36,23 @@ public class MyServer {
 
     public static void initializeServer() {
         try (WrappedServerSocket serverSocket = new WrappedServerSocket(10000)) {
-            WrappedSocket connectionSocket = (WrappedSocket) serverSocket.accept();
-            WrappedInputStream inputToServer = (WrappedInputStream) connectionSocket.getInputStream();
-            WrappedOutputStream outputFromServer = (WrappedOutputStream) connectionSocket.getOutputStream();
-            
-            Scanner scanner = new Scanner(inputToServer);
-            PrintWriter serverPrintOut = new PrintWriter(new OutputStreamWriter(outputFromServer), true);
-
             boolean done = false;
+            while(!done) {
+                WrappedSocket connectionSocket = (WrappedSocket) serverSocket.accept();
+                WrappedInputStream inputToServer = (WrappedInputStream) connectionSocket.getInputStream();
+                WrappedOutputStream outputFromServer = (WrappedOutputStream) connectionSocket.getOutputStream();
 
-            while (!done && scanner.hasNextLine()) {
-                String line = scanner.nextLine();
-                serverPrintOut.println(line);
-                if (line.toLowerCase().trim().equals("exit")) {
-                    done = true;
+                Scanner scanner = new Scanner(inputToServer);
+                PrintWriter serverPrintOut = new PrintWriter(new OutputStreamWriter(outputFromServer), true);
+                if (scanner.hasNextLine()) {
+                    String line = scanner.nextLine();
+                    serverPrintOut.println(line);
+                    if (line.toLowerCase().trim().equals("exit")) {
+                        done = true;
+                    }
                 }
+                scanner.close();
             }
-            scanner.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
