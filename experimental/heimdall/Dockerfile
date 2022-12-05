@@ -1,6 +1,6 @@
 # Copyright (c) 2021, and 2022 Cisco and/or its affiliates. All rights reserved.
 
-FROM golang:1.18.0 as build
+FROM golang:1.19.3 as build
 
 ARG GITHUB_ACCESS_TOKEN
 
