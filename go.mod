@@ -10,7 +10,7 @@ replace (
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/cenkalti/backoff/v4 v4.1.3
+	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cncf/xds/go v0.0.0-20220520190051-1e77728a1eaa
 	github.com/envoyproxy/go-control-plane v0.10.3-0.20220719090109-b024c36d9935
 	github.com/gin-contrib/gzip v0.0.6
