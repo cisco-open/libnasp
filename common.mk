@@ -1,6 +1,6 @@
 REPO_ROOT=$(shell git rev-parse --show-toplevel)
 
-LICENSEI_VERSION = 0.6.1
+LICENSEI_VERSION = 0.7.0
 GOLANGCI_VERSION = 1.50.1
 
 .PHONY: fmt
@@ -46,9 +46,9 @@ ${REPO_ROOT}/bin/licensei-${LICENSEI_VERSION}:
 
 .PHONY: license-check
 license-check: ${REPO_ROOT}/bin/licensei ## Run license check
-	${REPO_ROOT}/bin/licensei --config ${REPO_ROOT}/.licensei.toml check
-	${REPO_ROOT}/bin/licensei --config ${REPO_ROOT}/.licensei.toml header
+	${REPO_ROOT}/bin/licensei --debug --config ${REPO_ROOT}/.licensei.toml check
+	${REPO_ROOT}/bin/licensei --debug --config ${REPO_ROOT}/.licensei.toml header
 
 .PHONY: license-cache
 license-cache: ${REPO_ROOT}/bin/licensei ## Generate license cache
-	${REPO_ROOT}/bin/licensei --config ${REPO_ROOT}/.licensei.toml cache
+	${REPO_ROOT}/bin/licensei --debug --config ${REPO_ROOT}/.licensei.toml cache
