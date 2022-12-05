@@ -7,6 +7,7 @@ import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.server.reactive.AbstractServerHttpRequest;
 import org.springframework.http.server.reactive.SslInfo;
 import org.springframework.util.MultiValueMap;
@@ -49,8 +50,8 @@ public class NaspServerHttpRequest extends AbstractServerHttpRequest {
     }
 
     @Override
-    public String getMethodValue() {
-        return request.method();
+    public HttpMethod getMethod() {
+        return HttpMethod.valueOf(request.method());
     }
 
     @Override
