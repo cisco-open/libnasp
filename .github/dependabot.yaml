@@ -6,12 +6,12 @@ updates:
       interval: "weekly"
 
   - package-ecosystem: "maven"
-    directory: "/experimental/java"
+    directory: "/experimental/java/"
     schedule:
       interval: "weekly"
 
   - package-ecosystem: "maven"
-    directory: "/experimental/spring"
+    directory: "/experimental/spring/"
     schedule:
       interval: "weekly"
 
