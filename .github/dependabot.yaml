@@ -1,17 +1,17 @@
 version: 2
 updates:
   - package-ecosystem: "docker"
-    directory: "/"
+    directory: "/experimental/heimdall/"
     schedule:
       interval: "weekly"
 
   - package-ecosystem: "maven"
-    directory: "/"
+    directory: "/experimental/java"
     schedule:
       interval: "weekly"
 
-  - package-ecosystem: "gomod"
-    directory: "/"
+  - package-ecosystem: "maven"
+    directory: "/experimental/spring"
     schedule:
       interval: "weekly"
 
