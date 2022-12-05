@@ -32,18 +32,13 @@ jobs:
             go-mod-cache-${{ runner.os }}
             go-mod-cache
 
-      - name: Set Git refname
-        id: set-git-refname
-        run: echo "git_refname=$(echo "${{ github.ref }}" | sed -r 's@refs/(heads|pull|tags)/@@g')" >> $GITHUB_OUTPUT
-
       - name: Cache build dependencies
         id: cache-build-dependencies
         uses: actions/cache@v3
         with:
           path: bin/
-          key: build-deps-v2-${{ steps.set-git-refname.outputs.git_refname }}-{{ hashFiles('common.mk') }}
+          key: build-deps-v2-{{ hashFiles('common.mk') }}
           restore-keys: |
-            build-deps-v2-${{ steps.set-git-refname.outputs.git_refname }}
             build-deps-v2
 
       - name: Cache licenses
@@ -55,9 +50,8 @@ jobs:
             experimental/heimdall/.licensei.cache
             experimental/mobile/.licensei.cache
             experimental/java/.licensei.cache
-          key: licensei-v2-${{ steps.set-git-refname.outputs.git_refname }}-${{ hashFiles('go.sum') }}
+          key: licensei-v2-${{ hashFiles('go.sum') }}
           restore-keys: |
-            licensei-v2-${{ steps.set-git-refname.outputs.git_refname }}
             licensei-v2
 
       - name: Download license information for dependencies
