@@ -68,11 +68,13 @@ func (vm *wasmtimeVM) NewModule(wasmBytes []byte) api.WasmModule {
 		return nil
 	}
 
-	engine = nil
-	preCompiledModule = nil
-	moduleBytes = nil
-
-	runtime.GC()
+	//nolint:ineffassign
+	{
+		engine = nil
+		preCompiledModule = nil
+		moduleBytes = nil
+		runtime.GC()
+	}
 
 	ctx, ctxCancel := context.WithCancel(vm.ctx)
 
