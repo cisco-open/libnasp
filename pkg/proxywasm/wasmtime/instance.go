@@ -22,7 +22,7 @@ import (
 	"sync/atomic"
 
 	"emperror.dev/errors"
-	"github.com/bytecodealliance/wasmtime-go"
+	"github.com/bytecodealliance/wasmtime-go/v3"
 	"github.com/go-logr/logr"
 	"k8s.io/klog/v2"
 	"mosn.io/proxy-wasm-go-host/proxywasm/common"
