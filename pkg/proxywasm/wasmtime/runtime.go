@@ -16,6 +16,7 @@ package wasmtime
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/bytecodealliance/wasmtime-go/v3"
 	"github.com/go-logr/logr"
@@ -50,11 +51,28 @@ func (vm *wasmtimeVM) Runtime() *wasmtime.Engine {
 }
 
 func (vm *wasmtimeVM) NewModule(wasmBytes []byte) api.WasmModule {
-	compiledModule, err := wasmtime.NewModule(vm.engine, wasmBytes)
+	engine := wasmtime.NewEngine()
+	preCompiledModule, err := wasmtime.NewModule(engine, wasmBytes)
+	if err != nil {
+		panic(err)
+	}
+
+	moduleBytes, err := preCompiledModule.Serialize()
+	if err != nil {
+		panic(err)
+	}
+
+	compiledModule, err := wasmtime.NewModuleDeserialize(vm.engine, moduleBytes)
 	if err != nil {
 		vm.logger.Error(err, "could not compile module")
 		return nil
 	}
+
+	engine = nil
+	preCompiledModule = nil
+	moduleBytes = nil
+
+	runtime.GC()
 
 	ctx, ctxCancel := context.WithCancel(vm.ctx)
 
