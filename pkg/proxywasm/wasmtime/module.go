@@ -19,7 +19,7 @@ import (
 	"strings"
 
 	"emperror.dev/errors"
-	"github.com/bytecodealliance/wasmtime-go"
+	"github.com/bytecodealliance/wasmtime-go/v3"
 	"github.com/go-logr/logr"
 
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
