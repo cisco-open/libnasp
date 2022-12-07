@@ -1,4 +1,4 @@
-name: CI
+name: Mobile and Java build
 
 on:
   pull_request:
