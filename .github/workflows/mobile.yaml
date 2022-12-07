@@ -41,6 +41,11 @@ jobs:
           make java
           ./mvnw install
 
+      - name: Build spring library
+        working-directory: experimental/spring
+        run: |
+          ./mvnw install
+
       - name: Build android framework
         working-directory: experimental/mobile
         run: |
