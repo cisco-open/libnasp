@@ -9,7 +9,7 @@ env:
 
 jobs:
   build:
-    name: Mobile build
+    name: Mobile and Java build
     runs-on: macos-12
 
     steps:
@@ -23,8 +23,10 @@ jobs:
       
       - name: Setup gomobile
         run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          go install golang.org/x/mobile/cmd/gobind@latest
+          git clone -b plainjava git@github.com:bonifaido/mobile.git
+          cd mobile
+          go install ./cmd/gomobile
+          go install ./cmd/gobind
 
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
@@ -32,12 +34,18 @@ jobs:
       #     ## limits ssh access and adds the ssh public key for the user which triggered the workflow
       #     limit-access-to-actor: true
 
-      - name: Build android framework
+      - name: Build plain java library
+        working-directory: experimental/java
         run: |
-          cd experimental/mobile
+          make java
+          ./mvnw install
+
+      - name: Build android framework
+        working-directory: experimental/mobile
+        run: |
           make android
 
       - name: Build ios framework
+        working-directory: experimental/mobile
         run: |
-          cd experimental/mobile
           make ios
