@@ -23,7 +23,7 @@ jobs:
       
       - name: Setup gomobile
         run: |
-          git clone -b plainjava git@github.com:bonifaido/mobile.git
+          git clone -b plainjava https://github.com/bonifaido/mobile.git
           cd mobile
           go install ./cmd/gomobile
           go install ./cmd/gobind
