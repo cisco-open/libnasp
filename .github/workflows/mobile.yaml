@@ -44,6 +44,7 @@ jobs:
       - name: Build spring library
         working-directory: experimental/spring
         run: |
+          export JAVA_HOME="$(brew --prefix)/opt/openjdk/"
           ./mvnw install
 
       - name: Setup original gomobile
