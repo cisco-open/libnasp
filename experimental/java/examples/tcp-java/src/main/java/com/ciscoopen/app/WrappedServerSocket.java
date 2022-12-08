@@ -23,8 +23,7 @@ public class WrappedServerSocket extends ServerSocket {
     public Socket accept() throws IOException {
         try {
             Connection conn = this.TCPListener.accept();
-            Socket s = new WrappedSocket(conn);
-            return s;
+            return new WrappedSocket(conn);
         } catch (Exception e) {
             throw new IOException("could not bound to nasp tcp listener");
         }
