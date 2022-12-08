@@ -53,22 +53,6 @@
         </dependency>
     </dependencies>
 
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <configuration>
-                    <artifactSet>
-                        <includes>
-                            <include>nasp:nasp</include>
-                        </includes>
-                    </artifactSet>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
-
     <distributionManagement>
         <repository>
             <id>github-nasp</id>
