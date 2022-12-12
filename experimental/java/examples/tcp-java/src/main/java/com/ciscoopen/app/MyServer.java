@@ -36,22 +36,11 @@ public class MyServer {
 
     public static void initializeServer() {
         try (WrappedServerSocket serverSocket = new WrappedServerSocket(10000)) {
-            boolean done = false;
-            while(!done) {
+            while(true) {
                 WrappedSocket connectionSocket = (WrappedSocket) serverSocket.accept();
-                WrappedInputStream inputToServer = (WrappedInputStream) connectionSocket.getInputStream();
-                WrappedOutputStream outputFromServer = (WrappedOutputStream) connectionSocket.getOutputStream();
-
-                Scanner scanner = new Scanner(inputToServer);
-                PrintWriter serverPrintOut = new PrintWriter(new OutputStreamWriter(outputFromServer), true);
-                if (scanner.hasNextLine()) {
-                    String line = scanner.nextLine();
-                    serverPrintOut.println(line);
-                    if (line.toLowerCase().trim().equals("exit")) {
-                        done = true;
-                    }
-                }
-                scanner.close();
+                Runnable r = new ServerThread(connectionSocket);
+                Thread t = new Thread(r);
+                t.start();
             }
         } catch (Exception e) {
             e.printStackTrace();
