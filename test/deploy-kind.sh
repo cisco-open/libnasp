@@ -54,7 +54,7 @@ helm upgrade --install -n metallb-system --create-namespace metallb metallb/meta
 kubectl apply -f ${DIRECTORY}/metallb-config.yaml
 
 log "install istio"
-helm upgrade --install --create-namespace --namespace=istio-system istio-operator banzaicloud-stable/istio-operator --wait
+helm upgrade --install --create-namespace --namespace=istio-system istio-operator banzaicloud-stable/istio-operator --version 2.0.18 --wait
 kubectl apply --namespace istio-system -f ${DIRECTORY}/istio-controlplane.yaml
 
 log "waiting for istio controlplane to be available"
