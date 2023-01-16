@@ -56,6 +56,10 @@ type Selector struct {
 	selected []int
 }
 
+func NewSelector() *Selector {
+	return &Selector{c: make(chan int, 64)}
+}
+
 func (s *Selector) Select(timeout int64) int {
 	for {
 		select {
