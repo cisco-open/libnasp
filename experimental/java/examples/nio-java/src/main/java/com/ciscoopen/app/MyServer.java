@@ -2,6 +2,7 @@ package com.ciscoopen.app;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.net.StandardProtocolFamily;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Iterator;
@@ -12,6 +13,7 @@ public class MyServer {
         initializeServer();
 //        initializeClient();
     }
+
     public static void initializeClient() {
         try {
             SocketChannel channel = SocketChannel.open();
@@ -38,19 +40,23 @@ public class MyServer {
 
     public static void initializeServer() {
         try {
-            NaspServerSocketChannel server = new NaspServerSocketChannel(ServerSocketChannel.open());
+
+            NaspSelectorProvider naspSelectorProvider = new NaspSelectorProvider();
+
+            ServerSocketChannel server = naspSelectorProvider.openServerSocketChannel(StandardProtocolFamily.INET);
+
 //            ServerSocketChannel server = ServerSocketChannel.open();
             server.socket().bind(new InetSocketAddress("localhost", 10000));
             server.socket().setReuseAddress(true);
             server.configureBlocking(false);
 
-            Selector selector = Selector.open();
+            Selector selector = naspSelectorProvider.openSelector();
             server.register(selector, SelectionKey.OP_ACCEPT);
 
             ByteBuffer buffer = ByteBuffer.allocate(256);
             while (true) {
                 int channelCount = selector.select(10000);
-                System.out.println("After select");
+                System.out.println("After select, channelCount: " + channelCount);
                 if (channelCount > 0) {
                     Set<SelectionKey> keys = selector.selectedKeys();
                     Iterator<SelectionKey> iterator = keys.iterator();
@@ -80,6 +86,7 @@ public class MyServer {
             e.printStackTrace();
         }
     }
+
     private static void p(String s) {
         System.out.println(s);
     }

@@ -15,12 +15,15 @@
 package nasp
 
 import (
+	"Java/java/lang/System"
 	"context"
 	"encoding/json"
 	"io"
 	"net"
+
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cisco-open/nasp/pkg/istio"
@@ -39,10 +42,39 @@ type TCPListener struct {
 	fd       int64
 	ctx      context.Context
 	cancel   context.CancelFunc
+
+	asyncConnectionsLock sync.Mutex
+	asyncConnections     []*Connection
 }
 
 type Connection struct {
 	conn net.Conn
+}
+
+type Selector struct {
+	c        chan int
+	selected []int
+}
+
+func (s *Selector) Select(timeout int64) int {
+	for {
+		select {
+		case c := <-s.c:
+			_ := System.CurrentTimeMillis()
+
+			s.selected = append(s.selected, c)
+
+			l := len(s.c)
+
+			for i := 0; i < l; i++ {
+				s.selected = append(s.selected, <-s.c)
+			}
+
+			return l + 1
+		case <-time.After(1 * time.Millisecond):
+			return 0
+		}
+	}
 }
 
 func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, error) {
@@ -95,6 +127,35 @@ func (l *TCPListener) Accept() (*Connection, error) {
 		return nil, err
 	}
 	return &Connection{c}, nil
+}
+
+func (l *TCPListener) StartAsyncAccept() {
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				println(err.Error())
+				continue
+			}
+
+			l.asyncConnectionsLock.Lock()
+			l.asyncConnections = append(l.asyncConnections, conn)
+			l.asyncConnectionsLock.Unlock()
+		}
+	}()
+}
+
+func (l *TCPListener) AsyncAccept() *Connection {
+	l.asyncConnectionsLock.Lock()
+	defer l.asyncConnectionsLock.Unlock()
+
+	if len(l.asyncConnections) > 0 {
+		conn := l.asyncConnections[0]
+		l.asyncConnections = l.asyncConnections[1:]
+		return conn
+	}
+
+	return nil
 }
 
 func (c *Connection) Read(b []byte) (int, error) {

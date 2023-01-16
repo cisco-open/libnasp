@@ -32,7 +32,8 @@
             <groupId>nasp</groupId>
             <artifactId>nasp</artifactId>
             <version>0.0.0</version>
-            <scope>compile</scope>
+            <scope>system</scope>
+            <systemPath>${basedir}/../../repo/nasp/nasp/0.0.0/nasp-0.0.0.jar</systemPath>
         </dependency>
 <!--        <dependency>-->
 <!--            <groupId>com.cisco.nasp</groupId>-->

@@ -1,7 +1,10 @@
 package com.ciscoopen.app;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.SocketException;
 
 import nasp.Nasp;
 import nasp.TCPListener;
@@ -31,9 +34,8 @@ public class WrappedServerSocket extends ServerSocket {
     @Override
     public Socket accept() throws IOException {
         try {
-            Connection conn = this.TCPListener.accept();
-            Socket s = new WrappedSocket(conn);
-            return s;
+            Connection conn = this.TCPListener.asyncAccept();
+            return new WrappedSocket(conn);
         } catch (Exception e) {
             throw new IOException("could not bound to nasp tcp listener");
         }

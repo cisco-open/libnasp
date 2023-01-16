@@ -6,11 +6,13 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.nio.channels.SocketChannel;
 
 import nasp.Connection;
 
 public class WrappedSocket extends Socket {
-    Connection conn;
+    private final Connection conn;
+
     public WrappedSocket(Connection conn) {
         this.conn = conn;
     }
@@ -32,5 +34,10 @@ public class WrappedSocket extends Socket {
 
     public void setReuseAddress(boolean on) throws SocketException {
 
+    }
+
+    @Override
+    public SocketChannel getChannel() {
+        return super.getChannel();
     }
 }
