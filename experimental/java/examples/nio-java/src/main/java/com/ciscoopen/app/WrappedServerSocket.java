@@ -14,7 +14,7 @@ public class WrappedServerSocket extends ServerSocket {
     TCPListener TCPListener;
     public WrappedServerSocket(int port) throws IOException {
         try {
-            TCPListener = Nasp.newTCPListener("https://localhost:16443/config",
+            this.TCPListener = Nasp.newTCPListener("https://localhost:16443/config",
                     "test-tcp-16362813-F46B-41AC-B191-A390DB1F6BDF",
                     "16362813-F46B-41AC-B191-A390DB1F6BDF");
 

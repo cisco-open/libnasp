@@ -72,6 +72,10 @@ func NewSelector() *Selector {
 }
 
 func (s *Selector) Select(timeout int64) int {
+	timeoutChan := make(<-chan time.Time)
+	if timeout != -1 {
+		timeoutChan = time.After(time.Duration(timeout) * time.Millisecond)
+	}
 	select {
 	case c := <-s.queue:
 		s.selected = append(s.selected, c)
@@ -83,7 +87,7 @@ func (s *Selector) Select(timeout int64) int {
 		}
 
 		return l + 1
-	case <-time.After(1 * time.Millisecond):
+	case <-timeoutChan:
 		return 0
 	}
 }

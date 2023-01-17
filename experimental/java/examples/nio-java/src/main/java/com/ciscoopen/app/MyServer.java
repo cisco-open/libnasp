@@ -43,12 +43,10 @@ public class MyServer {
 
     public static void initializeServer() {
         try {
-
             NaspSelectorProvider naspSelectorProvider = new NaspSelectorProvider();
 
             ServerSocketChannel server = naspSelectorProvider.openServerSocketChannel(StandardProtocolFamily.INET);
 
-//            ServerSocketChannel server = ServerSocketChannel.open();
             server.socket().bind(new InetSocketAddress("localhost", 10000));
             server.socket().setReuseAddress(true);
             server.configureBlocking(false);
@@ -58,7 +56,7 @@ public class MyServer {
 
             ByteBuffer buffer = ByteBuffer.allocate(256);
             while (true) {
-                int channelCount = selector.select(10000);
+                int channelCount = selector.select();
                 System.out.println("After select, channelCount: " + channelCount);
                 if (channelCount > 0) {
                     Set<SelectionKey> keys = selector.selectedKeys();

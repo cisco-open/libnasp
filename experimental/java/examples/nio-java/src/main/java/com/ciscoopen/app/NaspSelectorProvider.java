@@ -1,5 +1,6 @@
 package com.ciscoopen.app;
 
+import nasp.TCPListener;
 import sun.nio.ch.SelectionKeyImpl;
 import sun.nio.ch.SelectorImpl;
 import sun.nio.ch.SelectorProviderImpl;
@@ -49,9 +50,9 @@ class NaspSelector extends SelectorImpl {
     @Override
     protected void implRegister(SelectionKeyImpl ski) {
         super.implRegister(ski);
-        // if ski.channel() == serverSocketChannel accept {
-          selectionKeyTable.put(ski.hashCode(), ski); // TODO is hashcode any good??
-        // }
+        NaspServerSocketChannel alma = (NaspServerSocketChannel)ski.channel();
+        alma.socket().TCPListener.startAsyncAccept(ski.hashCode(), selector);
+        selectionKeyTable.put(ski.hashCode(), ski);
     }
 
     @Override
