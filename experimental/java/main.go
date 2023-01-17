@@ -15,7 +15,6 @@
 package nasp
 
 import (
-	"Java/java/lang/System"
 	"context"
 	"encoding/json"
 	"io"
@@ -30,6 +29,13 @@ import (
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
 
 	"k8s.io/klog/v2"
+)
+
+const (
+	OP_READ    = 1 << 0
+	OP_WRITE   = 1 << 2
+	OP_CONNECT = 1 << 3
+	OP_ACCEPT  = 1 << 4
 )
 
 var logger = klog.NewKlogr()
@@ -51,34 +57,44 @@ type Connection struct {
 	conn net.Conn
 }
 
+type SelectedKey struct {
+	SelectedKeyId int
+	Operation     int
+}
+
 type Selector struct {
-	c        chan int
-	selected []int
+	queue    chan *SelectedKey
+	selected []*SelectedKey
 }
 
 func NewSelector() *Selector {
-	return &Selector{c: make(chan int, 64)}
+	return &Selector{queue: make(chan *SelectedKey, 64)}
 }
 
 func (s *Selector) Select(timeout int64) int {
-	for {
-		select {
-		case c := <-s.c:
-			_ := System.CurrentTimeMillis()
+	select {
+	case c := <-s.queue:
+		s.selected = append(s.selected, c)
 
-			s.selected = append(s.selected, c)
+		l := len(s.queue)
 
-			l := len(s.c)
-
-			for i := 0; i < l; i++ {
-				s.selected = append(s.selected, <-s.c)
-			}
-
-			return l + 1
-		case <-time.After(1 * time.Millisecond):
-			return 0
+		for i := 0; i < l; i++ {
+			s.selected = append(s.selected, <-s.queue)
 		}
+
+		return l + 1
+	case <-time.After(1 * time.Millisecond):
+		return 0
 	}
+}
+
+func (s *Selector) NextSelectedKey() *SelectedKey {
+	if len(s.selected) != 0 {
+		selected := s.selected[0]
+		s.selected = s.selected[1:]
+		return selected
+	}
+	return nil
 }
 
 func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, error) {
@@ -133,7 +149,7 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	return &Connection{c}, nil
 }
 
-func (l *TCPListener) StartAsyncAccept() {
+func (l *TCPListener) StartAsyncAccept(selectedKeyId int, selector *Selector) {
 	go func() {
 		for {
 			conn, err := l.Accept()
@@ -145,6 +161,8 @@ func (l *TCPListener) StartAsyncAccept() {
 			l.asyncConnectionsLock.Lock()
 			l.asyncConnections = append(l.asyncConnections, conn)
 			l.asyncConnectionsLock.Unlock()
+
+			selector.queue <- &SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: selectedKeyId}
 		}
 	}()
 }

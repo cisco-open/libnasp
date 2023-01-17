@@ -1,7 +1,5 @@
 package com.ciscoopen.app;
 
-
-
 import sun.nio.ch.SelectionKeyImpl;
 import sun.nio.ch.SelectorImpl;
 import sun.nio.ch.SelectorProviderImpl;
@@ -12,11 +10,14 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.spi.AbstractSelector;
 import java.nio.channels.spi.SelectorProvider;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Consumer;
 
 class NaspSelector extends SelectorImpl {
 
     private final nasp.Selector selector = new nasp.Selector();
+    private final Map<Integer, SelectionKeyImpl> selectionKeyTable = new HashMap<>();
 
     protected NaspSelector(SelectorProvider sp) {
         super(sp);
@@ -24,7 +25,20 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     protected int doSelect(Consumer<SelectionKey> action, long timeout) throws IOException {
-        return (int) selector.select(timeout);
+        int selected = (int) selector.select(timeout);
+
+        int numKeysUpdated = 0;
+        nasp.SelectedKey selectedKey;
+        while ((selectedKey = selector.nextSelectedKey()) != null) {
+            SelectionKeyImpl selectionKey = selectionKeyTable.get(selectedKey.getSelectedKeyId());
+            if (selectionKey != null) {
+                if (selectionKey.isValid()) {
+                    numKeysUpdated += processReadyEvents((int) selectedKey.getOperation(), selectionKey, action);
+                }
+            }
+        }
+
+        return numKeysUpdated;
     }
 
     @Override
@@ -35,7 +49,9 @@ class NaspSelector extends SelectorImpl {
     @Override
     protected void implRegister(SelectionKeyImpl ski) {
         super.implRegister(ski);
-        ski.channel();
+        // if ski.channel() == serverSocketChannel accept {
+          selectionKeyTable.put(ski.hashCode(), ski); // TODO is hashcode any good??
+        // }
     }
 
     @Override
