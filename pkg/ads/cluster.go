@@ -16,7 +16,6 @@ package ads
 
 import (
 	"context"
-	"net"
 
 	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
 
@@ -86,14 +85,10 @@ func (c *client) onClustersUpdated(ctx context.Context) {
 		}
 
 		if _, ok := c.clustersStats.Get(cl.GetName()); !ok {
-			c.clustersStats.Set(cl.GetName(), cluster.Stats{})
+			c.clustersStats.Set(cl.GetName(), &cluster.Stats{})
 		}
 
 		keepClustersStats[cl.GetName()] = struct{}{}
-
-		if cluster.GetLoadBalancingPolicy(cl) == envoy_config_cluster_v3.Cluster_ROUND_ROBIN {
-			continue
-		}
 
 		name := endpoint.GetClusterLoadAssignmentReference(cl)
 		if name == "" || !c.resources[resource_v3.EndpointType].IsInitialized() {
@@ -106,18 +101,17 @@ func (c *client) onClustersUpdated(ctx context.Context) {
 			continue
 		}
 
-		for _, localityLbEndpoints := range cla.GetEndpoints() {
-			for _, lbEndpoint := range localityLbEndpoints.GetLbEndpoints() {
-				socketAddress := lbEndpoint.GetEndpoint().GetAddress().GetSocketAddress()
-				if socketAddress == nil {
-					continue
+		endpointWeightsAreEqual := endpoint.LoadBalancingWeightsAreEqual(cla.GetEndpoints())
+		if (cluster.GetLoadBalancingPolicy(cl) != envoy_config_cluster_v3.Cluster_ROUND_ROBIN && cluster.GetLoadBalancingPolicy(cl) != envoy_config_cluster_v3.Cluster_LEAST_REQUEST) ||
+			(cluster.GetLoadBalancingPolicy(cl) == envoy_config_cluster_v3.Cluster_LEAST_REQUEST && endpointWeightsAreEqual) {
+			for _, localityLbEndpoints := range cla.GetEndpoints() {
+				for _, lbEndpoint := range localityLbEndpoints.GetLbEndpoints() {
+					address := endpoint.GetAddress(lbEndpoint.GetEndpoint())
+					if address == nil {
+						continue
+					}
+					c.endpointsStats.ResetRoundRobinCount(address.String())
 				}
-				address := net.TCPAddr{
-					IP:   net.ParseIP(socketAddress.GetAddress()),
-					Port: int(socketAddress.GetPortValue()),
-				}
-
-				c.endpointsStats.ResetRoundRobinCounter(address.String())
 			}
 		}
 	}

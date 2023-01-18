@@ -338,12 +338,37 @@ func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, route 
 		if cla.GetPolicy().GetOverprovisioningFactor() != nil {
 			overProvisioningFactor = float64(cla.GetPolicy().GetOverprovisioningFactor().GetValue()) / 100.0
 		}
-		endpointsLoad := endpoint.GetLoadDistribution(cla.GetEndpoints(), overProvisioningFactor)
+		endpointsLoad := endpoint.GetLoadDistribution(cla.GetEndpoints(), c.endpointsStats, overProvisioningFactor, -1.0)
 		endpoints := endpoint.Filter(cla.GetEndpoints(), endpoint.HasSocketAddress(), endpoint.WithHealthyStatus())
 		lb = loadbalancer.NewWeightedRoundRobinLoadBalancer(
 			endpoints,
 			endpointsLoad,
 			c.endpointsStats)
+	case envoy_config_cluster_v3.Cluster_LEAST_REQUEST:
+		overProvisioningFactor := 1.4 // default over provisioning factor
+		if cla.GetPolicy().GetOverprovisioningFactor() != nil {
+			overProvisioningFactor = float64(cla.GetPolicy().GetOverprovisioningFactor().GetValue()) / 100.0
+		}
+		p2cCount := uint32(2) // default number of healthy endpoints to select from by the Power of Two LB algorithm
+		if cl.GetLeastRequestLbConfig() != nil && cl.GetLeastRequestLbConfig().GetChoiceCount() != nil {
+			p2cCount = cl.GetLeastRequestLbConfig().GetChoiceCount().GetValue()
+		}
+
+		// active requests bias defaults to 1.0: https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers#weighted-least-request
+		activeRequestBias := 1.0
+		if cl.GetLeastRequestLbConfig() != nil && cl.GetLeastRequestLbConfig().GetActiveRequestBias() != nil {
+			activeRequestBias = cl.GetLeastRequestLbConfig().GetActiveRequestBias().GetDefaultValue()
+		}
+		endpointWeightsAreEqual := endpoint.LoadBalancingWeightsAreEqual(cla.GetEndpoints())
+		endpointsLoad := endpoint.GetLoadDistribution(cla.GetEndpoints(), c.endpointsStats, overProvisioningFactor, activeRequestBias)
+
+		endpoints := endpoint.Filter(cla.GetEndpoints(), endpoint.HasSocketAddress(), endpoint.WithHealthyStatus())
+		lb = loadbalancer.NewWeightedLeastLoadBalancer(
+			endpoints,
+			endpointsLoad,
+			c.endpointsStats,
+			p2cCount,
+			endpointWeightsAreEqual)
 	}
 
 	var endpointAddress net.Addr

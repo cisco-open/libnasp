@@ -283,8 +283,11 @@ func getLocalityLoadDistribution(localityLbEndpoints []*envoy_config_endpoint_v3
 
 // GetLoadDistribution computes the load distribution for healthy endpoints taking into account
 // priority level and locality load distribution
-func GetLoadDistribution(localityLbEndpoints []*envoy_config_endpoint_v3.LocalityLbEndpoints, overProvisioningFactor float64) map[string]float64 {
-	totalWeightPerLocality := make(map[string]uint32)
+// If the activeRequestBias is >= 0.0 than adjust effective endpoint weights based on active requests according to the
+// formula described at https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/load_balancers#weighted-least-request
+func GetLoadDistribution(localityLbEndpoints []*envoy_config_endpoint_v3.LocalityLbEndpoints,
+	endpointsStats *EndpointsStats, overProvisioningFactor, activeRequestBias float64) map[string]float64 {
+	totalWeightPerLocality := make(map[string]float64)
 	for _, localityLbEndpoint := range localityLbEndpoints {
 		locality := localityToString(localityLbEndpoint.GetLocality())
 		for _, lbEndpoint := range localityLbEndpoint.GetLbEndpoints() {
@@ -292,7 +295,15 @@ func GetLoadDistribution(localityLbEndpoints []*envoy_config_endpoint_v3.Localit
 				continue
 			}
 
-			weight := GetLoadBalancingWeight(lbEndpoint)
+			address := GetAddress(lbEndpoint.GetEndpoint())
+			if address == nil {
+				continue
+			}
+
+			weight := float64(GetLoadBalancingWeight(lbEndpoint))
+			if activeRequestBias >= 0.0 {
+				weight /= math.Pow(float64(endpointsStats.ActiveRequestsCount(address.String())+1), activeRequestBias)
+			}
 			totalWeightPerLocality[locality] += weight
 		}
 	}
@@ -303,21 +314,20 @@ func GetLoadDistribution(localityLbEndpoints []*envoy_config_endpoint_v3.Localit
 	for _, localityLbEndpoint := range localityLbEndpoints {
 		locality := localityToString(localityLbEndpoint.GetLocality())
 		for _, lbEndpoint := range localityLbEndpoint.GetLbEndpoints() {
-			socketAddress := lbEndpoint.GetEndpoint().GetAddress().GetSocketAddress()
-			if socketAddress == nil {
+			address := GetAddress(lbEndpoint.GetEndpoint())
+			if address == nil {
 				continue
 			}
 
-			address := net.TCPAddr{
-				IP:   net.ParseIP(socketAddress.GetAddress()),
-				Port: int(socketAddress.GetPortValue()),
+			weight := float64(GetLoadBalancingWeight(lbEndpoint))
+			if !IsHealthy(lbEndpoint) {
+				weight = 0.0
+			}
+			if activeRequestBias >= 0.0 {
+				weight /= math.Pow(float64(endpointsStats.ActiveRequestsCount(address.String())+1), activeRequestBias)
 			}
 
-			weight := GetLoadBalancingWeight(lbEndpoint)
-			if !IsHealthy(lbEndpoint) {
-				weight = 0
-			}
-			load := float64(weight) / float64(totalWeightPerLocality[locality]) * localityLoad[locality]
+			load := weight / totalWeightPerLocality[locality] * localityLoad[locality]
 			load = math.RoundToEven(load*100) / 100 // truncate precision to 2 decimals to avoid floating point number precision errors
 
 			loads[address.String()] = load
@@ -335,6 +345,53 @@ func GetLoadBalancingWeight(ep *envoy_config_endpoint_v3.LbEndpoint) uint32 {
 	}
 
 	return weight
+}
+
+// LoadBalancingWeightsAreEqual returns true if the weights of all the endpoints are equal
+func LoadBalancingWeightsAreEqual(endpoints []*envoy_config_endpoint_v3.LocalityLbEndpoints) bool {
+	if len(endpoints) <= 1 {
+		return true
+	}
+
+	localityLbEndpointsByPriority := make(map[uint32][]*envoy_config_endpoint_v3.LocalityLbEndpoints)
+	for _, localityLbEndpoints := range endpoints {
+		priority := localityLbEndpoints.GetPriority()
+		localityLbEndpointsByPriority[priority] = append(localityLbEndpointsByPriority[priority], localityLbEndpoints)
+	}
+
+	for _, localityLbEndpoints := range localityLbEndpointsByPriority {
+		if len(localityLbEndpoints) == 0 {
+			continue
+		}
+		// check if all LocalityLbEndpoints with the same priority have the same weight
+		weight := getLocalityLoadBalancingWeight(localityLbEndpoints[0])
+		localityEndpointsCount := len(localityLbEndpoints[0].GetLbEndpoints())
+		for i := 1; i < len(localityLbEndpoints); i++ {
+			if getLocalityLoadBalancingWeight(localityLbEndpoints[i]) != weight {
+				return false
+			}
+
+			if len(localityLbEndpoints[i].GetLbEndpoints()) != localityEndpointsCount {
+				return false
+			}
+		}
+
+		// all locality lb weights are equal in the same priority level; now check all endpoints in each locality
+		for i := range localityLbEndpoints {
+			if len(localityLbEndpoints[i].GetLbEndpoints()) <= 1 {
+				continue
+			}
+
+			weight = GetLoadBalancingWeight(localityLbEndpoints[i].GetLbEndpoints()[0])
+			for j := 1; j < len(localityLbEndpoints[i].GetLbEndpoints()); j++ {
+				if GetLoadBalancingWeight(localityLbEndpoints[i].GetLbEndpoints()[j]) != weight {
+					return false
+				}
+			}
+		}
+	}
+
+	return true
 }
 
 func getLocalityLoadBalancingWeight(locality *envoy_config_endpoint_v3.LocalityLbEndpoints) uint32 {

@@ -111,7 +111,7 @@ func (c *client) onEndpointsUpdated(ctx context.Context) {
 				}
 
 				if _, ok := c.endpointsStats.Get(netAddr.String()); !ok {
-					c.endpointsStats.Set(netAddr.String(), endpoint.Stats{})
+					c.endpointsStats.Set(netAddr.String(), &endpoint.Stats{})
 				}
 
 				keepEndpointsStats[netAddr.String()] = struct{}{}

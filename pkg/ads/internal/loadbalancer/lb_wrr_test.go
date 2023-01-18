@@ -75,14 +75,15 @@ func Test_weightedRoundRobinLoadBalancer_nextEndpoint(t *testing.T) {
 			},
 		},
 	}
-	endpointsLoad := endpoint.GetLoadDistribution(localityLbEndpoints, 1.4)
+
 	for _, ep := range endpoints {
 		address := net.TCPAddr{
 			IP:   net.ParseIP(ep.GetAddress().GetSocketAddress().GetAddress()),
 			Port: int(ep.GetAddress().GetSocketAddress().GetPortValue()),
 		}
-		stats.Set(address.String(), endpoint.Stats{})
+		stats.Set(address.String(), &endpoint.Stats{})
 	}
+	endpointsLoad := endpoint.GetLoadDistribution(localityLbEndpoints, stats, 1.4, -1.0)
 
 	lb := loadbalancer.NewWeightedRoundRobinLoadBalancer(endpoints, endpointsLoad, stats)
 
@@ -150,7 +151,7 @@ func Test_weightedRoundRobinLoadBalancer_nextEndpoint(t *testing.T) {
 	localityLbEndpoints[0].LbEndpoints[2].LoadBalancingWeight.Value = 4 // 7 -> 4 (70% -> 40%)
 	localityLbEndpoints[0].LbEndpoints[3].LoadBalancingWeight.Value = 3 // 0 -> 3 (0% -> 30%)
 
-	lb.SetEndpointsLoad(endpoint.GetLoadDistribution(localityLbEndpoints, 1.4))
+	lb.SetEndpointsLoad(endpoint.GetLoadDistribution(localityLbEndpoints, stats, 1.4, -1.0))
 
 	for i := 0; i < 1000; i++ {
 		next := lb.NextEndpoint()
@@ -441,11 +442,18 @@ func Test_endpointsLoadDistribution(t *testing.T) {
 
 	for _, test := range tests {
 		tc := test
+		stats := endpoint.NewEndpointsStats()
 
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			actualEndpointsLoadDistribution := endpoint.GetLoadDistribution(tc.localityLbEndpoints, 1.4)
+			actualEndpointsLoadDistribution := endpoint.GetLoadDistribution(tc.localityLbEndpoints, nil, 1.4, -1.0)
+			if assert.Equal(tc.expectedEndpointsLoadDistribution, actualEndpointsLoadDistribution) == false {
+				return
+			}
+
+			// if active request bias is 0.0 than load distribution should not change
+			actualEndpointsLoadDistribution = endpoint.GetLoadDistribution(tc.localityLbEndpoints, stats, 1.4, 0.0)
 			if assert.Equal(tc.expectedEndpointsLoadDistribution, actualEndpointsLoadDistribution) == false {
 				return
 			}
