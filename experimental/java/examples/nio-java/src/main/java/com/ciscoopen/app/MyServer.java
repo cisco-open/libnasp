@@ -45,7 +45,7 @@ public class MyServer {
         try {
             NaspSelectorProvider naspSelectorProvider = new NaspSelectorProvider();
 
-            ServerSocketChannel server = naspSelectorProvider.openServerSocketChannel(StandardProtocolFamily.INET);
+            ServerSocketChannel server = naspSelectorProvider.openServerSocketChannel();
 
             server.socket().bind(new InetSocketAddress("localhost", 10000));
             server.socket().setReuseAddress(true);

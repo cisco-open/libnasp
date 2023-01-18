@@ -1,5 +1,9 @@
 package com.ciscoopen.app;
 
+import sun.nio.ch.SelChImpl;
+import sun.nio.ch.SelectionKeyImpl;
+
+import java.io.FileDescriptor;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.net.SocketOption;
@@ -8,7 +12,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Set;
 
-public class NaspServerSocketChannel extends ServerSocketChannel {
+public class NaspServerSocketChannel extends ServerSocketChannel implements SelChImpl {
     private WrappedServerSocket socket;
 
     public NaspServerSocketChannel(SelectorProvider sp) {
@@ -55,20 +59,10 @@ public class NaspServerSocketChannel extends ServerSocketChannel {
 
     }
 
-//    public final SelectionKey register(Selector sel, int ops, Object att) throws ClosedChannelException {
-//        return this.channel.register(sel, ops, att);
-//    }
-
     @Override
     protected void implCloseSelectableChannel() throws IOException {
 
     }
-
-//    public final SelectionKey register(Selector sel, int ops)
-//            throws ClosedChannelException
-//    {
-//        return register(sel, ops, null);
-//    }
 
     public SocketChannel accept() throws IOException {
         return this.socket.accept().getChannel();
@@ -79,4 +73,33 @@ public class NaspServerSocketChannel extends ServerSocketChannel {
         return null;
     }
 
+    @Override
+    public FileDescriptor getFD() {
+        return null;
+    }
+
+    @Override
+    public int getFDVal() {
+        return 0;
+    }
+
+    @Override
+    public boolean translateAndUpdateReadyOps(int ops, SelectionKeyImpl ski) {
+        return false;
+    }
+
+    @Override
+    public boolean translateAndSetReadyOps(int ops, SelectionKeyImpl ski) {
+        return false;
+    }
+
+    @Override
+    public int translateInterestOps(int ops) {
+        return 0;
+    }
+
+    @Override
+    public void kill() throws IOException {
+
+    }
 }

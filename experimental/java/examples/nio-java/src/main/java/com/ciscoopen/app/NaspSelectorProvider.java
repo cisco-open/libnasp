@@ -50,7 +50,7 @@ class NaspSelector extends SelectorImpl {
     @Override
     protected void implRegister(SelectionKeyImpl ski) {
         super.implRegister(ski);
-        NaspServerSocketChannel alma = (NaspServerSocketChannel)ski.channel();
+        NaspServerSocketChannel alma = (NaspServerSocketChannel) ski.channel();
         alma.socket().TCPListener.startAsyncAccept(ski.hashCode(), selector);
         selectionKeyTable.put(ski.hashCode(), ski);
     }
