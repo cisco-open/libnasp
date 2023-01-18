@@ -1,5 +1,6 @@
 package com.ciscoopen.app;
 
+import sun.nio.ch.Net;
 import sun.nio.ch.SelChImpl;
 import sun.nio.ch.SelectionKeyImpl;
 
@@ -7,6 +8,7 @@ import java.io.FileDescriptor;
 import java.io.IOException;
 import java.net.SocketAddress;
 import java.net.SocketOption;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
@@ -83,19 +85,51 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
         return 0;
     }
 
-    @Override
     public boolean translateAndUpdateReadyOps(int ops, SelectionKeyImpl ski) {
-        return false;
+        return translateReadyOps(ops, ski.nioReadyOps(), ski);
     }
 
-    @Override
     public boolean translateAndSetReadyOps(int ops, SelectionKeyImpl ski) {
-        return false;
+        return translateReadyOps(ops, 0, ski);
     }
 
-    @Override
+    /**
+     * Translates native poll revent set into a ready operation set
+     */
+    public boolean translateReadyOps(int ops, int initialOps, SelectionKeyImpl ski) {
+        int intOps = ski.nioInterestOps();
+        int oldOps = ski.nioReadyOps();
+        int newOps = initialOps;
+
+        if ((ops & Net.POLLNVAL) != 0) {
+            // This should only happen if this channel is pre-closed while a
+            // selection operation is in progress
+            // ## Throw an error if this channel has not been pre-closed
+            return false;
+        }
+
+        if ((ops & (Net.POLLERR | Net.POLLHUP)) != 0) {
+            newOps = intOps;
+            ski.nioReadyOps(newOps);
+            return (newOps & ~oldOps) != 0;
+        }
+
+        if (((ops & Net.POLLIN) != 0) &&
+                ((intOps & SelectionKey.OP_ACCEPT) != 0))
+            newOps |= SelectionKey.OP_ACCEPT;
+
+        ski.nioReadyOps(newOps);
+        return (newOps & ~oldOps) != 0;
+    }
+
+    /**
+     * Translates an interest operation set into a native poll event set
+     */
     public int translateInterestOps(int ops) {
-        return 0;
+        int newOps = 0;
+        if ((ops & SelectionKey.OP_ACCEPT) != 0)
+            newOps |= Net.POLLIN;
+        return newOps;
     }
 
     @Override
