@@ -34,7 +34,7 @@ class NaspSelector extends SelectorImpl {
             SelectionKeyImpl selectionKey = selectionKeyTable.get(selectedKey.getSelectedKeyId());
             if (selectionKey != null) {
                 if (selectionKey.isValid()) {
-                    numKeysUpdated += processReadyEvents((int) selectedKey.getOperation(), selectionKey, action);
+                    numKeysUpdated += processReadyEvents(selectedKey.getOperation(), selectionKey, action);
                 }
             }
         }

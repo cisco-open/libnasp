@@ -58,8 +58,8 @@ type Connection struct {
 }
 
 type SelectedKey struct {
-	SelectedKeyId int
-	Operation     int
+	SelectedKeyId int32
+	Operation     int32
 }
 
 type Selector struct {
@@ -153,7 +153,7 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	return &Connection{c}, nil
 }
 
-func (l *TCPListener) StartAsyncAccept(selectedKeyId int, selector *Selector) {
+func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
 	go func() {
 		for {
 			conn, err := l.Accept()
