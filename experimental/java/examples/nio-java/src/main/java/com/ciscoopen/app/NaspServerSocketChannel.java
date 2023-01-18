@@ -44,7 +44,7 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
     public WrappedServerSocket socket() {
         try {
             if (this.socket == null) {
-                this.socket = new WrappedServerSocket(10000);
+                this.socket = new WrappedServerSocket(10000, provider());
             }
             return socket;
         } catch (IOException e) {

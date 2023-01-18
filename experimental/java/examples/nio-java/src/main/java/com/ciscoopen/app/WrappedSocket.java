@@ -7,14 +7,17 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.spi.SelectorProvider;
 
 import nasp.Connection;
 
 public class WrappedSocket extends Socket {
     private final Connection conn;
+    private final SocketChannel channel;
 
-    public WrappedSocket(Connection conn) {
+    public WrappedSocket(SelectorProvider provider, Connection conn) {
         this.conn = conn;
+        this.channel = new NaspSocketChannel(provider, conn);
     }
 
     @Override
@@ -38,6 +41,6 @@ public class WrappedSocket extends Socket {
 
     @Override
     public SocketChannel getChannel() {
-        return super.getChannel();
+        return channel;
     }
 }
