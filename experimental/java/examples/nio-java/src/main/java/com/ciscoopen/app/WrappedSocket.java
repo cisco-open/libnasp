@@ -17,8 +17,13 @@ public class WrappedSocket extends Socket {
 
     public WrappedSocket(SelectorProvider provider, Connection conn) {
         this.conn = conn;
-        this.channel = new NaspSocketChannel(provider, conn);
+        this.channel = new NaspSocketChannel(provider, conn, this);
     }
+    @Override
+    public int getPort() {
+        return 10000; //TODO fix this
+    }
+
 
     @Override
     public InputStream getInputStream() throws IOException {

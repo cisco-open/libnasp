@@ -54,7 +54,8 @@ type TCPListener struct {
 }
 
 type Connection struct {
-	conn net.Conn
+	conn       net.Conn
+	byteBuffer []byte
 }
 
 type SelectedKey struct {
@@ -150,7 +151,7 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{c}, nil
+	return &Connection{conn: c}, nil
 }
 
 func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
@@ -182,6 +183,48 @@ func (l *TCPListener) AsyncAccept() *Connection {
 	}
 
 	return nil
+}
+
+func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
+	go func() {
+		for {
+			_, err := c.Read(c.byteBuffer)
+			if err != nil {
+				println(err.Error())
+				continue
+			}
+			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
+		}
+	}()
+}
+func (c *Connection) AsyncRead(b []byte) (int32, error) {
+	bufferLen := len(c.byteBuffer)
+	if bufferLen > 0 {
+		b = c.byteBuffer[0:bufferLen]
+		c.byteBuffer = c.byteBuffer[bufferLen:]
+	}
+	return int32(bufferLen), nil
+}
+
+func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
+	go func() {
+		for {
+			_, err := c.Write(c.byteBuffer)
+			if err != nil {
+				println(err.Error())
+				continue
+			}
+			selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
+		}
+	}()
+}
+func (c *Connection) AsyncWrite(b []byte) (int32, error) {
+	bufferLen := len(c.byteBuffer)
+	if bufferLen > 0 {
+		b = c.byteBuffer[0:bufferLen]
+		c.byteBuffer = c.byteBuffer[bufferLen:]
+	}
+	return int32(bufferLen), nil
 }
 
 func (c *Connection) Read(b []byte) (int, error) {
@@ -233,7 +276,7 @@ func (d *TCPDialer) Dial() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{c}, nil
+	return &Connection{conn: c}, nil
 }
 
 // HTTP related structs and functions
