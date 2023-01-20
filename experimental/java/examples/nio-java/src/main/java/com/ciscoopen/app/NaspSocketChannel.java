@@ -1,6 +1,7 @@
 package com.ciscoopen.app;
 
 import nasp.Connection;
+import sun.nio.ch.Net;
 import sun.nio.ch.SelChImpl;
 import sun.nio.ch.SelectionKeyImpl;
 
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.net.SocketAddress;
 import java.net.SocketOption;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Set;
@@ -61,7 +63,8 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public boolean isConnected() {
-        return false;
+        //TODO check this if this is right the whole time
+        return true;
     }
 
     @Override
@@ -100,7 +103,11 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public int write(ByteBuffer src) throws IOException {
-        return 0;
+        try {
+            return connection.asyncWrite(src.array());
+        } catch (Exception e) {
+            throw new IOException(e);
+        }
     }
 
     @Override
@@ -133,19 +140,61 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         return 0;
     }
 
+    public boolean translateReadyOps(int ops, int initialOps, SelectionKeyImpl ski) {
+        int intOps = ski.nioInterestOps();
+        int oldOps = ski.nioReadyOps();
+        int newOps = initialOps;
+
+        if ((ops & Net.POLLNVAL) != 0) {
+            // This should only happen if this channel is pre-closed while a
+            // selection operation is in progress
+            // ## Throw an error if this channel has not been pre-closed
+            return false;
+        }
+
+        if ((ops & (Net.POLLERR | Net.POLLHUP)) != 0) {
+            newOps = intOps;
+            ski.nioReadyOps(newOps);
+            return (newOps & ~oldOps) != 0;
+        }
+
+        boolean connected = isConnected();
+        if (((ops & Net.POLLIN) != 0) &&
+                ((intOps & SelectionKey.OP_READ) != 0) && connected)
+            newOps |= SelectionKey.OP_READ;
+
+        if (((ops & Net.POLLCONN) != 0) &&
+                ((intOps & SelectionKey.OP_CONNECT) != 0) && isConnectionPending())
+            newOps |= SelectionKey.OP_CONNECT;
+
+        if (((ops & Net.POLLOUT) != 0) &&
+                ((intOps & SelectionKey.OP_WRITE) != 0) && connected)
+            newOps |= SelectionKey.OP_WRITE;
+
+        ski.nioReadyOps(newOps);
+        return (newOps & ~oldOps) != 0;
+    }
+
     @Override
     public boolean translateAndUpdateReadyOps(int ops, SelectionKeyImpl ski) {
-        return false;
+        return translateReadyOps(ops, ski.nioReadyOps(), ski);
     }
 
     @Override
     public boolean translateAndSetReadyOps(int ops, SelectionKeyImpl ski) {
-        return false;
+        return translateReadyOps(ops, 0, ski);
     }
 
     @Override
     public int translateInterestOps(int ops) {
-        return 0;
+        int newOps = 0;
+        if ((ops & SelectionKey.OP_READ) != 0)
+            newOps |= Net.POLLIN;
+        if ((ops & SelectionKey.OP_WRITE) != 0)
+            newOps |= Net.POLLOUT;
+        if ((ops & SelectionKey.OP_CONNECT) != 0)
+            newOps |= Net.POLLCONN;
+        return newOps;
     }
 
     @Override
