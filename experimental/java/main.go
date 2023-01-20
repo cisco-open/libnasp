@@ -54,8 +54,9 @@ type TCPListener struct {
 }
 
 type Connection struct {
-	conn       net.Conn
-	byteBuffer []byte
+	conn        net.Conn
+	readBuffer  []byte
+	writeBuffer []byte
 }
 
 type SelectedKey struct {
@@ -151,7 +152,7 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{conn: c}, nil
+	return &Connection{conn: c, readBuffer: make([]byte, 4096), writeBuffer: make([]byte, 4096)}, nil
 }
 
 func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
@@ -188,41 +189,50 @@ func (l *TCPListener) AsyncAccept() *Connection {
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	go func() {
 		for {
-			_, err := c.Read(c.byteBuffer)
+			num, err := c.Read(c.readBuffer)
+			println("Starting async read")
+			println(num)
 			if err != nil {
 				println(err.Error())
 				continue
 			}
-			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
+			if num > 0 {
+				selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
+			}
 		}
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
-	bufferLen := len(c.byteBuffer)
+	bufferLen := len(c.readBuffer)
+	println("Here comes the read bufferlen")
+	println(bufferLen)
 	if bufferLen > 0 {
-		b = c.byteBuffer[0:bufferLen]
-		c.byteBuffer = c.byteBuffer[bufferLen:]
+		copy(b, c.readBuffer[0:bufferLen])
+		c.readBuffer = make([]byte, 4096)
 	}
+	println(string(b))
 	return int32(bufferLen), nil
 }
 
 func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	go func() {
 		for {
-			_, err := c.Write(c.byteBuffer)
+			num, err := c.Write(c.writeBuffer)
 			if err != nil {
 				println(err.Error())
 				continue
 			}
-			selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
+			if num > 0 {
+				selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
+			}
 		}
 	}()
 }
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
-	bufferLen := len(c.byteBuffer)
+	bufferLen := len(c.writeBuffer)
 	if bufferLen > 0 {
-		b = c.byteBuffer[0:bufferLen]
-		c.byteBuffer = c.byteBuffer[bufferLen:]
+		copy(b, c.writeBuffer[0:bufferLen])
+		c.writeBuffer = c.writeBuffer[bufferLen:]
 	}
 	return int32(bufferLen), nil
 }
