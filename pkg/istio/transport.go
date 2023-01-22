@@ -74,7 +74,14 @@ func (t *istioHTTPRequestTransport) RoundTrip(req *http.Request) (*http.Response
 		}
 	}
 
-	return network.WrapHTTPTransport(t.transport, network.NewDialerWithTLSConfig(tlsConfig)).RoundTrip(req)
+	opts := []network.DialerOption{
+		network.DialerWithWrappedConnectionOptions(network.WrappedConnectionWithCloserWrapper(t.discoveryClient.NewConnectionCloseWrapper())),
+		network.DialerWithDialerWrapper(t.discoveryClient.NewDialWrapper()),
+	}
+
+	dialer := network.NewDialerWithTLSConfig(tlsConfig, opts...)
+
+	return network.WrapHTTPTransport(t.transport, dialer).RoundTrip(req)
 }
 
 func (t *istioHTTPRequestTransport) getTLSconfig() *tls.Config {

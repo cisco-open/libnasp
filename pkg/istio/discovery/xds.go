@@ -352,3 +352,15 @@ func (d *xdsDiscoveryClient) updateHTTPClientListenerProperties(address string, 
 		return
 	}
 }
+
+func (d *xdsDiscoveryClient) IncrementActiveRequestsCount(address string) {
+	d.xdsClient.IncrementActiveRequestsCount(address)
+}
+
+func (d *xdsDiscoveryClient) DecrementActiveRequestsCount(address string) {
+	d.xdsClient.DecrementActiveRequestsCount(address)
+}
+
+func (d *xdsDiscoveryClient) Logger() logr.Logger {
+	return d.logger
+}

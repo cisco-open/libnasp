@@ -124,7 +124,11 @@ func main() {
 
 	iih.Run(ctx)
 
-	transport, err := iih.GetHTTPTransport(http.DefaultTransport)
+	// make idle timeout minimal to test least request increment/decrement
+	t := http.DefaultTransport.(*http.Transport)
+	t.IdleConnTimeout = time.Nanosecond * 1
+
+	transport, err := iih.GetHTTPTransport(t)
 	if err != nil {
 		panic(err)
 	}

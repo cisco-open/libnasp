@@ -62,12 +62,27 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 		}
 	}
 
+	useTLS := tlsConfig != nil
+
+	opts := []network.DialerOption{
+		network.DialerWithWrappedConnectionOptions(network.WrappedConnectionWithCloserWrapper(d.discoveryClient.NewConnectionCloseWrapper())),
+		network.DialerWithDialerWrapper(d.discoveryClient.NewDialWrapper()),
+	}
+
+	var connectionDialer network.ConnectionDialer
+	if useTLS {
+		connectionDialer = network.NewDialerWithTLSConfig(tlsConfig, opts...)
+	} else {
+		connectionDialer = network.NewDialer(opts...)
+	}
+
 	var conn net.Conn
 	var err error
-	if tlsConfig != nil {
-		conn, err = network.NewDialerWithTLSConfig(tlsConfig).DialTLSContext(ctx, _net, address)
+
+	if useTLS {
+		conn, err = connectionDialer.DialContext(ctx, _net, address)
 	} else {
-		conn, err = network.NewDialer().DialContext(ctx, _net, address)
+		conn, err = connectionDialer.DialTLSContext(ctx, _net, address)
 	}
 	if err != nil {
 		return nil, err

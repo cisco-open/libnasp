@@ -482,7 +482,7 @@ func (h *IstioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, 
 		},
 	}
 
-	l = unifiedtls.NewUnifiedListener(network.WrapListener(l), network.WrapTLSConfig(tlsConfig), unifiedtls.TLSModeStrict)
+	l = unifiedtls.NewUnifiedListener(network.NewWrappedListener(l), network.WrapTLSConfig(tlsConfig), unifiedtls.TLSModeStrict)
 
 	return tcp.WrapListener(l, streamHandler), nil
 }

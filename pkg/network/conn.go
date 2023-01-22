@@ -34,6 +34,13 @@ type Connection interface {
 	SetLocalCertificate(cert *tls.Certificate)
 	GetConnectionState() *tls.ConnectionState
 	SetConnWithTLSConnectionState(ConnWithTLSConnectionState)
+	SetOptions(opts ...WrappedConnectionOption)
+}
+
+type ConnectionCloseWrapper interface {
+	AddParentCloseWrapper(ConnectionCloseWrapper)
+	BeforeClose(net.Conn) error
+	AfterClose(net.Conn) error
 }
 
 type ConnWithTLSConnectionState interface {
@@ -44,7 +51,7 @@ type wrappedListener struct {
 	net.Listener
 }
 
-func WrapListener(l net.Listener) net.Listener {
+func NewWrappedListener(l net.Listener) net.Listener {
 	return &wrappedListener{
 		Listener: l,
 	}
@@ -56,7 +63,7 @@ func (l *wrappedListener) Accept() (net.Conn, error) {
 		return nil, err
 	}
 
-	return NewWrappedConn(c), nil
+	return NewWrappedConnection(c), nil
 }
 
 type wrappedConn struct {
@@ -65,16 +72,40 @@ type wrappedConn struct {
 	connWithTLSConnectionState ConnWithTLSConnectionState
 	timeToFirstByte            time.Time
 	localCertificate           *x509.Certificate
+	closeWrapper               ConnectionCloseWrapper
+	beforeCloseRun             bool
+	originalAddress            string
 }
 
-func NewWrappedConn(conn net.Conn) Connection {
-	return &wrappedConn{
-		Conn: conn,
+type WrappedConnectionOption func(*wrappedConn)
+
+func WrappedConnectionWithCloserWrapper(closeWrapper ConnectionCloseWrapper) WrappedConnectionOption {
+	return func(wc *wrappedConn) {
+		if wc.closeWrapper != nil {
+			closeWrapper.AddParentCloseWrapper(wc.closeWrapper)
+		}
+		wc.closeWrapper = closeWrapper
 	}
 }
 
+func WrappedConnectionWithOriginalAddress(address string) WrappedConnectionOption {
+	return func(wc *wrappedConn) {
+		wc.originalAddress = address
+	}
+}
+
+func NewWrappedConnection(conn net.Conn, opts ...WrappedConnectionOption) Connection {
+	wc := &wrappedConn{
+		Conn: conn,
+	}
+
+	wc.SetOptions(opts...)
+
+	return wc
+}
+
 func NewConnectionToContext(ctx context.Context) context.Context {
-	return WrappedConnectionToContext(ctx, NewWrappedConn(NewNilConn()))
+	return WrappedConnectionToContext(ctx, NewWrappedConnection(NewNilConn()))
 }
 
 func (c *wrappedConn) NetConn() net.Conn {
@@ -99,6 +130,38 @@ func (c *wrappedConn) Write(b []byte) (n int, err error) {
 	}
 
 	return c.Conn.Write(b)
+}
+
+func (c *wrappedConn) SetOptions(opts ...WrappedConnectionOption) {
+	for _, opt := range opts {
+		opt(c)
+	}
+}
+
+func (c *wrappedConn) GetOriginalAddress() string {
+	return c.originalAddress
+}
+
+func (c *wrappedConn) Close() error {
+	if c.closeWrapper != nil && !c.beforeCloseRun {
+		if err := c.closeWrapper.BeforeClose(c); err != nil {
+			return err
+		}
+
+		c.beforeCloseRun = true
+	}
+
+	if err := c.Conn.Close(); err != nil {
+		return err
+	}
+
+	if c.closeWrapper != nil {
+		if err := c.closeWrapper.AfterClose(c); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *wrappedConn) GetTimeToFirstByte() time.Time {

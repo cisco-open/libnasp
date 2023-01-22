@@ -140,7 +140,7 @@ func (s *NetworkTestSuite) wrappedTCPServer(ctx context.Context, handler func(ne
 		return err
 	}
 
-	l = network.WrapListener(l)
+	l = network.NewWrappedListener(l)
 
 	s.wrappedTCPServerRunning = true
 
@@ -192,7 +192,7 @@ func (s *NetworkTestSuite) wrappedTLSServer(ctx context.Context, handler func(ne
 		InsecureSkipVerify: true,
 	}
 
-	l = ltls.NewUnifiedListener(network.WrapListener(l), network.WrapTLSConfig(tlsConfig), ltls.TLSModeStrict)
+	l = ltls.NewUnifiedListener(network.NewWrappedListener(l), network.WrapTLSConfig(tlsConfig), ltls.TLSModeStrict)
 
 	s.wrappedTLSServerRunning = true
 

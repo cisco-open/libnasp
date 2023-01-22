@@ -74,8 +74,11 @@ func (g *GRPCDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
 	}
 
 	ctx = network.NewConnectionToContext(ctx)
-
-	conn, err := network.NewDialerWithTLSConfig(tlsConfig).DialTLSContext(ctx, "tcp", addr)
+	opts := []network.DialerOption{
+		network.DialerWithWrappedConnectionOptions(network.WrappedConnectionWithCloserWrapper(g.discoveryClient.NewConnectionCloseWrapper())),
+		network.DialerWithDialerWrapper(g.discoveryClient.NewDialWrapper()),
+	}
+	conn, err := network.NewDialerWithTLSConfig(tlsConfig, opts...).DialTLSContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
