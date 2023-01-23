@@ -17,7 +17,11 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/banzaicloud/proxy-wasm-go-host/api"
 )
+
+type IoBuffer = api.IoBuffer
 
 type Context interface {
 	PropertyHolder

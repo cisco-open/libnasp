@@ -15,11 +15,12 @@
 package tcp
 
 import (
+	"errors"
+	"io"
 	"net"
 
-	pwapi "github.com/banzaicloud/proxy-wasm-go-host/api"
+	"github.com/banzaicloud/proxy-wasm-go-host/pkg/utils"
 	"github.com/cisco-open/nasp/pkg/network"
-	"github.com/cisco-open/nasp/pkg/proxywasm"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
 )
@@ -29,8 +30,10 @@ type wrappedConn struct {
 
 	stream api.Stream
 
-	readBuffer  pwapi.IoBuffer
-	writeBuffer pwapi.IoBuffer
+	readCacheBuffer    api.IoBuffer
+	readBuffer         api.IoBuffer
+	writeBuffer        api.IoBuffer
+	internalReadBuffer []byte
 
 	connectionInfoSet bool
 }
@@ -39,9 +42,12 @@ func NewWrappedConn(conn net.Conn, stream api.Stream) net.Conn {
 	c := &wrappedConn{
 		Conn: conn,
 
-		stream:      stream,
-		readBuffer:  proxywasm.NewBuffer([]byte{}),
-		writeBuffer: proxywasm.NewBuffer([]byte{}),
+		stream:          stream,
+		readCacheBuffer: utils.NewIoBufferBytes([]byte{}),
+		readBuffer:      utils.NewIoBufferBytes([]byte{}),
+		writeBuffer:     utils.NewIoBufferBytes([]byte{}),
+
+		internalReadBuffer: make([]byte, 16384),
 	}
 
 	if stream.Direction() == api.ListenerDirectionOutbound {
@@ -71,41 +77,52 @@ func (c *wrappedConn) Close() error {
 	return c.Conn.Close()
 }
 
-func (c *wrappedConn) Read(b []byte) (n int, err error) {
-	buf := make([]byte, len(b))
-	n, err = c.Conn.Read(buf)
-	if err != nil {
-		return
+func (c *wrappedConn) Read(b []byte) (int, error) {
+	// flush the remaining read buffer
+	if c.readCacheBuffer.Len() > 0 {
+		x := copy(b, c.readCacheBuffer.Bytes())
+		c.readCacheBuffer.Drain(x)
+
+		return x, nil
 	}
 
-	if !c.connectionInfoSet {
-		if connection, ok := network.WrappedConnectionFromNetConn(c); ok {
-			middleware.SetEnvoyConnectionInfo(connection, c.stream)
-			c.connectionInfoSet = true
-		}
+	// read from the underlying reader
+	n, err := c.Conn.Read(c.internalReadBuffer)
+	if n == 0 { // return if there is no more data
+		return n, err
 	}
-
-	c.readBuffer.Drain(c.readBuffer.Len())
-	if n, err := c.readBuffer.Write(buf[:n]); err != nil {
+	if err != nil && !errors.Is(err, io.EOF) { // or got a non-EOF error
 		return n, err
 	}
 
-	if c.stream.Direction() == api.ListenerDirectionOutbound {
-		if err := c.stream.HandleUpstreamData(c, n, c.readBuffer.Bytes()); err != nil {
-			return 0, err
-		}
-	} else {
-		if err := c.stream.HandleDownstreamData(c, n, c.readBuffer.Bytes()); err != nil {
-			return 0, err
+	if n, err := c.readBuffer.Write(c.internalReadBuffer[:n]); err == nil {
+		switch c.stream.Direction() {
+		case api.ListenerDirectionOutbound:
+			if err := c.stream.HandleUpstreamData(c, n); err != nil {
+				return 0, err
+			}
+		case api.ListenerDirectionUnspecified, api.ListenerDirectionInbound:
+			if err := c.stream.HandleDownstreamData(c, n); err != nil {
+				return 0, err
+			}
 		}
 	}
 
-	n = copy(b, c.readBuffer.Bytes())
+	// put the read data to the read buffer
+	if n, err := c.readCacheBuffer.Write(c.readBuffer.Bytes()); err != nil {
+		return n, err
+	} else {
+		c.readBuffer.Drain(n)
+	}
+
+	// copy from read buffer to the upstream buffer and drain the read buffer until the read len
+	n = copy(b, c.readCacheBuffer.Bytes())
+	c.readCacheBuffer.Drain(n)
 
 	return n, err
 }
 
-func (c *wrappedConn) Write(b []byte) (n int, err error) {
+func (c *wrappedConn) Write(b []byte) (int, error) {
 	if !c.connectionInfoSet {
 		if connection, ok := network.WrappedConnectionFromNetConn(c); ok {
 			middleware.SetEnvoyConnectionInfo(connection, c.stream)
@@ -113,27 +130,26 @@ func (c *wrappedConn) Write(b []byte) (n int, err error) {
 		}
 	}
 
-	var actN int
-	if actN, err = c.writeBuffer.Write(b); err != nil {
+	n, err := c.writeBuffer.Write(b)
+	if err != nil {
 		return n, err
 	}
 
 	if c.stream.Direction() == api.ListenerDirectionOutbound {
-		if err := c.stream.HandleDownstreamData(c, c.writeBuffer.Len(), c.writeBuffer.Bytes()); err != nil {
+		if err := c.stream.HandleDownstreamData(c, c.writeBuffer.Len()); err != nil {
 			return 0, err
 		}
 	} else {
-		if err := c.stream.HandleUpstreamData(c, c.writeBuffer.Len(), c.writeBuffer.Bytes()); err != nil {
+		if err := c.stream.HandleUpstreamData(c, c.writeBuffer.Len()); err != nil {
 			return 0, err
 		}
 	}
 
-	n, err = c.Conn.Write(c.writeBuffer.Bytes())
+	l, err := c.Conn.Write(c.writeBuffer.Bytes())
 	if err != nil {
-		return
+		return n, err
 	}
+	c.writeBuffer.Drain(l)
 
-	c.writeBuffer.Drain(n)
-
-	return actN, err
+	return n, nil
 }

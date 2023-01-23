@@ -130,9 +130,7 @@ func (s *stream) HandleHTTPRequest(req api.HTTPRequest) error {
 	for _, filterContext := range s.filterContexts {
 		action, err := func() (pwapi.Action, error) {
 			filterContext.Lock()
-			defer func() {
-				filterContext.Unlock()
-			}()
+			defer filterContext.Unlock()
 
 			return filterContext.GetExports().ProxyOnRequestHeaders(filterContext.ID(), int32(req.Header().Len()), 1)
 		}()
@@ -168,9 +166,7 @@ func (s *stream) HandleHTTPRequest(req api.HTTPRequest) error {
 			for _, filterContext := range s.filterContexts {
 				_, err := func() (pwapi.Action, error) {
 					filterContext.Lock()
-					defer func() {
-						filterContext.Unlock()
-					}()
+					defer filterContext.Unlock()
 
 					return filterContext.GetExports().ProxyOnRequestBody(filterContext.ID(), int32(nr), endOfStream)
 				}()
@@ -194,9 +190,7 @@ func (s *stream) HandleHTTPResponse(resp api.HTTPResponse) error {
 	for _, filterContext := range s.filterContexts {
 		_, err := func() (pwapi.Action, error) {
 			filterContext.Lock()
-			defer func() {
-				filterContext.Unlock()
-			}()
+			defer filterContext.Unlock()
 
 			return filterContext.GetExports().ProxyOnResponseHeaders(filterContext.ID(), int32(resp.Header().Len()), 1)
 		}()
@@ -229,9 +223,7 @@ func (s *stream) HandleHTTPResponse(resp api.HTTPResponse) error {
 			for _, filterContext := range s.filterContexts {
 				_, err := func() (pwapi.Action, error) {
 					filterContext.Lock()
-					defer func() {
-						filterContext.Unlock()
-					}()
+					defer filterContext.Unlock()
 
 					return filterContext.GetExports().ProxyOnResponseBody(filterContext.ID(), int32(nr), endOfStream)
 				}()
@@ -249,11 +241,11 @@ func (s *stream) HandleHTTPResponse(resp api.HTTPResponse) error {
 	return nil
 }
 
-func (s *stream) HandleDownstreamData(conn net.Conn, n int, buf []byte) error {
+func (s *stream) HandleDownstreamData(conn net.Conn, n int) error {
 	for _, filterContext := range s.filterContexts {
 		_, err := func() (pwapi.Action, error) {
 			filterContext.Lock()
-			defer filterContext.Close()
+			defer filterContext.Unlock()
 
 			return filterContext.GetExports().ProxyOnDownstreamData(filterContext.ID(), int32(n), 0)
 		}()
@@ -265,11 +257,11 @@ func (s *stream) HandleDownstreamData(conn net.Conn, n int, buf []byte) error {
 	return nil
 }
 
-func (s *stream) HandleUpstreamData(conn net.Conn, n int, buf []byte) error {
+func (s *stream) HandleUpstreamData(conn net.Conn, n int) error {
 	for _, filterContext := range s.filterContexts {
 		_, err := func() (pwapi.Action, error) {
 			filterContext.Lock()
-			defer filterContext.Close()
+			defer filterContext.Unlock()
 
 			return filterContext.GetExports().ProxyOnUpstreamData(filterContext.ID(), int32(n), 0)
 		}()
@@ -285,7 +277,7 @@ func (s *stream) HandleTCPNewConnection(conn net.Conn) error {
 	for _, filterContext := range s.filterContexts {
 		_, err := func() (pwapi.Action, error) {
 			filterContext.Lock()
-			defer filterContext.Close()
+			defer filterContext.Unlock()
 
 			return filterContext.GetExports().ProxyOnNewConnection(filterContext.ID())
 		}()
@@ -301,7 +293,7 @@ func (s *stream) HandleTCPCloseConnection(conn net.Conn) error {
 	for _, filterContext := range s.filterContexts {
 		err := func() error {
 			filterContext.Lock()
-			defer filterContext.Close()
+			defer filterContext.Unlock()
 
 			if err := filterContext.GetExports().ProxyOnUpstreamConnectionClose(filterContext.ID(), int32(pwapi.PeerTypeRemote)); err != nil {
 				return err
