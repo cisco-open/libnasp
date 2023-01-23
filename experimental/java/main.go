@@ -179,8 +179,8 @@ func (l *TCPListener) AsyncAccept() *Connection {
 
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	go func() {
-		tempBuffer := make([]byte, 1024)
 		for {
+			tempBuffer := make([]byte, 1024)
 			num, err := c.Read(tempBuffer)
 			if err != nil {
 				if err == io.EOF {
@@ -200,12 +200,8 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
 	c.readLock.Lock()
 	defer c.readLock.Unlock()
-	bufferLen := c.readBuffer.Len()
-	//TODO b cap nehogy tobbett olvassak
-	if bufferLen > 0 {
-		copy(b, c.readBuffer.Bytes())
-	}
-	return int32(bufferLen), nil
+	n, err := c.readBuffer.Read(b)
+	return int32(n), err
 }
 
 func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {

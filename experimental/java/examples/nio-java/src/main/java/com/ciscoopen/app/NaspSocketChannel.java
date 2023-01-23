@@ -92,9 +92,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         try {
             byte[] tempBuffer = new byte[4096];
             int num = connection.asyncRead(tempBuffer);
-            for (int i = 0; i < num; i++) {
-                dst.put(tempBuffer[i]);
-            }
+            dst.put(tempBuffer, 0, num);
             return num;
         } catch (Exception e) {
             throw new IOException(e);
