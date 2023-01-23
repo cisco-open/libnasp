@@ -47,7 +47,6 @@ func (c *discoveryClientDialWrapper) BeforeDial(ctx context.Context, network, ad
 }
 
 func (c *discoveryClientDialWrapper) AfterDial(ctx context.Context, conn net.Conn, network, addr string) error {
-	c.discoveryClient.Logger().V(0).Info("increment active request count", "address", addr)
 	c.discoveryClient.IncrementActiveRequestsCount(addr)
 
 	if c.parentDialWrapper != nil {
@@ -90,7 +89,6 @@ func (c *discoveryClientCloser) BeforeClose(conn net.Conn) error {
 		address = res.GetOriginalAddress()
 	}
 
-	c.discoveryClient.Logger().V(0).Info("decrement active request count", "address", address)
 	c.discoveryClient.DecrementActiveRequestsCount(address)
 
 	if c.parentCloseWrapper != nil {

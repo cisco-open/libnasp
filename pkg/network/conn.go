@@ -35,6 +35,7 @@ type Connection interface {
 	GetConnectionState() *tls.ConnectionState
 	SetConnWithTLSConnectionState(ConnWithTLSConnectionState)
 	SetOptions(opts ...WrappedConnectionOption)
+	GetOriginalAddress() string
 }
 
 type ConnectionCloseWrapper interface {

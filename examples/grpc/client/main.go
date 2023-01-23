@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 	"k8s.io/klog/v2"
 
 	"github.com/cisco-open/nasp/examples/grpc/pb"
@@ -51,10 +50,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	grpcDialOptions = append(grpcDialOptions, grpc.WithKeepaliveParams(keepalive.ClientParameters{
-		Timeout: time.Nanosecond * 1,
-	}))
-
 	client, err := grpc.Dial(
 		"localhost:8082",
 		grpcDialOptions...,
@@ -70,12 +65,14 @@ func main() {
 		defer cancel()
 		defer client.Close()
 
-		reply, err := pb.NewGreeterClient(client).SayHello(ctx, &pb.HelloRequest{Name: "world"})
-		if err != nil {
-			log.Fatal(err)
-		}
+		for i := 0; i < 10; i++ {
+			reply, err := pb.NewGreeterClient(client).SayHello(ctx, &pb.HelloRequest{Name: "world"})
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		log.Println(reply.Message)
+			log.Println(reply.Message)
+		}
 	}()
 
 	time.Sleep(time.Millisecond * 100)

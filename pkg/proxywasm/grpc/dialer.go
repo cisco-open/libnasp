@@ -93,6 +93,11 @@ func (g *GRPCDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
 func (g *GRPCDialer) RequestInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 	g.logger.Info("intercepted request", "target", cc.Target(), "method", method, "req", req)
 
+	if g.connection != nil {
+		g.discoveryClient.IncrementActiveRequestsCount(g.connection.GetOriginalAddress())
+		defer g.discoveryClient.DecrementActiveRequestsCount(g.connection.GetOriginalAddress())
+	}
+
 	stream, err := g.streamHandler.NewStream(api.ListenerDirectionOutbound)
 	if err != nil {
 		g.logger.Error(err, "could not get new stream")
