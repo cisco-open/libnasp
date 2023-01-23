@@ -15,6 +15,7 @@
 package nasp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -45,7 +46,6 @@ var logger = klog.NewKlogr()
 type TCPListener struct {
 	iih      *istio.IstioIntegrationHandler
 	listener net.Listener
-	fd       int64
 	ctx      context.Context
 	cancel   context.CancelFunc
 
@@ -54,9 +54,10 @@ type TCPListener struct {
 }
 
 type Connection struct {
-	conn        net.Conn
-	readBuffer  []byte
-	writeBuffer []byte
+	conn         net.Conn
+	readBuffer   *bytes.Buffer
+	readLock     sync.Mutex
+	writeChannel chan []byte
 }
 
 type SelectedKey struct {
@@ -120,11 +121,6 @@ func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, e
 	if err != nil {
 		return nil, err
 	}
-	fileListener, err := listener.(*net.TCPListener).File()
-	if err != nil {
-		return nil, err
-	}
-	fd := fileListener.Fd()
 
 	listener, err = iih.GetTCPListener(listener)
 	if err != nil {
@@ -137,14 +133,9 @@ func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, e
 	return &TCPListener{
 		iih:      iih,
 		listener: listener,
-		fd:       int64(fd),
 		ctx:      ctx,
 		cancel:   cancel,
 	}, nil
-}
-
-func (l *TCPListener) GetFD() int64 {
-	return l.fd
 }
 
 func (l *TCPListener) Accept() (*Connection, error) {
@@ -152,7 +143,7 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{conn: c, readBuffer: make([]byte, 4096), writeBuffer: make([]byte, 4096)}, nil
+	return &Connection{conn: c, readBuffer: new(bytes.Buffer), writeChannel: make(chan []byte, 64)}, nil
 }
 
 func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
@@ -188,53 +179,57 @@ func (l *TCPListener) AsyncAccept() *Connection {
 
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	go func() {
+		tempBuffer := make([]byte, 1024)
 		for {
-			num, err := c.Read(c.readBuffer)
-			println("Starting async read")
-			println(num)
+			num, err := c.Read(tempBuffer)
 			if err != nil {
+				println("Error received:")
 				println(err.Error())
 				continue
 			}
-			if num > 0 {
-				selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
-			}
+			c.readLock.Lock()
+			c.readBuffer.Write(tempBuffer[:num])
+			c.readLock.Unlock()
+			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
 		}
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
-	bufferLen := len(c.readBuffer)
-	println("Here comes the read bufferlen")
-	println(bufferLen)
+	c.readLock.Lock()
+	defer c.readLock.Unlock()
+	bufferLen := c.readBuffer.Len()
+	//TODO b cap nehogy tobbett olvassak
 	if bufferLen > 0 {
-		copy(b, c.readBuffer[0:bufferLen])
-		c.readBuffer = make([]byte, 4096)
+		copy(b, c.readBuffer.Bytes())
 	}
-	println(string(b))
 	return int32(bufferLen), nil
 }
 
 func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	go func() {
 		for {
-			num, err := c.Write(c.writeBuffer)
-			if err != nil {
-				println(err.Error())
-				continue
+			select {
+			case buff := <-c.writeChannel:
+				for {
+					num, err := c.Write(buff)
+					if err != nil {
+						println(err.Error())
+						continue
+					}
+					if len(buff) == num {
+						break
+					} else {
+						buff = buff[num:]
+					}
+				}
 			}
-			if num > 0 {
-				selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
-			}
+			selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
 		}
 	}()
 }
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
-	bufferLen := len(c.writeBuffer)
-	if bufferLen > 0 {
-		copy(b, c.writeBuffer[0:bufferLen])
-		c.writeBuffer = c.writeBuffer[bufferLen:]
-	}
-	return int32(bufferLen), nil
+	c.writeChannel <- b
+	return int32(len(b)), nil
 }
 
 func (c *Connection) Read(b []byte) (int, error) {

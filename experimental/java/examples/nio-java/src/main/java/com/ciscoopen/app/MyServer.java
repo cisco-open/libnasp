@@ -54,7 +54,7 @@ public class MyServer {
             Selector selector = naspSelectorProvider.openSelector();
             server.register(selector, SelectionKey.OP_ACCEPT);
 
-            ByteBuffer buffer = ByteBuffer.allocate(256);
+            ByteBuffer buffer = ByteBuffer.allocate(4096);
             while (true) {
                 int channelCount = selector.select();
                 System.out.println("After select, channelCount: " + channelCount);
@@ -70,11 +70,16 @@ public class MyServer {
                             client.register(selector, SelectionKey.OP_READ, client.socket().getPort());
                         } else if (key.isReadable()) {
                             SocketChannel client = (SocketChannel) key.channel();
-                            p("port: " + key.attachment());
-                            if (client.read(buffer) < 0) {
+                            int readBytes = client.read(buffer);
+                            System.out.println("The number of bytes read");
+                            System.out.println(readBytes);
+                            if (readBytes < 0) {
                                 key.cancel();
                                 client.close();
                             } else {
+                                System.out.println("inside else");
+                                System.out.println(buffer.position());
+                                System.out.println(buffer.remaining());
                                 buffer.flip(); // read from the buffer
                                 client.write(buffer);
                                 buffer.clear();

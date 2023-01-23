@@ -90,7 +90,12 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public int read(ByteBuffer dst) throws IOException {
         try {
-            return connection.asyncRead(dst.array());
+            byte[] tempBuffer = new byte[4096];
+            int num = connection.asyncRead(tempBuffer);
+            for (int i = 0; i < num; i++) {
+                dst.put(tempBuffer[i]);
+            }
+            return num;
         } catch (Exception e) {
             throw new IOException(e);
         }
@@ -104,7 +109,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public int write(ByteBuffer src) throws IOException {
         try {
-            return connection.asyncWrite(src.array());
+            byte[] tempArray = new byte[src.limit()];
+            src.get(tempArray, 0, src.limit());
+            return connection.asyncWrite(tempArray);
         } catch (Exception e) {
             throw new IOException(e);
         }
