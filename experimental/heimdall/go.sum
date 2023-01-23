@@ -127,7 +127,6 @@ github.com/banzaicloud/operator-tools v0.28.8 h1:juokC+0E7EnkdlmGR9Yn5UasRS6a5sN
 github.com/banzaicloud/operator-tools v0.28.8/go.mod h1:WhWEQk/6F951K55DX6/cyGKqo6ymLYy1SEN54tCWnqo=
 github.com/banzaicloud/proxy-wasm-go-host v1.0.1 h1:4WPHglx1YBk40kNe6AFaMeaeDlhuSCtNxrIwQl61PaU=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1 h1:kCCEUxvOxFClesgtL+JeBqHq4W6insjajcRtyNLoObs=
-github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime v1.0.0 h1:Il4ynAOEkLCJ8PItn/Ik0ZAGfiSGFRQ9QtXLyjNyg9Y=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3 v3.0.2-c1 h1:JPP2UBToeAeeyBBNeJnAYBY4yrNUapB3Au40xvBjNKQ=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.8-c1 h1:TfJ/UikKoxPhCSnWQ0+t+rF/bufsAjnHfWkHUzagJEg=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=

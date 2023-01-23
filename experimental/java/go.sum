@@ -134,7 +134,6 @@ github.com/banzaicloud/proxy-wasm-go-host v1.0.1 h1:4WPHglx1YBk40kNe6AFaMeaeDlhu
 github.com/banzaicloud/proxy-wasm-go-host v1.0.1/go.mod h1:ceg5fs685OwGAGl7gnSdse2YKMiMJBxKuSK8uMmxTqM=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1 h1:kCCEUxvOxFClesgtL+JeBqHq4W6insjajcRtyNLoObs=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1/go.mod h1:LLCsxoNbU88BofPbOWbvxsmnKnqdsv6RVGvYAfKirZc=
-github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime v1.0.0 h1:Il4ynAOEkLCJ8PItn/Ik0ZAGfiSGFRQ9QtXLyjNyg9Y=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3 v3.0.2-c1 h1:JPP2UBToeAeeyBBNeJnAYBY4yrNUapB3Au40xvBjNKQ=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3 v3.0.2-c1/go.mod h1:MCrrCIxSKM3IUTJjHDFYIg4tf8LWKv4PS+mr7inZBzU=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.8-c1 h1:TfJ/UikKoxPhCSnWQ0+t+rF/bufsAjnHfWkHUzagJEg=
