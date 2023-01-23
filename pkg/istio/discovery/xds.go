@@ -55,12 +55,10 @@ type listenerPropertiesContext struct {
 
 type clientPropertiesContext struct {
 	context.Context
-	response ads.ClientPropertiesResponse
 }
 
 type httpClientPropertiesContext struct {
 	context.Context
-	response ads.HTTPClientPropertiesResponse
 }
 
 func NewXDSDiscoveryClient(environment *environment.IstioEnvironment, caClient ca.Client, logger logr.Logger) DiscoveryClient {
@@ -170,12 +168,13 @@ func (d *xdsDiscoveryClient) watchForListenerPropertiesResponse(ctx context.Cont
 			case <-ctx.Done():
 				return
 			case resp, ok := <-respChan:
-				if ok {
-					d.updateListenerPropertiesResponse(address, resp)
-					if resp.Error() == nil {
-						for _, f := range callbacks {
-							f(resp.ListenerProperties())
-						}
+				if !ok {
+					return
+				}
+				d.updateListenerPropertiesResponse(address, resp)
+				if resp.Error() == nil {
+					for _, f := range callbacks {
+						f(resp.ListenerProperties())
 					}
 				}
 			}
@@ -208,74 +207,17 @@ func (d *xdsDiscoveryClient) GetTCPClientPropertiesByHost(ctx context.Context, a
 		return nil, errors.New("xds client is not connected")
 	}
 
-	err := d.watchForTCPClientProperties(ctx, address, callbacks...)
-	if err != nil {
-		return nil, err
-	}
-
-	var response ads.ClientPropertiesResponse
-
-	err = d.backoffRetry(ctx, func() error {
-		if c, ok := d.tcpClientPropertiesContexts[address]; ok && c.response != nil {
-			response = c.response
-			return nil
-		}
-		return errors.New("could not find listener properties")
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return response.ClientProperties(), response.Error()
-}
-
-func (d *xdsDiscoveryClient) watchForTCPClientProperties(ctx context.Context, address string, callbacks ...func(ClientProperties)) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	if _, ok := d.tcpClientPropertiesContexts[address]; ok {
-		return nil
-	}
-
-	d.tcpClientPropertiesContexts[address] = &clientPropertiesContext{
-		Context: ctx,
-	}
-
 	respChan, err := d.xdsClient.GetTCPClientPropertiesByHost(ctx, address)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	go func(ctx context.Context, address string, respChan <-chan ads.ClientPropertiesResponse) {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case resp, ok := <-respChan:
-				if ok {
-					d.updateTCPClientProperties(address, resp)
-					if resp.Error() == nil {
-						for _, f := range callbacks {
-							f(resp.ClientProperties())
-						}
-					}
-				}
-			}
-		}
-	}(ctx, address, respChan)
-
-	return nil
-}
-
-func (d *xdsDiscoveryClient) updateTCPClientProperties(address string, response ads.ClientPropertiesResponse) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	if c, ok := d.tcpClientPropertiesContexts[address]; ok {
-		d.logger.Info("tcp client property update", "address", address, "properties", response.ClientProperties(), "error", response.Error())
-		c.response = response
-		return
+	resp, ok := <-respChan
+	if ok {
+		return resp.ClientProperties(), resp.Error()
 	}
+
+	return nil, errors.New("could not find tcp client properties")
 }
 
 func (d *xdsDiscoveryClient) GetHTTPClientPropertiesByHost(ctx context.Context, address string, callbacks ...func(HTTPClientProperties)) (HTTPClientProperties, error) {
@@ -283,74 +225,17 @@ func (d *xdsDiscoveryClient) GetHTTPClientPropertiesByHost(ctx context.Context, 
 		return nil, errors.New("xds client is not connected")
 	}
 
-	err := d.watchForHTTPClientProperties(ctx, address, callbacks...)
-	if err != nil {
-		return nil, err
-	}
-
-	var response ads.HTTPClientPropertiesResponse
-
-	err = d.backoffRetry(ctx, func() error {
-		if c, ok := d.httpClientPropertiesContexts[address]; ok && c.response != nil {
-			response = c.response
-			return nil
-		}
-		return errors.New("could not find http client properties")
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return response.ClientProperties(), response.Error()
-}
-
-func (d *xdsDiscoveryClient) watchForHTTPClientProperties(ctx context.Context, address string, callbacks ...func(HTTPClientProperties)) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	if _, ok := d.httpClientPropertiesContexts[address]; ok {
-		return nil
-	}
-
-	d.httpClientPropertiesContexts[address] = &httpClientPropertiesContext{
-		Context: ctx,
-	}
-
 	respChan, err := d.xdsClient.GetHTTPClientPropertiesByHost(ctx, address)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	go func(ctx context.Context, address string, respChan <-chan ads.HTTPClientPropertiesResponse) {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case resp, ok := <-respChan:
-				if ok {
-					d.updateHTTPClientListenerProperties(address, resp)
-					if resp.Error() == nil {
-						for _, f := range callbacks {
-							f(resp.ClientProperties())
-						}
-					}
-				}
-			}
-		}
-	}(ctx, address, respChan)
-
-	return nil
-}
-
-func (d *xdsDiscoveryClient) updateHTTPClientListenerProperties(address string, response ads.HTTPClientPropertiesResponse) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	if c, ok := d.httpClientPropertiesContexts[address]; ok {
-		d.logger.V(3).Info("http client property update", "address", address, "properties", response.ClientProperties(), "error", response.Error())
-		c.response = response
-		return
+	resp, ok := <-respChan
+	if ok {
+		return resp.ClientProperties(), resp.Error()
 	}
+
+	return nil, errors.New("could not find http client properties")
 }
 
 func (d *xdsDiscoveryClient) IncrementActiveRequestsCount(address string) {
