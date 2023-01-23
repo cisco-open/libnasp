@@ -126,6 +126,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace (
-	github.com/cisco-open/nasp => ../..
-)
+replace github.com/cisco-open/nasp => ../..
