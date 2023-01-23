@@ -83,7 +83,7 @@ func (c *client) onRouteConfigurationsUpdated(ctx context.Context) {
 						"route configuration", r.GetName(),
 						"route", route.GetName(),
 						"cluster", cluster.Cluster)
-					c.clustersStats.ResetWeightedClusterSelectionCounter(cluster.Cluster)
+					c.clustersStats.ResetWeightedClusterSelectionCount(cluster.Cluster)
 				}
 			}
 		}

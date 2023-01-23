@@ -18,17 +18,26 @@ import (
 	"context"
 
 	"net"
+
+	"github.com/go-logr/logr"
 )
 
 type DiscoveryClient interface {
 	Connect(ctx context.Context) error
 	ListenerDiscoveryClient
 	ClientDiscoveryClient
+
+	NewConnectionCloseWrapper() ConnectionCloseWrapper
+	NewDialWrapper() DialWrapper
+	Logger() logr.Logger
 }
 
 type ClientDiscoveryClient interface {
 	GetHTTPClientPropertiesByHost(ctx context.Context, address string, callbacks ...func(HTTPClientProperties)) (HTTPClientProperties, error)
 	GetTCPClientPropertiesByHost(ctx context.Context, address string, callbacks ...func(ClientProperties)) (ClientProperties, error)
+
+	IncrementActiveRequestsCount(address string)
+	DecrementActiveRequestsCount(address string)
 }
 
 type ListenerDiscoveryClient interface {

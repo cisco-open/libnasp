@@ -75,6 +75,14 @@ type Client interface {
 
 	// GetSearchDomains returns the currently configured search domain list for this client
 	GetSearchDomains() []string
+
+	// IncrementActiveRequestsCount increments the active requests count for the endpoint given its address.
+	// Should be invoked when a connection is successfully established to the endpoint and a request is sent to it.
+	IncrementActiveRequestsCount(address string)
+
+	// DecrementActiveRequestsCount decrements the active requests count for the endpoint given its address
+	// Should be invoked when the endpoint finished processing a request
+	DecrementActiveRequestsCount(address string)
 }
 
 // ListenerPropertiesResponse contains the result for the API call

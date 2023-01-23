@@ -45,9 +45,7 @@ func (lb *weightedRoundRobinLoadBalancer) NextEndpoint() net.Addr {
 	var totalRoundRobinCount uint32
 
 	for endpointAddress := range lb.endpointsLoad {
-		if stats, ok := lb.endpointsStats.Get(endpointAddress); ok {
-			totalRoundRobinCount += stats.RoundRobinCount
-		}
+		totalRoundRobinCount += lb.endpointsStats.RoundRobinCount(endpointAddress)
 	}
 
 	totalRoundRobinCount++ // we want to retrieve the next endpoint for the next upcoming connection
@@ -72,14 +70,10 @@ func (lb *weightedRoundRobinLoadBalancer) NextEndpoint() net.Addr {
 		// algorithm to satisfy locality's weight as well as endpoint's weights within the locality
 		maxSelectCount := endpointLoad * float64(totalRoundRobinCount)
 
-		relativeLoad := float64(0) // the current load relative to maxSelectCount
-		stats, ok := lb.endpointsStats.Get(address.String())
-		if ok {
-			if float64(stats.RoundRobinCount) >= maxSelectCount {
-				continue // skip this endpoint as was already selected by round-robin maxLoad times
-			}
-			relativeLoad = float64(stats.RoundRobinCount) / maxSelectCount
+		if float64(lb.endpointsStats.RoundRobinCount(address.String())) >= maxSelectCount {
+			continue // skip this endpoint as was already selected by round-robin maxLoad times
 		}
+		relativeLoad := float64(lb.endpointsStats.RoundRobinCount(address.String())) / maxSelectCount // the current load relative to maxSelectCount
 
 		if relativeLoad < minLoad {
 			minLoad = relativeLoad
@@ -104,7 +98,7 @@ func (lb *weightedRoundRobinLoadBalancer) NextEndpoint() net.Addr {
 		}
 	}
 
-	lb.endpointsStats.IncRoundRobinCounter(selectedEndpointAddress.String())
+	lb.endpointsStats.IncRoundRobinCount(selectedEndpointAddress.String())
 
 	return endpoint.GetAddress(selectedEndpoint)
 }

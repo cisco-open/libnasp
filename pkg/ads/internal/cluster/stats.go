@@ -20,38 +20,54 @@ import (
 
 // Stats stores various items related to an upstream cluster
 type Stats struct {
-	// WeightedClusterSelectionCount is the number of times the upstream cluster was selected in case of weighted routing
+	// weightedClusterSelectionCount is the number of times the upstream cluster was selected in case of weighted routing
 	// to clusters (traffic shifting scenario)
-	WeightedClusterSelectionCount uint32
+	weightedClusterSelectionCount uint32
+}
+
+// WeightedClusterSelectionCount returns the number of times the upstream cluster was selected in case of weighted routing
+// to clusters (traffic shifting scenario)
+func (s *Stats) WeightedClusterSelectionCount() uint32 {
+	if s == nil {
+		return 0
+	}
+
+	return s.weightedClusterSelectionCount
 }
 
 // ClustersStats stores Stats for a collection of clusters
 type ClustersStats struct {
-	*util.KeyValueCollection[string, Stats]
+	*util.KeyValueCollection[string, *Stats]
 }
 
-func (cs *ClustersStats) IncWeightedClusterSelectionCounter(clusterName string) {
+func (cs *ClustersStats) IncWeightedClusterSelectionCount(clusterName string) {
 	cs.Lock()
 	defer cs.Unlock()
 
 	if stats, ok := cs.Items()[clusterName]; ok {
-		stats.WeightedClusterSelectionCount++
-		cs.Items()[clusterName] = stats
+		stats.weightedClusterSelectionCount++
 	}
 }
 
-func (cs *ClustersStats) ResetWeightedClusterSelectionCounter(clusterName string) {
+func (cs *ClustersStats) ResetWeightedClusterSelectionCount(clusterName string) {
 	cs.Lock()
 	defer cs.Unlock()
 
 	if stats, ok := cs.Items()[clusterName]; ok {
-		stats.WeightedClusterSelectionCount = 0
-		cs.Items()[clusterName] = stats
+		stats.weightedClusterSelectionCount = 0
 	}
+}
+
+// WeightedClusterSelectionCount returns the number of times the upstream the given upstream cluster was selected
+// in case of weighted routing to clusters (traffic shifting scenario)
+func (cs *ClustersStats) WeightedClusterSelectionCount(clusterName string) uint32 {
+	stats, _ := cs.Get(clusterName)
+
+	return stats.WeightedClusterSelectionCount()
 }
 
 func NewClustersStats() *ClustersStats {
 	return &ClustersStats{
-		KeyValueCollection: util.NewKeyValueCollection[string, Stats](),
+		KeyValueCollection: util.NewKeyValueCollection[string, *Stats](),
 	}
 }

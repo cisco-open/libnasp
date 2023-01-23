@@ -69,9 +69,7 @@ func SelectCluster(weightedClusters map[string]uint32, clustersStats *ClustersSt
 	var totalSelectionCount, totalWeight uint32
 	for clusterName, clusterWeight := range weightedClusters {
 		totalWeight += clusterWeight
-		if stats, ok := clustersStats.Get(clusterName); ok {
-			totalSelectionCount += stats.WeightedClusterSelectionCount
-		}
+		totalSelectionCount += clustersStats.WeightedClusterSelectionCount(clusterName)
 	}
 
 	totalSelectionCount++ // we want to retrieve the next cluster for the next upcoming connection
@@ -85,13 +83,10 @@ func SelectCluster(weightedClusters map[string]uint32, clustersStats *ClustersSt
 		// the maximum number of times this cluster can be selected by the algorithm to satisfy cluster's weights
 		maxLoad := float64(clusterWeight) / float64(totalWeight) * float64(totalSelectionCount)
 
-		load := float64(0) // the current load relative to maxLoad
-		if stats, ok := clustersStats.Get(clusterName); ok {
-			if float64(stats.WeightedClusterSelectionCount) >= maxLoad {
-				continue // skip this cluster as was already selected maxLoad times
-			}
-			load = float64(stats.WeightedClusterSelectionCount) / maxLoad
+		if float64(clustersStats.WeightedClusterSelectionCount(clusterName)) >= maxLoad {
+			continue // skip this cluster as was already selected maxLoad times
 		}
+		load := float64(clustersStats.WeightedClusterSelectionCount(clusterName)) / maxLoad // the current load relative to maxLoad
 
 		if load < minLoad {
 			minLoad = load
@@ -114,7 +109,7 @@ func SelectCluster(weightedClusters map[string]uint32, clustersStats *ClustersSt
 		}
 	}
 
-	clustersStats.IncWeightedClusterSelectionCounter(selectedCluster)
+	clustersStats.IncWeightedClusterSelectionCount(selectedCluster)
 
 	return selectedCluster
 }

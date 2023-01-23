@@ -18,6 +18,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"time"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -57,16 +58,22 @@ func main() {
 		log.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	iih.Run(ctx)
 
-	greeter := pb.NewGreeterClient(client)
+	func() {
+		defer cancel()
+		defer client.Close()
 
-	reply, err := greeter.SayHello(context.Background(), &pb.HelloRequest{Name: "world"})
-	if err != nil {
-		log.Fatal(err)
-	}
+		for i := 0; i < 10; i++ {
+			reply, err := pb.NewGreeterClient(client).SayHello(ctx, &pb.HelloRequest{Name: "world"})
+			if err != nil {
+				log.Fatal(err)
+			}
 
-	log.Println(reply.Message)
+			log.Println(reply.Message)
+		}
+	}()
+
+	time.Sleep(time.Millisecond * 100)
 }

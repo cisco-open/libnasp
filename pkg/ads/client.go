@@ -85,6 +85,18 @@ func (c *client) SetSearchDomains(domains []string) {
 	c.config.SearchDomains = domains
 }
 
+// IncrementActiveRequestsCount increments the active requests count for the endpoint given its address.
+// Should be invoked when a connection is successfully established to the endpoint and a request is sent to it.
+func (c *client) IncrementActiveRequestsCount(address string) {
+	c.endpointsStats.IncActiveRequestsCount(address)
+}
+
+// DecrementActiveRequestsCount decrements the active requests count for the endpoint given its address
+// Should be invoked when the endpoint finished processing a request
+func (c *client) DecrementActiveRequestsCount(address string) {
+	c.endpointsStats.DecActiveRequestsCount(address)
+}
+
 // GetSearchDomains returns the currently configured search domain list for this client
 func (c *client) GetSearchDomains() []string {
 	c.mu.RLock()

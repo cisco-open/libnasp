@@ -88,7 +88,10 @@ func (c *client) onListenersUpdated(ctx context.Context) {
 
 					if tcpProxy.GetCluster() != "" {
 						// traffic is routed to single upstream cluster thus reset weighted cluster stats
-						c.clustersStats.ResetWeightedClusterSelectionCounter(tcpProxy.GetCluster())
+						log.V(2).Info("reset weighted upstream cluster selection counter as traffic is routed to single upstream cluster",
+							"listener", listener.GetName(),
+							"cluster", tcpProxy.GetCluster())
+						c.clustersStats.ResetWeightedClusterSelectionCount(tcpProxy.GetCluster())
 					}
 				}
 			}

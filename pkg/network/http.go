@@ -68,13 +68,13 @@ func (s *server) GetUnifiedListener() ltls.UnifiedListener {
 }
 
 func (s *server) Serve(l net.Listener) error {
-	s.unifiedListener = ltls.NewUnifiedListener(WrapListener(l), nil, ltls.TLSModeDisabled)
+	s.unifiedListener = ltls.NewUnifiedListener(NewWrappedListener(l), nil, ltls.TLSModeDisabled)
 
 	return s.Server.Serve(s.unifiedListener)
 }
 
 func (s *server) ServeWithTLSConfig(l net.Listener, config *tls.Config) error {
-	s.unifiedListener = ltls.NewUnifiedListener(WrapListener(l), WrapTLSConfig(config), ltls.TLSModePermissive)
+	s.unifiedListener = ltls.NewUnifiedListener(NewWrappedListener(l), WrapTLSConfig(config), ltls.TLSModePermissive)
 
 	return s.Server.Serve(s.unifiedListener)
 }
