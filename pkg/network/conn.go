@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-type Connection interface {
+type Connection interface { //nolint:interfacebloat
 	net.Conn
 
 	NetConn() net.Conn
