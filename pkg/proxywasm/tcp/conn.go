@@ -17,8 +17,7 @@ package tcp
 import (
 	"net"
 
-	"mosn.io/proxy-wasm-go-host/proxywasm/common"
-
+	pwapi "github.com/banzaicloud/proxy-wasm-go-host/api"
 	"github.com/cisco-open/nasp/pkg/network"
 	"github.com/cisco-open/nasp/pkg/proxywasm"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
@@ -30,8 +29,8 @@ type wrappedConn struct {
 
 	stream api.Stream
 
-	readBuffer  common.IoBuffer
-	writeBuffer common.IoBuffer
+	readBuffer  pwapi.IoBuffer
+	writeBuffer pwapi.IoBuffer
 
 	connectionInfoSet bool
 }

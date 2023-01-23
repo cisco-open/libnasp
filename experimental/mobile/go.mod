@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
 	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
-	k8s.io/klog/v2 v2.70.0
+	k8s.io/klog/v2 v2.80.1
 )
 
 require (
@@ -16,6 +16,10 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed // indirect
+	github.com/banzaicloud/proxy-wasm-go-host v1.0.0 // indirect
+	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.0 // indirect
+	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime v1.0.0 // indirect
+	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.6 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bytecodealliance/wasmtime-go/v3 v3.0.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
@@ -81,7 +85,7 @@ require (
 	github.com/spf13/cobra v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
-	github.com/tetratelabs/wazero v1.0.0-pre.4 // indirect
+	github.com/tetratelabs/wazero v1.0.0-pre.6 // indirect
 	github.com/wasmerio/wasmer-go v1.0.4 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
@@ -116,7 +120,6 @@ require (
 	k8s.io/client-go v0.24.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20220627174259-011e075b9cb8 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
-	mosn.io/proxy-wasm-go-host v0.1.1-0.20220422021702-84b9c9ae81df // indirect
 	sigs.k8s.io/controller-runtime v0.12.3 // indirect
 	sigs.k8s.io/gateway-api v0.5.1-0.20220815164014-854e2bfc5276 // indirect
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
@@ -128,5 +131,4 @@ replace (
 	github.com/cisco-open/nasp => ../..
 	github.com/spf13/cobra => github.com/spf13/cobra v1.6.0
 	helm.sh/helm/v3 => helm.sh/helm/v3 v3.9.4
-	mosn.io/proxy-wasm-go-host => github.com/banzaicloud/proxy-wasm-go-host v0.0.0-20221016152507-38b921ff1f31
 )
