@@ -183,6 +183,9 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		for {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
+				if err == io.EOF {
+					break
+				}
 				println("Error received:")
 				println(err.Error())
 				continue
@@ -218,9 +221,10 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 					}
 					if len(buff) == num {
 						break
-					} else {
-						buff = buff[num:]
 					}
+					// } else {
+					// 	buff = buff[num:]
+					// }
 				}
 			}
 			selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
