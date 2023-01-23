@@ -130,23 +130,21 @@ func (d *dialer) dialContext(dialer connectionDialer, ctx context.Context, netwo
 		return nil, err
 	}
 
-	wrapConnection := func() (net.Conn, error) {
-		opts := append(d.wrappedConnectionOptions, WrappedConnectionWithOriginalAddress(addr))
+	wrapConnection := func() net.Conn {
+		opts := d.wrappedConnectionOptions
+		opts = append(opts, WrappedConnectionWithOriginalAddress(addr))
 
 		if wc, ok := WrappedConnectionFromContext(ctx); ok {
 			wc.SetNetConn(c)
 			wc.SetOptions(opts...)
 
-			return wc, nil
+			return wc
 		}
 
-		return NewWrappedConnection(c, opts...), nil
+		return NewWrappedConnection(c, opts...)
 	}
 
-	wc, err := wrapConnection()
-	if err != nil {
-		return nil, err
-	}
+	wc := wrapConnection()
 
 	if d.dialWrapper != nil {
 		if err := d.dialWrapper.AfterDial(ctx, wc, network, addr); err != nil {
