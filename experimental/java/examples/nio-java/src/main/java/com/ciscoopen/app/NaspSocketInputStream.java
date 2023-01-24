@@ -5,10 +5,10 @@ import nasp.Connection;
 import java.io.IOException;
 import java.io.InputStream;
 
-public class WrappedInputStream extends InputStream {
-    Connection conn;
+public class NaspSocketInputStream extends InputStream {
+    private final Connection conn;
 
-    public WrappedInputStream(Connection conn) {
+    public NaspSocketInputStream(Connection conn) {
         this.conn = conn;
     }
 

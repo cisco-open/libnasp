@@ -4,12 +4,11 @@ import nasp.Connection;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 
-public class WrappedOutputStream extends OutputStream {
-    Connection conn;
+public class NaspSocketOutputStream extends OutputStream {
+    private final Connection conn;
 
-    public WrappedOutputStream(Connection conn) {
+    public NaspSocketOutputStream(Connection conn) {
         this.conn = conn;
     }
     

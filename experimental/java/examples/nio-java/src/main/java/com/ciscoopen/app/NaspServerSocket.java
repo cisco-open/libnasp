@@ -11,11 +11,11 @@ import nasp.Nasp;
 import nasp.TCPListener;
 import nasp.Connection;
 
-public class WrappedServerSocket extends ServerSocket {
-    TCPListener TCPListener;
-    SelectorProvider selectorProvider;
+public class NaspServerSocket extends ServerSocket {
+    private final TCPListener TCPListener;
+    private final SelectorProvider selectorProvider;
 
-    public WrappedServerSocket(int port, SelectorProvider selectorProvider) throws IOException {
+    public NaspServerSocket(int port, SelectorProvider selectorProvider) throws IOException {
         try {
             this.TCPListener = Nasp.newTCPListener("https://localhost:16443/config",
                     "test-tcp-16362813-F46B-41AC-B191-A390DB1F6BDF",
@@ -27,6 +27,7 @@ public class WrappedServerSocket extends ServerSocket {
 
         this.selectorProvider = selectorProvider;
     }
+
     @Override
     public void bind(SocketAddress endpoint) throws IOException {
     }
@@ -39,11 +40,14 @@ public class WrappedServerSocket extends ServerSocket {
     @Override
     public Socket accept() throws IOException {
         try {
-            Connection conn = this.TCPListener.asyncAccept();
-            return new WrappedSocket(selectorProvider, conn);
+            Connection conn = TCPListener.asyncAccept();
+            return new NaspSocket(selectorProvider, conn);
         } catch (Exception e) {
             throw new IOException("could not bound to nasp tcp listener");
         }
     }
 
+    public nasp.TCPListener getTCPListener() {
+        return TCPListener;
+    }
 }

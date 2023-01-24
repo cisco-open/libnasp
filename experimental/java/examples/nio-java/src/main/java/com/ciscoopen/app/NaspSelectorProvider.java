@@ -52,11 +52,11 @@ class NaspSelector extends SelectorImpl {
         super.implRegister(ski);
         if (ski.channel() instanceof NaspServerSocketChannel) {
             NaspServerSocketChannel naspServerSockChan = (NaspServerSocketChannel) ski.channel();
-            naspServerSockChan.socket().TCPListener.startAsyncAccept(ski.hashCode(), selector);
+            naspServerSockChan.socket().getTCPListener().startAsyncAccept(ski.hashCode(), selector);
         } else if (ski.channel() instanceof NaspSocketChannel) {
             NaspSocketChannel naspSockChan = (NaspSocketChannel) ski.channel();
-            naspSockChan.connection.startAsyncRead(ski.hashCode(), selector);
-            naspSockChan.connection.startAsyncWrite(ski.hashCode(), selector);
+            naspSockChan.getConnection().startAsyncRead(ski.hashCode(), selector);
+            naspSockChan.getConnection().startAsyncWrite(ski.hashCode(), selector);
         }
         selectionKeyTable.put(ski.hashCode(), ski);
     }

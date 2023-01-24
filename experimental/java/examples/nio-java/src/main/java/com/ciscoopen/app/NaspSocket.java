@@ -11,11 +11,11 @@ import java.nio.channels.spi.SelectorProvider;
 
 import nasp.Connection;
 
-public class WrappedSocket extends Socket {
+public class NaspSocket extends Socket {
     private final Connection conn;
     private final SocketChannel channel;
 
-    public WrappedSocket(SelectorProvider provider, Connection conn) {
+    public NaspSocket(SelectorProvider provider, Connection conn) {
         this.conn = conn;
         this.channel = new NaspSocketChannel(provider, conn, this);
     }
@@ -27,12 +27,12 @@ public class WrappedSocket extends Socket {
 
     @Override
     public InputStream getInputStream() throws IOException {
-        return new WrappedInputStream(this.conn);
+        return new NaspSocketInputStream(this.conn);
     }
 
     @Override
     public OutputStream getOutputStream() throws IOException {
-        return new WrappedOutputStream(this.conn);
+        return new NaspSocketOutputStream(this.conn);
     }
 
     @Override

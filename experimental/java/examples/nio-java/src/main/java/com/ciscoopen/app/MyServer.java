@@ -51,7 +51,7 @@ public class MyServer {
             server.configureBlocking(false);
 
             Selector selector = naspSelectorProvider.openSelector();
-            server.register(selector, SelectionKey.OP_ACCEPT);
+            server.register(selector, server.validOps());
 
             ByteBuffer buffer = ByteBuffer.allocate(4096);
             while (true) {
@@ -65,7 +65,7 @@ public class MyServer {
                         if (key.isAcceptable()) {
                             SocketChannel client = server.accept();
                             client.configureBlocking(false);
-                            client.register(selector, SelectionKey.OP_READ, client.socket().getPort());
+                            client.register(selector, client.validOps(), client.socket().getPort());
                         } else if (key.isReadable()) {
                             SocketChannel client = (SocketChannel) key.channel();
                             if (client.read(buffer) < 0) {

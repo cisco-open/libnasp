@@ -17,10 +17,10 @@ import java.util.Set;
 
 public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
-    public final nasp.Connection connection;
-    private final WrappedSocket socket;
+    private final Connection connection;
+    private final NaspSocket socket;
 
-    protected NaspSocketChannel(SelectorProvider provider, Connection connection, WrappedSocket socket) {
+    protected NaspSocketChannel(SelectorProvider provider, Connection connection, NaspSocket socket) {
         super(provider);
         this.connection = connection;
         this.socket = socket;
@@ -57,7 +57,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     }
 
     @Override
-    public WrappedSocket socket() {
+    public NaspSocket socket() {
         return socket;
     }
 
@@ -90,9 +90,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public int read(ByteBuffer dst) throws IOException {
         try {
-            byte[] tempBuffer = new byte[4096];
-            int num = connection.asyncRead(tempBuffer);
-            dst.put(tempBuffer, 0, num);
+            byte[] buff = new byte[dst.remaining()];
+            int num = connection.asyncRead(buff);
+            dst.put(buff, 0, num);
             return num;
         } catch (Exception e) {
             throw new IOException(e);
@@ -101,7 +101,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public long read(ByteBuffer[] dsts, int offset, int length) throws IOException {
-        return 0;
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -117,7 +117,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public long write(ByteBuffer[] srcs, int offset, int length) throws IOException {
-        return 0;
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -205,5 +205,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public void kill() throws IOException {
 
+    }
+
+    public Connection getConnection() {
+        return connection;
     }
 }

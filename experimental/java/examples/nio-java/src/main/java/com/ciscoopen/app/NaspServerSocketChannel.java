@@ -15,7 +15,7 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.Set;
 
 public class NaspServerSocketChannel extends ServerSocketChannel implements SelChImpl {
-    private WrappedServerSocket socket;
+    private NaspServerSocket socket;
 
     public NaspServerSocketChannel(SelectorProvider sp) {
         super(sp);
@@ -41,10 +41,10 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
         return null;
     }
 
-    public WrappedServerSocket socket() {
+    public NaspServerSocket socket() {
         try {
             if (this.socket == null) {
-                this.socket = new WrappedServerSocket(10000, provider());
+                this.socket = new NaspServerSocket(10000, provider());
             }
             return socket;
         } catch (IOException e) {
