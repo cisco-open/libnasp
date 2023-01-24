@@ -52,10 +52,6 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
         }
     }
 
-//    public final SelectableChannel configureBlocking(boolean block) throws IOException {
-//        return this.channel.configureBlocking(block);
-//    }
-
     @Override
     protected void implConfigureBlocking(boolean block) throws IOException {
 

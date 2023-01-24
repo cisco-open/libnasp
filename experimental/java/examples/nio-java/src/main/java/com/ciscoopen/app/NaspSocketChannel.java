@@ -18,7 +18,7 @@ import java.util.Set;
 public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     public final nasp.Connection connection;
-    private WrappedSocket socket;
+    private final WrappedSocket socket;
 
     protected NaspSocketChannel(SelectorProvider provider, Connection connection, WrappedSocket socket) {
         super(provider);
