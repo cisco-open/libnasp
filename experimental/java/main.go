@@ -227,9 +227,12 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		}
 	}()
 }
+
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
-	c.writeChannel <- b
-	return int32(len(b)), nil
+	bCopy := make([]byte, len(b))
+	copy(bCopy, b)
+	c.writeChannel <- bCopy
+	return int32(len(bCopy)), nil
 }
 
 func (c *Connection) Read(b []byte) (int, error) {

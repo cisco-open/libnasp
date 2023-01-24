@@ -107,10 +107,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public int write(ByteBuffer src) throws IOException {
         try {
-//            byte[] tempArray = new byte[src.limit()];
-//            src.get(tempArray, 0, src.limit());
-//            return connection.asyncWrite(tempArray);
-            return connection.asyncWrite(src.array());
+            byte[] tempArray = new byte[src.limit()];
+            src.get(tempArray, 0, src.limit());
+            return connection.asyncWrite(tempArray);
         } catch (Exception e) {
             throw new IOException(e);
         }
