@@ -1,6 +1,5 @@
 package com.ciscoopen.app;
 
-import nasp.TCPListener;
 import sun.nio.ch.SelectionKeyImpl;
 import sun.nio.ch.SelectorImpl;
 import sun.nio.ch.SelectorProviderImpl;
@@ -26,7 +25,7 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     protected int doSelect(Consumer<SelectionKey> action, long timeout) throws IOException {
-        int selected = (int) selector.select(timeout);
+        selector.select(timeout);
 
         int numKeysUpdated = 0;
         nasp.SelectedKey selectedKey;
@@ -50,14 +49,6 @@ class NaspSelector extends SelectorImpl {
     @Override
     protected void implRegister(SelectionKeyImpl ski) {
         super.implRegister(ski);
-        if (ski.channel() instanceof NaspServerSocketChannel) {
-            NaspServerSocketChannel naspServerSockChan = (NaspServerSocketChannel) ski.channel();
-            naspServerSockChan.socket().getTCPListener().startAsyncAccept(ski.hashCode(), selector);
-        } else if (ski.channel() instanceof NaspSocketChannel) {
-            NaspSocketChannel naspSockChan = (NaspSocketChannel) ski.channel();
-            naspSockChan.getConnection().startAsyncRead(ski.hashCode(), selector);
-            naspSockChan.getConnection().startAsyncWrite(ski.hashCode(), selector);
-        }
         selectionKeyTable.put(ski.hashCode(), ski);
     }
 
@@ -73,7 +64,17 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     protected void setEventOps(SelectionKeyImpl ski) {
-
+        if (ski.channel() instanceof NaspServerSocketChannel naspServerSockChan) {
+            naspServerSockChan.socket().getTCPListener().startAsyncAccept(ski.hashCode(), selector);
+        } else if (ski.channel() instanceof NaspSocketChannel naspSockChan) {
+            int interestOps = ski.interestOps();
+            if ((interestOps & SelectionKey.OP_READ) != 0) {
+                naspSockChan.getConnection().startAsyncRead(ski.hashCode(), selector);
+            }
+            if ((interestOps & SelectionKey.OP_WRITE) != 0) {
+                naspSockChan.getConnection().startAsyncWrite(ski.hashCode(), selector);
+            }
+        }
     }
 }
 
