@@ -114,7 +114,8 @@ func (c *wrappedConn) Write(b []byte) (n int, err error) {
 		}
 	}
 
-	if n, err := c.writeBuffer.Write(b); err != nil {
+	var actN int
+	if actN, err = c.writeBuffer.Write(b); err != nil {
 		return n, err
 	}
 
@@ -135,5 +136,5 @@ func (c *wrappedConn) Write(b []byte) (n int, err error) {
 
 	c.writeBuffer.Drain(n)
 
-	return n, err
+	return actN, err
 }

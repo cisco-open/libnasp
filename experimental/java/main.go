@@ -217,10 +217,9 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 					}
 					if len(buff) == num {
 						break
+					} else {
+						buff = buff[num:]
 					}
-					// } else {
-					// 	buff = buff[num:]
-					// }
 				}
 			}
 			selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
