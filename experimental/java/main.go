@@ -58,6 +58,8 @@ type Connection struct {
 	readBuffer   *bytes.Buffer
 	readLock     sync.Mutex
 	writeChannel chan []byte
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
 type SelectedKey struct {
@@ -143,7 +145,14 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{conn: c, readBuffer: new(bytes.Buffer), writeChannel: make(chan []byte, 64)}, nil
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Connection{
+		conn:         c,
+		readBuffer:   new(bytes.Buffer),
+		writeChannel: make(chan []byte, 64),
+		ctx:          ctx,
+		cancel:       cancel,
+	}, nil
 }
 
 func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
@@ -184,6 +193,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
 				if err == io.EOF {
+					c.conn.Close()
 					break
 				}
 				println("Error received:")
@@ -221,10 +231,16 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 						buff = buff[num:]
 					}
 				}
+			case <-c.ctx.Done():
+				c.conn.Close()
 			}
 			selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
 		}
 	}()
+}
+
+func (c *Connection) Close() {
+	c.cancel()
 }
 
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {

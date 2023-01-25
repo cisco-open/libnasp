@@ -127,7 +127,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     protected void implCloseSelectableChannel() throws IOException {
-
+        connection.close();
     }
 
     @Override
