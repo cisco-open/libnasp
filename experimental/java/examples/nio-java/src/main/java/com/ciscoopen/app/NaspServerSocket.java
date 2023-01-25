@@ -1,23 +1,23 @@
 package com.ciscoopen.app;
 
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketAddress;
-import java.net.SocketException;
+import java.net.*;
 import java.nio.channels.spi.SelectorProvider;
 
 import nasp.Nasp;
+import nasp.NaspIntegrationHandler;
 import nasp.TCPListener;
 import nasp.Connection;
 
 public class NaspServerSocket extends ServerSocket {
-    private final TCPListener TCPListener;
+
+    private final NaspIntegrationHandler NaspIntegrationHandler;
+    private TCPListener TCPListener;
     private final SelectorProvider selectorProvider;
 
-    public NaspServerSocket(int port, SelectorProvider selectorProvider) throws IOException {
+    public NaspServerSocket(SelectorProvider selectorProvider) throws IOException {
         try {
-            this.TCPListener = Nasp.newTCPListener("https://localhost:16443/config",
+            NaspIntegrationHandler = Nasp.newNaspIntegrationHandler("https://localhost:16443/config",
                     "test-tcp-16362813-F46B-41AC-B191-A390DB1F6BDF",
                     "16362813-F46B-41AC-B191-A390DB1F6BDF");
 
@@ -30,6 +30,16 @@ public class NaspServerSocket extends ServerSocket {
 
     @Override
     public void bind(SocketAddress endpoint) throws IOException {
+        if (endpoint instanceof InetSocketAddress) {
+            try {
+                TCPListener = NaspIntegrationHandler.bind(((InetSocketAddress) endpoint).getHostString(),
+                        ((InetSocketAddress) endpoint).getPort());
+            } catch (Exception e) {
+                throw new IOException(e);
+            }
+        } else {
+            throw new UnsupportedOperationException();
+        }
     }
 
     @Override

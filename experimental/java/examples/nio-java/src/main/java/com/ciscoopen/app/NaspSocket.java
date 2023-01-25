@@ -21,7 +21,12 @@ public class NaspSocket extends Socket {
     }
     @Override
     public int getPort() {
-        return 10000; //TODO fix this
+        try {
+            return conn.getAddress().getPort();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
     }
 
 

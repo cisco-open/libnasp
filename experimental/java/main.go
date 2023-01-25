@@ -18,8 +18,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
+	"strconv"
 
 	"net/http"
 	"strings"
@@ -44,13 +46,16 @@ var logger = klog.NewKlogr()
 // TCP related structs and functions
 
 type TCPListener struct {
-	iih      *istio.IstioIntegrationHandler
 	listener net.Listener
-	ctx      context.Context
-	cancel   context.CancelFunc
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
+}
+
+type NaspIntegrationHandler struct {
+	iih    *istio.IstioIntegrationHandler
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 type Connection struct {
@@ -60,6 +65,11 @@ type Connection struct {
 	writeChannel chan []byte
 	ctx          context.Context
 	cancel       context.CancelFunc
+}
+
+type Address struct {
+	Host string
+	Port int32
 }
 
 type SelectedKey struct {
@@ -106,7 +116,7 @@ func (s *Selector) NextSelectedKey() *SelectedKey {
 	return nil
 }
 
-func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, error) {
+func NewNaspIntegrationHandler(heimdallURL, clientID, clientSecret string) (*NaspIntegrationHandler, error) {
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		UseTLS:              true,
 		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret, "v1"),
@@ -119,24 +129,29 @@ func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, e
 		return nil, err
 	}
 
-	listener, err := net.Listen("tcp", "localhost:10000")
-	if err != nil {
-		return nil, err
-	}
-
-	listener, err = iih.GetTCPListener(listener)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	go iih.Run(ctx)
 
+	return &NaspIntegrationHandler{
+		iih:    iih,
+		ctx:    ctx,
+		cancel: cancel,
+	}, nil
+}
+
+func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
+	if err != nil {
+		return nil, err
+	}
+
+	listener, err = h.iih.GetTCPListener(listener)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TCPListener{
-		iih:      iih,
 		listener: listener,
-		ctx:      ctx,
-		cancel:   cancel,
 	}, nil
 }
 
@@ -184,6 +199,17 @@ func (l *TCPListener) AsyncAccept() *Connection {
 	}
 
 	return nil
+}
+
+func (c *Connection) GetAddress() (*Address, error) {
+	address := c.conn.LocalAddr().String()
+	port, err := strconv.Atoi(address[strings.LastIndex(address, ":")+1:])
+	if err != nil {
+		return nil, err
+	}
+	return &Address{
+		Host: address[0:strings.LastIndex(address, ":")],
+		Port: int32(port)}, nil
 }
 
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {

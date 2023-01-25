@@ -44,7 +44,7 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
     public NaspServerSocket socket() {
         try {
             if (this.socket == null) {
-                this.socket = new NaspServerSocket(10000, provider());
+                this.socket = new NaspServerSocket(provider());
             }
             return socket;
         } catch (IOException e) {

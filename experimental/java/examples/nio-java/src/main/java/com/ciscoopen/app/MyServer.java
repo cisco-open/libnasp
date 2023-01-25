@@ -42,15 +42,13 @@ public class MyServer {
 
     public static void initializeServer() {
         try {
-            NaspSelectorProvider naspSelectorProvider = new NaspSelectorProvider();
-
-            ServerSocketChannel server = naspSelectorProvider.openServerSocketChannel();
+            ServerSocketChannel server = ServerSocketChannel.open();
 
             server.socket().bind(new InetSocketAddress("localhost", 10000));
             server.socket().setReuseAddress(true);
             server.configureBlocking(false);
 
-            Selector selector = naspSelectorProvider.openSelector();
+            Selector selector = Selector.open();
             server.register(selector, server.validOps());
 
             ByteBuffer buffer = ByteBuffer.allocate(4096);
