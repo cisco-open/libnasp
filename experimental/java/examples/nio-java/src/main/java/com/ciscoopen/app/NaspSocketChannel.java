@@ -1,12 +1,15 @@
 package com.ciscoopen.app;
 
 import nasp.Connection;
+import nasp.TCPDialer;
+import nasp.Nasp;
 import sun.nio.ch.Net;
 import sun.nio.ch.SelChImpl;
 import sun.nio.ch.SelectionKeyImpl;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketOption;
 import java.nio.ByteBuffer;
@@ -17,8 +20,14 @@ import java.util.Set;
 
 public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
-    private final Connection connection;
-    private final NaspSocket socket;
+    private TCPDialer dialer;
+    private Connection connection;
+    private NaspSocket socket;
+    private InetSocketAddress address;
+
+    public NaspSocketChannel(SelectorProvider provider) {
+        super(provider);
+    }
 
     protected NaspSocketChannel(SelectorProvider provider, Connection connection, NaspSocket socket) {
         super(provider);
@@ -74,12 +83,21 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public boolean connect(SocketAddress remote) throws IOException {
+        try {
+            dialer = Nasp.newTCPDialer("https://localhost:16443/config",
+                    "test-tcp-16362813-F46B-41AC-B191-A390DB1F6BDF",
+                    "16362813-F46B-41AC-B191-A390DB1F6BDF");
+        } catch (Exception e) {
+            throw new IOException("could not get nasp tcp dialer");
+        }
+        address = (InetSocketAddress)remote;
         return false;
     }
 
     @Override
     public boolean finishConnect() throws IOException {
-        return false;
+        connection = dialer.asyncDial();
+        return true;
     }
 
     @Override
@@ -209,5 +227,13 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     public Connection getConnection() {
         return connection;
+    }
+
+    public TCPDialer getTCPDialer() {
+        return dialer;
+    }
+
+    public InetSocketAddress getAddress() {
+        return address;
     }
 }

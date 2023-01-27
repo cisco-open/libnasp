@@ -5,9 +5,11 @@ import sun.nio.ch.SelectorImpl;
 import sun.nio.ch.SelectorProviderImpl;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.AbstractSelector;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.HashMap;
@@ -74,6 +76,14 @@ class NaspSelector extends SelectorImpl {
             if ((interestOps & SelectionKey.OP_WRITE) != 0) {
                 naspSockChan.getConnection().startAsyncWrite(ski.hashCode(), selector);
             }
+            if ((interestOps & SelectionKey.OP_CONNECT) != 0) {
+                //This could happen if we are servers not clients
+                if (naspSockChan.getTCPDialer() != null) {
+                    InetSocketAddress address = naspSockChan.getAddress();
+                    naspSockChan.getTCPDialer().startAsyncDial(ski.hashCode(), selector,
+                            address.getHostString(), address.getPort());
+                }
+            }
         }
     }
 }
@@ -88,5 +98,10 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
     @Override
     public ServerSocketChannel openServerSocketChannel() throws IOException {
         return new NaspServerSocketChannel(this);
+    }
+
+    @Override
+    public SocketChannel openSocketChannel() throws IOException {
+        return new NaspSocketChannel(this);
     }
 }

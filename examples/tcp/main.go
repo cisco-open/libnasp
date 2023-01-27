@@ -87,7 +87,7 @@ func server() {
 			reader := bufio.NewReader(conn)
 			for {
 				// read client request data
-				bytes, err := reader.ReadBytes(byte('\n'))
+				bytes, err := reader.ReadBytes(byte('!'))
 				if err != nil {
 					if err != io.EOF {
 						fmt.Println("failed to read data, err:", err)
@@ -125,7 +125,7 @@ func client() {
 
 	defer conn.Close()
 
-	bytes := []byte("hello\n")
+	bytes := []byte("hello!")
 	fmt.Printf("request: %s", bytes)
 
 	_, err = conn.Write(bytes)

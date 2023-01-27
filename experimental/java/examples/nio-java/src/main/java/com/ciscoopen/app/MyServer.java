@@ -12,28 +12,47 @@ import java.util.Set;
 
 public class MyServer {
     public static void main(String[] args) {
-        initializeServer();
-//        initializeClient();
+//        initializeServer();
+        initializeClient();
     }
 
     public static void initializeClient() {
         try {
-            SocketChannel channel = SocketChannel.open();
-            channel.connect(new InetSocketAddress("localhost", 10000));
-            System.out.println("Connection Set: " + channel.getRemoteAddress());
+            Selector selector = Selector.open();
+            SocketChannel client = SocketChannel.open();
+            client.configureBlocking(false);
+            client.connect(new InetSocketAddress("localhost", 10000));
+            client.register(selector, SelectionKey.OP_CONNECT);
+            System.out.println("Connection Set: " + client.getRemoteAddress());
+
             ByteBuffer buffer = ByteBuffer.allocate(256);
-            buffer.clear();
-            String newData = "This is string from the client";
-            buffer.put(newData.getBytes());
-            buffer.flip();
-            while (buffer.hasRemaining()) {
-                channel.write(buffer);
+            while (true) {
+                int channelCount = selector.select();
+                if (channelCount > 0 ){
+                    Set<SelectionKey> keys = selector.selectedKeys();
+                    Iterator<SelectionKey> iterator = keys.iterator();
+                    while (iterator.hasNext()) {
+                        SelectionKey key = iterator.next();
+                        iterator.remove();
+                        if (key.isConnectable()) {
+                            client.finishConnect();
+                            key.interestOps(SelectionKey.OP_WRITE);
+                        } else if (key.isWritable()){
+                            String newData = "This is string from the client!";
+                            buffer.put(newData.getBytes());
+                            buffer.flip();
+                            client.write(buffer);
+                            buffer.clear();
+                            key.interestOps(SelectionKey.OP_READ);
+                        } else if (key.isReadable()){
+                            client.read(buffer);
+                            System.out.println(new String(buffer.array()));
+                            key.cancel();
+                            client.close();
+                        }
+                    }
+                }
             }
-            while (channel.read(buffer) < 0) {
-                System.out.println(buffer);
-                buffer.clear();
-            }
-            channel.close();
 
         } catch (IOException e) {
             e.printStackTrace();

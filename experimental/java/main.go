@@ -218,7 +218,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		for {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
-				if err == io.EOF {
+				if err == io.EOF || strings.Contains(err.Error(), net.ErrClosed.Error()) {
 					c.conn.Close()
 					break
 				}
@@ -289,6 +289,9 @@ type TCPDialer struct {
 	dialer itcp.Dialer
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	asyncConnectionsLock sync.Mutex
+	asyncConnections     []*Connection
 }
 
 func NewTCPDialer(heimdallURL, clientID, clientSecret string) (*TCPDialer, error) {
@@ -320,12 +323,51 @@ func NewTCPDialer(heimdallURL, clientID, clientSecret string) (*TCPDialer, error
 	}, nil
 }
 
-func (d *TCPDialer) Dial() (*Connection, error) {
-	c, err := d.dialer.DialContext(context.Background(), "tcp", "localhost:10000")
+func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, address string, port int) {
+	go func() {
+		for {
+			conn, err := d.Dial(address, port)
+			if err != nil {
+				println(err.Error())
+				continue
+			}
+
+			d.asyncConnectionsLock.Lock()
+			d.asyncConnections = append(d.asyncConnections, conn)
+			d.asyncConnectionsLock.Unlock()
+
+			selector.queue <- &SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
+		}
+	}()
+}
+
+func (d *TCPDialer) AsyncDial() *Connection {
+	d.asyncConnectionsLock.Lock()
+	defer d.asyncConnectionsLock.Unlock()
+
+	if len(d.asyncConnections) > 0 {
+		conn := d.asyncConnections[0]
+		d.asyncConnections = d.asyncConnections[1:]
+		return conn
+	}
+
+	return nil
+}
+
+func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
+	backgroundCtx := context.Background()
+	c, err := d.dialer.DialContext(backgroundCtx, "tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{conn: c}, nil
+	ctx, cancel := context.WithCancel(backgroundCtx)
+	return &Connection{
+		conn:         c,
+		readBuffer:   new(bytes.Buffer),
+		writeChannel: make(chan []byte, 64),
+		ctx:          ctx,
+		cancel:       cancel,
+	}, nil
 }
 
 // HTTP related structs and functions
