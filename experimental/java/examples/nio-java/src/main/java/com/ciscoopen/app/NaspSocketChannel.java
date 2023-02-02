@@ -37,32 +37,32 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public SocketChannel bind(SocketAddress local) throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public <T> SocketChannel setOption(SocketOption<T> name, T value) throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public <T> T getOption(SocketOption<T> name) throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Set<SocketOption<?>> supportedOptions() {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public SocketChannel shutdownInput() throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public SocketChannel shutdownOutput() throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -102,7 +102,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public SocketAddress getRemoteAddress() throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -140,7 +140,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public SocketAddress getLocalAddress() throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -155,12 +155,13 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public FileDescriptor getFD() {
-        return null;
+
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public int getFDVal() {
-        return 0;
+        throw new UnsupportedOperationException();
     }
 
     public boolean translateReadyOps(int ops, int initialOps, SelectionKeyImpl ski) {
@@ -222,7 +223,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public void kill() throws IOException {
-
+        throw new UnsupportedOperationException();
     }
 
     public Connection getConnection() {

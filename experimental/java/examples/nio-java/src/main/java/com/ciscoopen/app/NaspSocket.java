@@ -42,11 +42,11 @@ public class NaspSocket extends Socket {
 
     @Override
     public void bind(SocketAddress bindPoint) throws IOException {
-
+        throw new UnsupportedOperationException();
     }
 
     public void setReuseAddress(boolean on) throws SocketException {
-
+        throw new UnsupportedOperationException();
     }
 
     @Override

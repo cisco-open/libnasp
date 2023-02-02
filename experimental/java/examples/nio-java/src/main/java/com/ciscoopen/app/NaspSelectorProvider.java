@@ -45,7 +45,7 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     public Selector wakeup() {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -56,12 +56,12 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     protected void implClose() throws IOException {
-
+        throw new UnsupportedOperationException();
     }
 
     @Override
     protected void implDereg(SelectionKeyImpl ski) throws IOException {
-
+        throw new UnsupportedOperationException();
     }
 
     @Override

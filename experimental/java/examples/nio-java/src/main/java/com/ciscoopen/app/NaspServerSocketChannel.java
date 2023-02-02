@@ -23,22 +23,22 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
 
     @Override
     public ServerSocketChannel bind(SocketAddress local, int backlog) throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public <T> ServerSocketChannel setOption(SocketOption<T> name, T value) throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public <T> T getOption(SocketOption<T> name) throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public Set<SocketOption<?>> supportedOptions() {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     public NaspServerSocket socket() {
@@ -59,7 +59,7 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
 
     @Override
     protected void implCloseSelectableChannel() throws IOException {
-
+        throw new UnsupportedOperationException();
     }
 
     public SocketChannel accept() throws IOException {
@@ -68,17 +68,17 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
 
     @Override
     public SocketAddress getLocalAddress() throws IOException {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public FileDescriptor getFD() {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public int getFDVal() {
-        return 0;
+        throw new UnsupportedOperationException();
     }
 
     public boolean translateAndUpdateReadyOps(int ops, SelectionKeyImpl ski) {
@@ -130,6 +130,6 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
 
     @Override
     public void kill() throws IOException {
-
+        throw new UnsupportedOperationException();
     }
 }

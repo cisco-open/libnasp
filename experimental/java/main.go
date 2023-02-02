@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -209,6 +210,7 @@ func (c *Connection) GetAddress() (*Address, error) {
 	}
 	return &Address{
 		Host: address[0:strings.LastIndex(address, ":")],
+		//nolint:gosec
 		Port: int32(port)}, nil
 }
 
@@ -218,7 +220,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		for {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
-				if err == io.EOF || strings.Contains(err.Error(), net.ErrClosed.Error()) {
+				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
 					c.conn.Close()
 					break
 				}
