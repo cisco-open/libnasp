@@ -325,19 +325,17 @@ func NewTCPDialer(heimdallURL, clientID, clientSecret string) (*TCPDialer, error
 
 func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, address string, port int) {
 	go func() {
-		for {
-			conn, err := d.Dial(address, port)
-			if err != nil {
-				println(err.Error())
-				continue
-			}
-
-			d.asyncConnectionsLock.Lock()
-			d.asyncConnections = append(d.asyncConnections, conn)
-			d.asyncConnectionsLock.Unlock()
-
-			selector.queue <- &SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
+		conn, err := d.Dial(address, port)
+		if err != nil {
+			println(err.Error())
+			return
 		}
+
+		d.asyncConnectionsLock.Lock()
+		d.asyncConnections = append(d.asyncConnections, conn)
+		d.asyncConnectionsLock.Unlock()
+
+		selector.queue <- &SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
 	}()
 }
 

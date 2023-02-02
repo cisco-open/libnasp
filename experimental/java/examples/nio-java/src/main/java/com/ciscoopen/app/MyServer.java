@@ -12,8 +12,8 @@ import java.util.Set;
 
 public class MyServer {
     public static void main(String[] args) {
-//        initializeServer();
-        initializeClient();
+        initializeServer();
+//        initializeClient();
     }
 
     public static void initializeClient() {
@@ -26,35 +26,32 @@ public class MyServer {
             System.out.println("Connection Set: " + client.getRemoteAddress());
 
             ByteBuffer buffer = ByteBuffer.allocate(256);
-            while (true) {
-                int channelCount = selector.select();
-                if (channelCount > 0 ){
-                    Set<SelectionKey> keys = selector.selectedKeys();
-                    Iterator<SelectionKey> iterator = keys.iterator();
-                    while (iterator.hasNext()) {
-                        SelectionKey key = iterator.next();
-                        iterator.remove();
-                        if (key.isConnectable()) {
-                            client.finishConnect();
+            int channelCount = selector.select();
+            if (channelCount > 0 ){
+                Set<SelectionKey> keys = selector.selectedKeys();
+                Iterator<SelectionKey> iterator = keys.iterator();
+                while (iterator.hasNext()) {
+                    SelectionKey key = iterator.next();
+                    iterator.remove();
+                    if (key.isConnectable()) {
+                        if (client.finishConnect()) {
                             key.interestOps(SelectionKey.OP_WRITE);
-                        } else if (key.isWritable()){
                             String newData = "This is string from the client!";
                             buffer.put(newData.getBytes());
                             buffer.flip();
                             client.write(buffer);
                             buffer.clear();
                             key.interestOps(SelectionKey.OP_READ);
-                        } else if (key.isReadable()){
-                            client.read(buffer);
-                            System.out.println(new String(buffer.array()));
-                            key.cancel();
-                            client.close();
                         }
+                    } else if (key.isReadable()){
+                        client.read(buffer);
+                        System.out.println(new String(buffer.array()));
+                        key.cancel();
+                        client.close();
                     }
                 }
             }
-
-        } catch (IOException e) {
+    } catch (IOException e) {
             e.printStackTrace();
         }
     }
