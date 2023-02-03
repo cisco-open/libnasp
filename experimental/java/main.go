@@ -15,12 +15,18 @@
 package nasp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net"
+	"strconv"
+
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cisco-open/nasp/pkg/istio"
@@ -29,22 +35,89 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	OP_READ    = 1 << 0
+	OP_WRITE   = 1 << 2
+	OP_CONNECT = 1 << 3
+	OP_ACCEPT  = 1 << 4
+)
+
 var logger = klog.NewKlogr()
 
 // TCP related structs and functions
 
 type TCPListener struct {
-	iih      *istio.IstioIntegrationHandler
 	listener net.Listener
-	ctx      context.Context
-	cancel   context.CancelFunc
+
+	asyncConnectionsLock sync.Mutex
+	asyncConnections     []*Connection
+}
+
+type NaspIntegrationHandler struct {
+	iih    *istio.IstioIntegrationHandler
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 type Connection struct {
-	conn net.Conn
+	conn         net.Conn
+	readBuffer   *bytes.Buffer
+	readLock     sync.Mutex
+	writeChannel chan []byte
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
-func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, error) {
+type Address struct {
+	Host string
+	Port int32
+}
+
+type SelectedKey struct {
+	SelectedKeyId int32
+	Operation     int32
+}
+
+type Selector struct {
+	queue    chan *SelectedKey
+	selected []*SelectedKey
+}
+
+func NewSelector() *Selector {
+	return &Selector{queue: make(chan *SelectedKey, 64)}
+}
+
+func (s *Selector) Select(timeout int64) int {
+	timeoutChan := make(<-chan time.Time)
+	if timeout != -1 {
+		timeoutChan = time.After(time.Duration(timeout) * time.Millisecond)
+	}
+	select {
+	case c := <-s.queue:
+		s.selected = append(s.selected, c)
+
+		l := len(s.queue)
+
+		for i := 0; i < l; i++ {
+			s.selected = append(s.selected, <-s.queue)
+		}
+
+		return l + 1
+	case <-timeoutChan:
+		return 0
+	}
+}
+
+func (s *Selector) NextSelectedKey() *SelectedKey {
+	if len(s.selected) != 0 {
+		selected := s.selected[0]
+		s.selected = s.selected[1:]
+		return selected
+	}
+	return nil
+}
+
+func NewNaspIntegrationHandler(heimdallURL, clientID, clientSecret string) (*NaspIntegrationHandler, error) {
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		UseTLS:              true,
 		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret, "v1"),
@@ -57,24 +130,29 @@ func NewTCPListener(heimdallURL, clientID, clientSecret string) (*TCPListener, e
 		return nil, err
 	}
 
-	listener, err := net.Listen("tcp", "localhost:10000")
-	if err != nil {
-		return nil, err
-	}
-
-	listener, err = iih.GetTCPListener(listener)
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	go iih.Run(ctx)
 
+	return &NaspIntegrationHandler{
+		iih:    iih,
+		ctx:    ctx,
+		cancel: cancel,
+	}, nil
+}
+
+func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
+	if err != nil {
+		return nil, err
+	}
+
+	listener, err = h.iih.GetTCPListener(listener)
+	if err != nil {
+		return nil, err
+	}
+
 	return &TCPListener{
-		iih:      iih,
 		listener: listener,
-		ctx:      ctx,
-		cancel:   cancel,
 	}, nil
 }
 
@@ -83,7 +161,121 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{c}, nil
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Connection{
+		conn:         c,
+		readBuffer:   new(bytes.Buffer),
+		writeChannel: make(chan []byte, 64),
+		ctx:          ctx,
+		cancel:       cancel,
+	}, nil
+}
+
+func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				println(err.Error())
+				continue
+			}
+
+			l.asyncConnectionsLock.Lock()
+			l.asyncConnections = append(l.asyncConnections, conn)
+			l.asyncConnectionsLock.Unlock()
+
+			selector.queue <- &SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: selectedKeyId}
+		}
+	}()
+}
+
+func (l *TCPListener) AsyncAccept() *Connection {
+	l.asyncConnectionsLock.Lock()
+	defer l.asyncConnectionsLock.Unlock()
+
+	if len(l.asyncConnections) > 0 {
+		conn := l.asyncConnections[0]
+		l.asyncConnections = l.asyncConnections[1:]
+		return conn
+	}
+
+	return nil
+}
+
+func (c *Connection) GetAddress() (*Address, error) {
+	address := c.conn.LocalAddr().String()
+	port, err := strconv.Atoi(address[strings.LastIndex(address, ":")+1:])
+	if err != nil {
+		return nil, err
+	}
+	return &Address{
+		Host: address[0:strings.LastIndex(address, ":")],
+		//nolint:gosec
+		Port: int32(port)}, nil
+}
+
+func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
+	go func() {
+		tempBuffer := make([]byte, 1024)
+		for {
+			num, err := c.Read(tempBuffer)
+			if err != nil {
+				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
+					c.conn.Close()
+					break
+				}
+				println("Error received:")
+				println(err.Error())
+				continue
+			}
+			c.readLock.Lock()
+			c.readBuffer.Write(tempBuffer[:num])
+			c.readLock.Unlock()
+			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
+		}
+	}()
+}
+func (c *Connection) AsyncRead(b []byte) (int32, error) {
+	c.readLock.Lock()
+	defer c.readLock.Unlock()
+	n, err := c.readBuffer.Read(b)
+	return int32(n), err
+}
+
+func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
+	go func() {
+		for {
+			select {
+			case buff := <-c.writeChannel:
+				for {
+					num, err := c.Write(buff)
+					if err != nil {
+						println(err.Error())
+						continue
+					}
+					if len(buff) == num {
+						break
+					} else {
+						buff = buff[num:]
+					}
+				}
+			case <-c.ctx.Done():
+				c.conn.Close()
+			}
+			selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
+		}
+	}()
+}
+
+func (c *Connection) Close() {
+	c.cancel()
+}
+
+func (c *Connection) AsyncWrite(b []byte) (int32, error) {
+	bCopy := make([]byte, len(b))
+	copy(bCopy, b)
+	c.writeChannel <- bCopy
+	return int32(len(bCopy)), nil
 }
 
 func (c *Connection) Read(b []byte) (int, error) {
@@ -99,6 +291,9 @@ type TCPDialer struct {
 	dialer itcp.Dialer
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	asyncConnectionsLock sync.Mutex
+	asyncConnections     []*Connection
 }
 
 func NewTCPDialer(heimdallURL, clientID, clientSecret string) (*TCPDialer, error) {
@@ -130,12 +325,49 @@ func NewTCPDialer(heimdallURL, clientID, clientSecret string) (*TCPDialer, error
 	}, nil
 }
 
-func (d *TCPDialer) Dial() (*Connection, error) {
-	c, err := d.dialer.DialContext(context.Background(), "tcp", "localhost:10000")
+func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, address string, port int) {
+	go func() {
+		conn, err := d.Dial(address, port)
+		if err != nil {
+			println(err.Error())
+			return
+		}
+
+		d.asyncConnectionsLock.Lock()
+		d.asyncConnections = append(d.asyncConnections, conn)
+		d.asyncConnectionsLock.Unlock()
+
+		selector.queue <- &SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
+	}()
+}
+
+func (d *TCPDialer) AsyncDial() *Connection {
+	d.asyncConnectionsLock.Lock()
+	defer d.asyncConnectionsLock.Unlock()
+
+	if len(d.asyncConnections) > 0 {
+		conn := d.asyncConnections[0]
+		d.asyncConnections = d.asyncConnections[1:]
+		return conn
+	}
+
+	return nil
+}
+
+func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
+	backgroundCtx := context.Background()
+	c, err := d.dialer.DialContext(backgroundCtx, "tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{c}, nil
+	ctx, cancel := context.WithCancel(backgroundCtx)
+	return &Connection{
+		conn:         c,
+		readBuffer:   new(bytes.Buffer),
+		writeChannel: make(chan []byte, 64),
+		ctx:          ctx,
+		cancel:       cancel,
+	}, nil
 }
 
 // HTTP related structs and functions
