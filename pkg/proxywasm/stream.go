@@ -15,6 +15,7 @@
 package proxywasm
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"net"
@@ -125,7 +126,7 @@ func (h *streamHandler) NewStream(direction api.ListenerDirection, options ...ap
 }
 
 func (s *stream) HandleHTTPRequest(req api.HTTPRequest) error {
-	s.Set("http.request", req)
+	HTTPRequestProperty(s).Set(req)
 
 	for _, filterContext := range s.filterContexts {
 		action, err := func() (pwapi.Action, error) {
@@ -147,8 +148,8 @@ func (s *stream) HandleHTTPRequest(req api.HTTPRequest) error {
 	}
 
 	originalBody := req.Body()
-	body := NewBuffer([]byte{})
-	s.Set("request.body", body)
+	body := new(bytes.Buffer)
+	HTTPRequestBodyProperty(s).Set(body)
 	req.SetBody(io.NopCloser(body))
 
 	buf := make([]byte, 4096)
@@ -185,7 +186,7 @@ func (s *stream) HandleHTTPRequest(req api.HTTPRequest) error {
 }
 
 func (s *stream) HandleHTTPResponse(resp api.HTTPResponse) error {
-	s.Set("http.response", resp)
+	HTTPResponseProperty(s).Set(resp)
 
 	for _, filterContext := range s.filterContexts {
 		_, err := func() (pwapi.Action, error) {
@@ -204,8 +205,8 @@ func (s *stream) HandleHTTPResponse(resp api.HTTPResponse) error {
 	}
 
 	originalBody := resp.Body()
-	body := NewBuffer([]byte{})
-	s.Set("response.body", body)
+	body := new(bytes.Buffer)
+	HTTPResponseBodyProperty(s).Set(body)
 	resp.SetBody(io.NopCloser(body))
 
 	buf := make([]byte, 4096)

@@ -25,7 +25,6 @@ import (
 	klog "k8s.io/klog/v2"
 
 	pwapi "github.com/banzaicloud/proxy-wasm-go-host/api"
-	"github.com/banzaicloud/proxy-wasm-go-host/pkg/utils"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 )
 
@@ -79,7 +78,7 @@ func (f *HostFunctions) Logger() logr.Logger {
 func (f *HostFunctions) GetPluginConfig() pwapi.IoBuffer {
 	if val, found := f.properties.Get("plugin_config.bytes"); found {
 		if content, ok := val.([]byte); ok {
-			return utils.NewIoBufferBytes(content)
+			return bytes.NewBuffer(content)
 		}
 	}
 
@@ -124,79 +123,57 @@ func (f *HostFunctions) SetProperty(key, value string) pwapi.WasmResult {
 }
 
 func (f *HostFunctions) GetHttpRequestHeader() pwapi.HeaderMap {
-	var value interface{}
-	var ok bool
-
-	value, ok = f.properties.Get("http.request")
+	req, ok := HTTPRequestProperty(f.properties).Get()
 	if !ok {
 		return nil
 	}
 
-	if req, ok := value.(api.HTTPRequest); ok {
-		return NewHeaders(req.Header(), f.Logger())
-	}
-
-	return nil
+	return NewHeaders(req.Header(), f.Logger())
 }
 
 func (f *HostFunctions) GetHttpRequestBody() pwapi.IoBuffer {
-	if val, ok := f.properties.Get("request.body"); ok {
-		if content, ok := val.(pwapi.IoBuffer); ok {
-			return content
-		}
+	if body, ok := HTTPRequestBodyProperty(f.properties).Get(); ok {
+		return body
 	}
 
 	return nil
 }
 
 func (f *HostFunctions) GetHttpResponseBody() pwapi.IoBuffer {
-	if val, ok := f.properties.Get("response.body"); ok {
-		if content, ok := val.(pwapi.IoBuffer); ok {
-			return content
-		}
+	if body, ok := HTTPResponseBodyProperty(f.properties).Get(); ok {
+		return body
 	}
 
 	return nil
 }
 
 func (f *HostFunctions) GetHttpResponseHeader() pwapi.HeaderMap {
-	var value interface{}
-	var ok bool
-
-	value, ok = f.properties.Get("http.response")
+	resp, ok := HTTPResponseProperty(f.properties).Get()
 	if !ok {
 		return nil
 	}
 
-	if resp, ok := value.(api.HTTPResponse); ok {
-		return NewHeaders(resp.Header(), f.Logger())
-	}
-
-	return nil
+	return NewHeaders(resp.Header(), f.Logger())
 }
 
 func (f *HostFunctions) GetDownStreamData() pwapi.IoBuffer {
-	if val, found := f.properties.Get("downstream.data"); found {
-		if content, ok := val.(pwapi.IoBuffer); ok {
-			return content
-		}
+	if data, found := DownstreamDataProperty(f.properties).Get(); found {
+		return data
 	}
 
 	return nil
 }
 
 func (f *HostFunctions) GetUpstreamData() pwapi.IoBuffer {
-	if val, found := f.properties.Get("upstream.data"); found {
-		if content, ok := val.(pwapi.IoBuffer); ok {
-			return content
-		}
+	if data, found := UpstreamDataProperty(f.properties).Get(); found {
+		return data
 	}
 
 	return nil
 }
 
 func (f *HostFunctions) SendHttpResp(respCode int32, respCodeDetail pwapi.IoBuffer, respBody pwapi.IoBuffer, additionalHeaderMap pwapi.HeaderMap, grpcCode int32) pwapi.WasmResult {
-	if value, ok := f.properties.Get("http.response"); ok {
+	if value, ok := HTTPResponseProperty(f.properties).Get(); ok {
 		if resp, ok := value.(interface {
 			GetHTTPResponse() *http.Response
 		}); ok {
