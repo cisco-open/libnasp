@@ -20,6 +20,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"net"
+	"reflect"
 	"time"
 )
 
@@ -82,7 +83,7 @@ type WrappedConnectionOption func(*wrappedConn)
 
 func WrappedConnectionWithCloserWrapper(closeWrapper ConnectionCloseWrapper) WrappedConnectionOption {
 	return func(wc *wrappedConn) {
-		if wc.closeWrapper != nil {
+		if wc.closeWrapper != nil && !reflect.DeepEqual(wc.closeWrapper, closeWrapper) {
 			closeWrapper.AddParentCloseWrapper(wc.closeWrapper)
 		}
 		wc.closeWrapper = closeWrapper

@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
+	"reflect"
 )
 
 type dialer struct {
@@ -44,6 +45,9 @@ type DialerOption func(*dialer)
 
 func DialerWithDialerWrapper(w DialWrapper) DialerOption {
 	return func(d *dialer) {
+		if d.dialWrapper != nil && !reflect.DeepEqual(d.dialWrapper, w) {
+			w.AddParentDialerWrapper(d.dialWrapper)
+		}
 		d.dialWrapper = w
 	}
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/cisco-open/nasp/pkg/istio/discovery"
 	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/nasp/pkg/network/pool"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
 )
@@ -33,6 +34,8 @@ type tcpDialer struct {
 	streamHandler   api.StreamHandler
 	tlsConfig       *tls.Config
 	discoveryClient discovery.DiscoveryClient
+
+	connectionPoolRegistry pool.Registry
 }
 
 func NewTCPDialer(streamHandler api.StreamHandler, tlsConfig *tls.Config, discoveryClient discovery.DiscoveryClient) Dialer {
@@ -40,6 +43,8 @@ func NewTCPDialer(streamHandler api.StreamHandler, tlsConfig *tls.Config, discov
 		streamHandler:   streamHandler,
 		tlsConfig:       tlsConfig,
 		discoveryClient: discoveryClient,
+
+		connectionPoolRegistry: pool.NewSyncMapPoolRegistry(pool.SyncMapPoolRegistryWithLogger(streamHandler.Logger())),
 	}
 }
 
@@ -76,25 +81,50 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 		connectionDialer = network.NewDialer(opts...)
 	}
 
-	var conn net.Conn
-	var err error
+	f := func() (net.Conn, error) {
+		var conn net.Conn
+		var err error
 
-	if useTLS {
-		conn, err = connectionDialer.DialContext(ctx, _net, address)
-	} else {
-		conn, err = connectionDialer.DialTLSContext(ctx, _net, address)
+		if useTLS {
+			conn, err = connectionDialer.DialContext(ctx, _net, address)
+		} else {
+			conn, err = connectionDialer.DialTLSContext(ctx, _net, address)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		wrappedConn, err := d.handleNewConnection(conn, prop)
+		if err != nil {
+			conn.Close()
+			return nil, err
+		}
+
+		return wrappedConn, nil
 	}
+
+	var cp pool.Pool
+	if !d.connectionPoolRegistry.HasPool(address) {
+		d.streamHandler.Logger().Info("new pool created", "address", address)
+		p, err := pool.NewChannelPool(
+			f,
+			pool.ChannelPoolWithLogger(d.streamHandler.Logger()),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		d.connectionPoolRegistry.AddPool(address, p)
+	}
+
+	cp, err := d.connectionPoolRegistry.GetPool(address)
 	if err != nil {
 		return nil, err
 	}
 
-	wrappedConn, err := d.handleNewConnection(conn, prop)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
+	d.streamHandler.Logger().Info("pool stat", "address", address, "len", cp.Len())
 
-	return wrappedConn, nil
+	return cp.Get()
 }
 
 func (d *tcpDialer) handleNewConnection(conn net.Conn, prop discovery.ClientProperties) (net.Conn, error) {
