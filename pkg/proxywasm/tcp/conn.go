@@ -15,12 +15,15 @@
 package tcp
 
 import (
-	"errors"
+	"bytes"
 	"io"
 	"net"
+	"sync"
 
-	"github.com/banzaicloud/proxy-wasm-go-host/pkg/utils"
+	"emperror.dev/errors"
+
 	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/nasp/pkg/proxywasm"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
 )
@@ -30,12 +33,15 @@ type wrappedConn struct {
 
 	stream api.Stream
 
-	readCacheBuffer    api.IoBuffer
-	readBuffer         api.IoBuffer
-	writeBuffer        api.IoBuffer
-	internalReadBuffer []byte
+	readCacheBuffer api.IoBuffer
+	readBuffer      api.IoBuffer
+	writeBuffer     api.IoBuffer
+	internalBuffer  []byte
 
 	connectionInfoSet bool
+
+	writeMu sync.Mutex
+	readMu  sync.Mutex
 }
 
 func NewWrappedConn(conn net.Conn, stream api.Stream) net.Conn {
@@ -43,19 +49,18 @@ func NewWrappedConn(conn net.Conn, stream api.Stream) net.Conn {
 		Conn: conn,
 
 		stream:          stream,
-		readCacheBuffer: utils.NewIoBufferBytes([]byte{}),
-		readBuffer:      utils.NewIoBufferBytes([]byte{}),
-		writeBuffer:     utils.NewIoBufferBytes([]byte{}),
-
-		internalReadBuffer: make([]byte, 16384),
+		readCacheBuffer: new(bytes.Buffer),
+		readBuffer:      new(bytes.Buffer),
+		writeBuffer:     new(bytes.Buffer),
+		internalBuffer:  make([]byte, 1024),
 	}
 
 	if stream.Direction() == api.ListenerDirectionOutbound {
-		stream.Set("upstream.data", c.readBuffer)
-		stream.Set("downstream.data", c.writeBuffer)
+		proxywasm.UpstreamDataProperty(stream).Set(c.readBuffer)
+		proxywasm.DownstreamDataProperty(stream).Set(c.writeBuffer)
 	} else {
-		stream.Set("downstream.data", c.readBuffer)
-		stream.Set("upstream.data", c.writeBuffer)
+		proxywasm.DownstreamDataProperty(stream).Set(c.readBuffer)
+		proxywasm.UpstreamDataProperty(stream).Set(c.writeBuffer)
 	}
 
 	return c
@@ -78,16 +83,20 @@ func (c *wrappedConn) Close() error {
 }
 
 func (c *wrappedConn) Read(b []byte) (int, error) {
-	// flush the remaining read buffer
-	if c.readCacheBuffer.Len() > 0 {
-		x := copy(b, c.readCacheBuffer.Bytes())
-		c.readCacheBuffer.Drain(x)
+	c.readMu.Lock()
+	defer c.readMu.Unlock()
 
+	// flush the remaining read buffer
+	x, err := c.readCacheBuffer.Read(b)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return x, err
+	}
+	if x == len(b) {
 		return x, nil
 	}
 
 	// read from the underlying reader
-	n, err := c.Conn.Read(c.internalReadBuffer)
+	n, err := c.Conn.Read(c.internalBuffer)
 	if n == 0 { // return if there is no more data
 		return n, err
 	}
@@ -95,34 +104,40 @@ func (c *wrappedConn) Read(b []byte) (int, error) {
 		return n, err
 	}
 
-	if n, err := c.readBuffer.Write(c.internalReadBuffer[:n]); err == nil {
-		switch c.stream.Direction() {
-		case api.ListenerDirectionOutbound:
-			if err := c.stream.HandleUpstreamData(c, n); err != nil {
-				return 0, err
-			}
-		case api.ListenerDirectionUnspecified, api.ListenerDirectionInbound:
-			if err := c.stream.HandleDownstreamData(c, n); err != nil {
-				return 0, err
-			}
+	n, err = c.readBuffer.Write(c.internalBuffer[:n])
+	if err != nil {
+		return n, err
+	}
+
+	switch c.stream.Direction() {
+	case api.ListenerDirectionOutbound:
+		if err := c.stream.HandleUpstreamData(c, n); err != nil {
+			return 0, err
+		}
+	case api.ListenerDirectionUnspecified, api.ListenerDirectionInbound:
+		if err := c.stream.HandleDownstreamData(c, n); err != nil {
+			return 0, err
 		}
 	}
 
-	// put the read data to the read buffer
-	if n, err := c.readCacheBuffer.Write(c.readBuffer.Bytes()); err != nil {
+	defer func() {
+		// put the read data to the read buffer
+		_, _ = io.Copy(c.readCacheBuffer, c.readBuffer)
+	}()
+
+	if n, err := c.readBuffer.Read(b[x:]); err != nil {
 		return n, err
 	} else {
-		c.readBuffer.Drain(n)
+		x += n
 	}
 
-	// copy from read buffer to the upstream buffer and drain the read buffer until the read len
-	n = copy(b, c.readCacheBuffer.Bytes())
-	c.readCacheBuffer.Drain(n)
-
-	return n, err
+	return x, err
 }
 
 func (c *wrappedConn) Write(b []byte) (int, error) {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+
 	if !c.connectionInfoSet {
 		if connection, ok := network.WrappedConnectionFromNetConn(c); ok {
 			middleware.SetEnvoyConnectionInfo(connection, c.stream)
@@ -136,20 +151,22 @@ func (c *wrappedConn) Write(b []byte) (int, error) {
 	}
 
 	if c.stream.Direction() == api.ListenerDirectionOutbound {
-		if err := c.stream.HandleDownstreamData(c, c.writeBuffer.Len()); err != nil {
+		if err := c.stream.HandleDownstreamData(c, n); err != nil {
 			return 0, err
 		}
 	} else {
-		if err := c.stream.HandleUpstreamData(c, c.writeBuffer.Len()); err != nil {
+		if err := c.stream.HandleUpstreamData(c, n); err != nil {
 			return 0, err
 		}
 	}
 
-	l, err := c.Conn.Write(c.writeBuffer.Bytes())
-	if err != nil {
-		return n, err
+	for {
+		n1, err := io.Copy(c.Conn, io.LimitReader(c.writeBuffer, int64(cap(b))))
+		if err != nil {
+			return 0, err
+		}
+		if n1 == 0 {
+			return n, nil
+		}
 	}
-	c.writeBuffer.Drain(l)
-
-	return n, nil
 }
