@@ -326,9 +326,8 @@ func (s *stream) Close() error {
 	for _, filterContext := range s.filterContexts {
 		err := func() error {
 			filterContext.Lock()
-			defer filterContext.Close()
 
-			return StopWasmContext(filterContext.ID(), filterContext, filterContext.Logger())
+			return filterContext.Close()
 		}()
 		if err != nil {
 			return errors.WithStack(err)
