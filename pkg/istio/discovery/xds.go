@@ -239,12 +239,12 @@ func (d *xdsDiscoveryClient) GetHTTPClientPropertiesByHost(ctx context.Context, 
 }
 
 func (d *xdsDiscoveryClient) IncrementActiveRequestsCount(address string) {
-	d.logger.V(0).Info("increment active request count", "address", address)
+	d.logger.V(2).Info("increment active request count", "address", address)
 	d.xdsClient.IncrementActiveRequestsCount(address)
 }
 
 func (d *xdsDiscoveryClient) DecrementActiveRequestsCount(address string) {
-	d.logger.V(0).Info("decrement active request count", "address", address)
+	d.logger.V(2).Info("decrement active request count", "address", address)
 	d.xdsClient.DecrementActiveRequestsCount(address)
 }
 
