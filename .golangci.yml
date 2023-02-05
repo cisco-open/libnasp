@@ -1,6 +1,7 @@
 run:
   skip-dirs:
     - .gen
+    - ".*~"
   skip-files:
     - ".*zz_.*\\.go$"
 
@@ -79,8 +80,8 @@ linters-settings:
       - G402
       - G112
   funlen:
-    lines: 129        # default: 60
-    statements: 64   # default: 40
+    lines: 129 # default: 60
+    statements: 64 # default: 40
 
 issues:
   exclude-rules:

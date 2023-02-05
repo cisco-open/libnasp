@@ -125,7 +125,7 @@ github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d h1:Byv0BzEl
 github.com/banzaicloud/k8s-objectmatcher v1.8.0 h1:Nugn25elKtPMTA2br+JgHNeSQ04sc05MDPmpJnd1N2A=
 github.com/banzaicloud/operator-tools v0.28.8 h1:juokC+0E7EnkdlmGR9Yn5UasRS6a5sNV4NTe+kFtpMA=
 github.com/banzaicloud/operator-tools v0.28.8/go.mod h1:WhWEQk/6F951K55DX6/cyGKqo6ymLYy1SEN54tCWnqo=
-github.com/banzaicloud/proxy-wasm-go-host v1.0.0 h1:A8y5wyevNmtGz1lReBTWtxM6En7hCZkorVWOjMAoIto=
+github.com/banzaicloud/proxy-wasm-go-host v1.0.1 h1:4WPHglx1YBk40kNe6AFaMeaeDlhuSCtNxrIwQl61PaU=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.0 h1:iYbU68KzvtxlejS9uWG5Cvfr5ZR6PlWXmPyi0LABBMY=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime v1.0.0 h1:Il4ynAOEkLCJ8PItn/Ik0ZAGfiSGFRQ9QtXLyjNyg9Y=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.6 h1:X+XStrljEd1zB9tJDJfMMALHKz41jKF4ZFMsK4Jr7Uw=

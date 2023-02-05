@@ -9,7 +9,7 @@ replace (
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/banzaicloud/proxy-wasm-go-host v1.0.0
+	github.com/banzaicloud/proxy-wasm-go-host v1.0.1
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.0
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime v1.0.0
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.6
@@ -29,6 +29,7 @@ require (
 	github.com/sethvargo/go-envconfig v0.8.2
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/atomic v1.9.0
+	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	google.golang.org/genproto v0.0.0-20220628213854-d9e0b6570c03
 	google.golang.org/grpc v1.47.0
@@ -124,7 +125,6 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
-	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e // indirect
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
 	golang.org/x/sys v0.0.0-20220627191245-f75cf1eec38b // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
