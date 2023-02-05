@@ -35,6 +35,7 @@ pub fn _start() {
             metadata_id_received: false,
             metadata_received: false,
             metadata_exchanged: false,
+            metadata_sent: false,
         })
     });
 }
@@ -46,6 +47,7 @@ struct MetadataFilter {
     metadata_id_received: bool,
     metadata_received: bool,
     metadata_exchanged: bool,
+    metadata_sent: bool,
 }
 
 impl MetadataFilter {
@@ -86,6 +88,7 @@ impl RootContext for MetadataFilter {
             metadata_id_received: self.metadata_id_received,
             metadata_received: self.metadata_received,
             metadata_exchanged: self.metadata_exchanged,
+            metadata_sent: self.metadata_sent,
         }))
     }
 
@@ -116,7 +119,7 @@ impl StreamContext for MetadataFilter {
 
         // send local metadata by prepending it into the downstream buffer
         if direction == TRAFFIC_DIRECTION_OUTBOUND {
-            if alpn != "istio-peer-exchange" {
+            if alpn != "istio-peer-exchange" || self.metadata_sent {
                 return Action::Continue;
             }
 
@@ -133,6 +136,7 @@ impl StreamContext for MetadataFilter {
 
             debug!("prepend metadata value to downstream buffer");
             self.set_downstream_data(0, 0, &buffer);
+            self.metadata_sent = true;
 
             return Action::Continue;
         }
@@ -263,6 +267,7 @@ impl StreamContext for MetadataFilter {
         if direction == TRAFFIC_DIRECTION_INBOUND
             && self.metadata_received
             && self.metadata_id_received
+            && !self.metadata_sent
         {
             let mut buffer = Vec::<u8>::new();
 
@@ -278,6 +283,7 @@ impl StreamContext for MetadataFilter {
             self.set_downstream_data(0, 0, &buffer);
 
             self.metadata_exchanged = true;
+            self.metadata_sent = true;
         }
 
         Action::Continue
