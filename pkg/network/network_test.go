@@ -391,7 +391,7 @@ func (s *NetworkTestSuite) TestWrappedHTTPServerWithWrappedClient() {
 		return s.wrappedHTTPServerRunning
 	}, time.Second*5, time.Millisecond*10, "wrapped http server didn't come up")
 
-	c := http.Client{
+	c := http.Client{ //nolint:forcetypeassert
 		Transport: network.WrapHTTPTransport(http.DefaultTransport.(*http.Transport).Clone(), network.NewDialer()),
 	}
 
@@ -459,7 +459,7 @@ func (s *NetworkTestSuite) TestWrappedHTTPSServerWithWrappedClient() {
 		InsecureSkipVerify: true,
 	})
 
-	c := http.Client{
+	c := http.Client{ //nolint:forcetypeassert
 		Transport: network.WrapHTTPTransport(http.DefaultTransport.(*http.Transport).Clone(), d),
 	}
 
