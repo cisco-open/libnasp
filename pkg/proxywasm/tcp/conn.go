@@ -28,6 +28,8 @@ import (
 	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
 )
 
+const internalBufferSize = 16384
+
 type wrappedConn struct {
 	net.Conn
 
@@ -52,7 +54,7 @@ func NewWrappedConn(conn net.Conn, stream api.Stream) net.Conn {
 		readCacheBuffer: new(bytes.Buffer),
 		readBuffer:      new(bytes.Buffer),
 		writeBuffer:     new(bytes.Buffer),
-		internalBuffer:  make([]byte, 1024),
+		internalBuffer:  make([]byte, internalBufferSize),
 	}
 
 	if stream.Direction() == api.ListenerDirectionOutbound {
@@ -161,7 +163,7 @@ func (c *wrappedConn) Write(b []byte) (int, error) {
 	}
 
 	for {
-		n1, err := io.Copy(c.Conn, io.LimitReader(c.writeBuffer, int64(cap(b))))
+		n1, err := io.Copy(c.Conn, io.LimitReader(c.writeBuffer, int64(internalBufferSize)))
 		if err != nil {
 			return 0, err
 		}
