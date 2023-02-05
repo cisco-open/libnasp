@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
 	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
-	k8s.io/klog/v2 v2.80.1
+	k8s.io/klog/v2 v2.90.0
 )
 
 require (
@@ -17,9 +17,9 @@ require (
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed // indirect
 	github.com/banzaicloud/proxy-wasm-go-host v1.0.1 // indirect
-	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.0 // indirect
-	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime v1.0.0 // indirect
-	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.6 // indirect
+	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1 // indirect
+	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3 v3.0.2-c1 // indirect
+	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.8-c1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bytecodealliance/wasmtime-go/v3 v3.0.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
@@ -85,12 +85,12 @@ require (
 	github.com/spf13/cobra v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
-	github.com/tetratelabs/wazero v1.0.0-pre.6 // indirect
+	github.com/tetratelabs/wazero v1.0.0-pre.8 // indirect
 	github.com/wasmerio/wasmer-go v1.0.4 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect

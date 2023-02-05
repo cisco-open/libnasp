@@ -31,7 +31,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime"
+	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3"
 	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero"
 	"github.com/cisco-open/nasp/pkg/ca"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
