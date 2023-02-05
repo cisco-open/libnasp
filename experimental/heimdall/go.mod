@@ -9,7 +9,7 @@ require (
 	k8s.io/api v0.24.2
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.24.2
-	k8s.io/klog/v2 v2.80.1
+	k8s.io/klog/v2 v2.90.0
 	sigs.k8s.io/controller-runtime v0.12.3
 )
 
@@ -74,8 +74,8 @@ require (
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	github.com/wayneashleyberry/terminal-dimensions v1.0.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e // indirect
