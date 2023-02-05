@@ -30,6 +30,8 @@ type wasmPluginManager struct {
 	logger logr.Logger
 
 	plugins sync.Map
+
+	mu sync.Mutex
 }
 
 func NewWasmPluginManager(vms api.VMStore, logger logr.Logger) api.WasmPluginManager {
@@ -46,6 +48,9 @@ func (m *wasmPluginManager) Logger() logr.Logger {
 }
 
 func (m *wasmPluginManager) Delete(config api.WasmPluginConfig) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	plugin, err := m.Get(config)
 	if err != nil {
 		return err
@@ -59,6 +64,9 @@ func (m *wasmPluginManager) Delete(config api.WasmPluginConfig) error {
 }
 
 func (m *wasmPluginManager) Get(config api.WasmPluginConfig) (api.WasmPlugin, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if val, ok := m.plugins.Load(config.Key()); ok {
 		if plugin, ok := val.(api.WasmPlugin); ok {
 			return plugin, nil
@@ -69,19 +77,26 @@ func (m *wasmPluginManager) Get(config api.WasmPluginConfig) (api.WasmPlugin, er
 }
 
 func (m *wasmPluginManager) GetOrCreate(config api.WasmPluginConfig) (api.WasmPlugin, error) {
+	m.mu.Lock()
+
 	if val, ok := m.plugins.Load(config.Key()); ok {
 		if plugin, ok := val.(api.WasmPlugin); ok {
-			m.Logger().V(3).Info("getOrCreate plugin", "cached", true, "key", config.Key())
+			m.Logger().V(2).Info("getOrCreate plugin", "cached", true, "key", config.Key())
+			m.mu.Unlock()
 			return plugin, nil
 		}
 	}
 
-	m.Logger().V(3).Info("getOrCreate plugin", "cached", false, "key", config.Key())
+	m.Logger().V(2).Info("getOrCreate plugin", "cached", false, "key", config.Key())
+	m.mu.Unlock()
 
 	return m.Add(config)
 }
 
 func (m *wasmPluginManager) Add(config api.WasmPluginConfig) (api.WasmPlugin, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	var err error
 
 	if config.Name == "" {
@@ -119,8 +134,6 @@ func (m *wasmPluginManager) Add(config api.WasmPluginConfig) (api.WasmPlugin, er
 	} else {
 		plugin.module = module
 	}
-
-	// plugin.module.SetLogger(plugin.logger.WithName("wasm"))
 
 	plugin.ctx = GetBaseContext().GetOrCreateContext(plugin.config.RootID)
 
