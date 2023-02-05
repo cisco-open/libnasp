@@ -26,7 +26,7 @@ type FilterContext interface {
 	Logger() logr.Logger
 	Lock()
 	Unlock()
-	Close()
+	Close() error
 	ID() int32
 	RootContext() Context
 	GetABIContext() api.ContextHandler

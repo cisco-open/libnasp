@@ -194,6 +194,14 @@ func (f *HostFunctions) SendHttpResp(respCode int32, respCodeDetail pwapi.IoBuff
 }
 
 func (f *HostFunctions) SetEffectiveContextID(contextID int32) pwapi.WasmResult {
+	res := f.setEffectiveContextID(contextID)
+
+	f.logger.V(2).Info("set effective context id", "contextID", contextID, "result", res)
+
+	return res
+}
+
+func (f *HostFunctions) setEffectiveContextID(contextID int32) pwapi.WasmResult {
 	var rootContext api.ContextHandler
 	if ctx, ok := RootABIContextProperty(f.properties).Get(); ok {
 		rootContext = ctx
@@ -265,6 +273,7 @@ func (f *HostFunctions) SetTickPeriodMilliseconds(tickPeriodMilliseconds int32) 
 			case <-done:
 				return
 			case <-ticker.C:
+				logger.V(3).Info("tick")
 				rootContext.GetInstance().Lock(rootContext)
 
 				if err := rootContext.GetExports().ProxyOnTick(plugin.Context().ID()); err != nil {

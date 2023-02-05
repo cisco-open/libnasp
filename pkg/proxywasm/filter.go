@@ -62,8 +62,10 @@ func NewFilterContext(plugin api.WasmPlugin, properties api.PropertyHolder) (api
 	defer context.Unlock()
 
 	if err := context.GetExports().ProxyOnContextCreate(context.ID(), context.rootContext.ID()); err != nil {
-		return nil, errors.WrapIfWithDetails(err, "could not create context", "id", context.ID)
+		return nil, errors.WrapIfWithDetails(err, "could not create context", "id", context.ID(), "pluginName", plugin.Name())
 	}
+
+	context.logger.V(2).Info("context created", "id", context.ID(), "pluginName", plugin.Name())
 
 	plugin.RegisterFilterContext(instance, context)
 
@@ -86,10 +88,14 @@ func (c *filterContext) Unlock() {
 	c.ABIContext.GetInstance().Unlock()
 }
 
-func (c *filterContext) Close() {
+func (c *filterContext) Close() error {
+	err := StopWasmContext(c.ID(), c, c.Logger())
+
 	c.Unlock()
 	c.plugin.ReleaseInstance(c.ABIContext.GetInstance())
 	c.plugin.UnregisterFilterContext(c.ABIContext.GetInstance(), c)
+
+	return err
 }
 
 func (c *filterContext) ID() int32 {
