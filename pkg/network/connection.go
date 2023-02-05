@@ -29,6 +29,23 @@ type contextKey struct {
 var connectionContextKey = contextKey{"network.connection"}
 var ConnectionTrackerLogger logr.Logger = logr.Discard()
 
+type ConnectionHolder interface {
+	SetConn(net.Conn)
+	NetConn() net.Conn
+}
+
+type connectionHolder struct {
+	net.Conn
+}
+
+func (h *connectionHolder) SetConn(conn net.Conn) {
+	h.Conn = conn
+}
+
+func (h *connectionHolder) NetConn() net.Conn {
+	return h.Conn
+}
+
 type connectionTracker struct {
 	logger logr.Logger
 
@@ -37,12 +54,30 @@ type connectionTracker struct {
 }
 
 func WrappedConnectionToContext(ctx context.Context, conn net.Conn) context.Context {
-	return context.WithValue(ctx, connectionContextKey, conn)
+	return context.WithValue(ctx, connectionContextKey, &connectionHolder{conn})
+}
+
+func ConnectionHolderFromContext(ctx context.Context) (ConnectionHolder, bool) {
+	if c, ok := ctx.Value(connectionContextKey).(ConnectionHolder); ok {
+		return c, true
+	}
+
+	return nil, false
+}
+
+func SetConnectionToContextConnectionHolder(ctx context.Context, conn net.Conn) bool {
+	if h, ok := ConnectionHolderFromContext(ctx); ok {
+		h.SetConn(conn)
+
+		return true
+	}
+
+	return false
 }
 
 func WrappedConnectionFromContext(ctx context.Context) (Connection, bool) {
-	if c, ok := ctx.Value(connectionContextKey).(net.Conn); ok {
-		return WrappedConnectionFromNetConn(c)
+	if c, ok := ctx.Value(connectionContextKey).(ConnectionHolder); ok {
+		return WrappedConnectionFromNetConn(c.NetConn())
 	}
 
 	return nil, false

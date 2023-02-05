@@ -19,6 +19,7 @@ import (
 	"crypto/x509"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 
 	ltls "github.com/cisco-open/nasp/pkg/tls"
 )
@@ -39,7 +40,6 @@ type server struct {
 
 func WrapHTTPTransport(rt http.RoundTripper, dialer ConnectionDialer) http.RoundTripper {
 	if t, ok := rt.(*http.Transport); ok {
-		t = t.Clone()
 		t.DialContext = dialer.DialContext
 		t.DialTLSContext = dialer.DialTLSContext
 
@@ -104,7 +104,12 @@ type transport struct {
 }
 
 func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req = req.WithContext(NewConnectionToContext(req.Context()))
+	ctx := NewConnectionToContext(req.Context())
+	req = req.WithContext(httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		GotConn: func(i httptrace.GotConnInfo) {
+			SetConnectionToContextConnectionHolder(ctx, i.Conn)
+		},
+	}))
 
 	return t.RoundTripper.RoundTrip(req)
 }

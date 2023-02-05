@@ -392,7 +392,7 @@ func (s *NetworkTestSuite) TestWrappedHTTPServerWithWrappedClient() {
 	}, time.Second*5, time.Millisecond*10, "wrapped http server didn't come up")
 
 	c := http.Client{
-		Transport: network.WrapHTTPTransport(http.DefaultTransport, network.NewDialer()),
+		Transport: network.WrapHTTPTransport(http.DefaultTransport.(*http.Transport).Clone(), network.NewDialer()),
 	}
 
 	resp, err := c.Get("http://" + s.wrappedHTTPServerAddr)
@@ -460,7 +460,7 @@ func (s *NetworkTestSuite) TestWrappedHTTPSServerWithWrappedClient() {
 	})
 
 	c := http.Client{
-		Transport: network.WrapHTTPTransport(http.DefaultTransport, d),
+		Transport: network.WrapHTTPTransport(http.DefaultTransport.(*http.Transport).Clone(), d),
 	}
 
 	resp, err := c.Get("https://" + s.wrappedHTTPSServerAddr + "/")
