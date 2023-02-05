@@ -86,3 +86,84 @@ func (p rootABIContextProperty) Get() (api.ContextHandler, bool) {
 func (p rootABIContextProperty) Set(ctx api.ContextHandler) {
 	p.PropertyHolder.Set(p.key, ctx)
 }
+
+func HTTPRequestProperty(p api.PropertyHolder) httpRequestProperty {
+	return httpRequestProperty{p, "http.request"}
+}
+
+type httpRequestProperty struct {
+	api.PropertyHolder
+	key string
+}
+
+func (p httpRequestProperty) Get() (api.HTTPRequest, bool) {
+	if v, ok := p.PropertyHolder.Get(p.key); ok {
+		if req, ok := v.(api.HTTPRequest); ok {
+			return req, true
+		}
+	}
+
+	return nil, false
+}
+
+func (p httpRequestProperty) Set(req api.HTTPRequest) {
+	p.PropertyHolder.Set(p.key, req)
+}
+
+func HTTPResponseProperty(p api.PropertyHolder) httpResponseProperty {
+	return httpResponseProperty{p, "http.response"}
+}
+
+type httpResponseProperty struct {
+	api.PropertyHolder
+	key string
+}
+
+func (p httpResponseProperty) Get() (api.HTTPResponse, bool) {
+	if v, ok := p.PropertyHolder.Get(p.key); ok {
+		if resp, ok := v.(api.HTTPResponse); ok {
+			return resp, true
+		}
+	}
+
+	return nil, false
+}
+
+func (p httpResponseProperty) Set(resp api.HTTPResponse) {
+	p.PropertyHolder.Set(p.key, resp)
+}
+
+func UpstreamDataProperty(p api.PropertyHolder) ioBufferProperty {
+	return ioBufferProperty{p, "upstream.data"}
+}
+
+func DownstreamDataProperty(p api.PropertyHolder) ioBufferProperty {
+	return ioBufferProperty{p, "downstream.data"}
+}
+
+func HTTPRequestBodyProperty(p api.PropertyHolder) ioBufferProperty {
+	return ioBufferProperty{p, "request.body"}
+}
+
+func HTTPResponseBodyProperty(p api.PropertyHolder) ioBufferProperty {
+	return ioBufferProperty{p, "response.body"}
+}
+
+type ioBufferProperty struct {
+	api.PropertyHolder
+	key string
+}
+
+func (p ioBufferProperty) Get() (api.IoBuffer, bool) {
+	if v, ok := p.PropertyHolder.Get(p.key); ok {
+		if buff, ok := v.(api.IoBuffer); ok {
+			return buff, true
+		}
+	}
+
+	return nil, false
+}
+
+func (p ioBufferProperty) Set(buff api.IoBuffer) {
+	p.PropertyHolder.Set(p.key, buff)
+}

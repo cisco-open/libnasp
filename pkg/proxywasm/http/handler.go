@@ -24,6 +24,7 @@ import (
 	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 
+	"github.com/cisco-open/nasp/pkg/proxywasm"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 )
 
@@ -94,8 +95,8 @@ func (h *httpHandler) serve(responseWriter http.ResponseWriter, request *http.Re
 
 	request.Header.Add(":method", request.Method)
 
-	stream.Set("http.request", wrappedRequest)
-	stream.Set("http.response", wrappedResponse)
+	proxywasm.HTTPRequestProperty(stream).Set(wrappedRequest)
+	proxywasm.HTTPResponseProperty(stream).Set(wrappedResponse)
 
 	h.BeforeRequest(wrappedRequest, stream)
 
