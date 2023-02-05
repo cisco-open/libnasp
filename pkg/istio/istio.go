@@ -383,6 +383,7 @@ func (h *IstioIntegrationHandler) defaultClientFilters() []api.WasmPluginConfig 
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "stats-filter.wasm"),
 			},
+			Configuration: api.JsonnableMap{},
 			InstanceCount: 1,
 		},
 	}
@@ -411,6 +412,7 @@ func (h *IstioIntegrationHandler) defaultServerFilters() []api.WasmPluginConfig 
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "stats-filter.wasm"),
 			},
+			Configuration: api.JsonnableMap{},
 			InstanceCount: 1,
 		},
 	}
@@ -527,6 +529,7 @@ func (h *IstioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConf
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "tcp-metadata-exchange-filter.wasm"),
 			},
+			Configuration: api.JsonnableMap{},
 			InstanceCount: 1,
 		},
 		{
@@ -537,6 +540,7 @@ func (h *IstioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConf
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "stats-filter.wasm"),
 			},
+			Configuration: api.JsonnableMap{},
 			InstanceCount: 1,
 		},
 	}
@@ -552,6 +556,7 @@ func (h *IstioIntegrationHandler) defaultTCPServerFilters() []api.WasmPluginConf
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "tcp-metadata-exchange-filter.wasm"),
 			},
+			Configuration: api.JsonnableMap{},
 			InstanceCount: 1,
 		},
 		{
@@ -562,6 +567,7 @@ func (h *IstioIntegrationHandler) defaultTCPServerFilters() []api.WasmPluginConf
 				ID:      "",
 				Code:    proxywasm.NewFileDataSource(filters.Filters, "stats-filter.wasm"),
 			},
+			Configuration: api.JsonnableMap{},
 			InstanceCount: 1,
 		},
 	}
