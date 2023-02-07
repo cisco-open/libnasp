@@ -45,8 +45,8 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     public Selector wakeup() {
-//        throw new UnsupportedOperationException();
-        return null;
+        selector.wakeUp();
+        return this;
     }
 
     @Override

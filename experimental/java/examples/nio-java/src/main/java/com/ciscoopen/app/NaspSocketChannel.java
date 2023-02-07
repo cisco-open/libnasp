@@ -107,7 +107,15 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public SocketAddress getRemoteAddress() throws IOException {
-//        throw new UnsupportedOperationException();
+        try {
+            if (connection == null) {
+                connection = dialer.asyncDial();
+            }
+            return new InetSocketAddress(connection.getRemoteAddress().getHost(),
+                    connection.getRemoteAddress().getPort());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         return null;
     }
 

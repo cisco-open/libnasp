@@ -40,6 +40,7 @@ const (
 	OP_WRITE   = 1 << 2
 	OP_CONNECT = 1 << 3
 	OP_ACCEPT  = 1 << 4
+	OP_WAKEUP  = -1
 )
 
 var logger = klog.NewKlogr()
@@ -94,6 +95,10 @@ func (s *Selector) Select(timeout int64) int {
 	}
 	select {
 	case c := <-s.queue:
+		if c.Operation == OP_WAKEUP {
+			return 0
+		}
+
 		s.selected = append(s.selected, c)
 
 		l := len(s.queue)
@@ -106,6 +111,10 @@ func (s *Selector) Select(timeout int64) int {
 	case <-timeoutChan:
 		return 0
 	}
+}
+
+func (s *Selector) WakeUp() {
+	s.queue <- &SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: -1}
 }
 
 func (s *Selector) NextSelectedKey() *SelectedKey {

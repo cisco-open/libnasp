@@ -13,7 +13,7 @@ import java.nio.channels.spi.SelectorProvider;
 import nasp.Connection;
 
 public class NaspSocket extends Socket {
-    private final Connection conn;
+    private Connection conn;
     private final SocketChannel channel;
 
     public NaspSocket(SelectorProvider provider, Connection conn) {
