@@ -3,6 +3,7 @@ package com.ciscoopen.app;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
@@ -27,6 +28,16 @@ public class NaspSocket extends Socket {
             e.printStackTrace();
         }
         return 0;
+    }
+
+    @Override
+    public InetAddress getInetAddress() {
+        try {
+            return InetAddress.getByName(conn.getRemoteAddress().getHost());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
 

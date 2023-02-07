@@ -214,6 +214,18 @@ func (c *Connection) GetAddress() (*Address, error) {
 		Port: int32(port)}, nil
 }
 
+func (c *Connection) GetRemoteAddress() (*Address, error) {
+	address := c.conn.RemoteAddr().String()
+	port, err := strconv.Atoi(address[strings.LastIndex(address, ":")+1:])
+	if err != nil {
+		return nil, err
+	}
+	return &Address{
+		Host: address[0:strings.LastIndex(address, ":")],
+		//nolint:gosec
+		Port: int32(port)}, nil
+}
+
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	go func() {
 		tempBuffer := make([]byte, 1024)
