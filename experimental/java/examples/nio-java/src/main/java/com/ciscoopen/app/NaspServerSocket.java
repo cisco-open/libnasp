@@ -15,6 +15,9 @@ public class NaspServerSocket extends ServerSocket {
     private TCPListener TCPListener;
     private final SelectorProvider selectorProvider;
 
+    private int localPort;
+    private String localAddress;
+
     public NaspServerSocket(SelectorProvider selectorProvider) throws IOException {
         try {
             NaspIntegrationHandler = Nasp.newNaspIntegrationHandler("https://localhost:16443/config",
@@ -32,14 +35,27 @@ public class NaspServerSocket extends ServerSocket {
     public void bind(SocketAddress endpoint) throws IOException {
         if (endpoint instanceof InetSocketAddress) {
             try {
-                TCPListener = NaspIntegrationHandler.bind(((InetSocketAddress) endpoint).getHostString(),
-                        ((InetSocketAddress) endpoint).getPort());
+                localAddress = ((InetSocketAddress) endpoint).getHostString();
+                localPort = ((InetSocketAddress) endpoint).getPort();
+                TCPListener = NaspIntegrationHandler.bind(localAddress, localPort);
             } catch (Exception e) {
                 throw new IOException(e);
             }
         } else {
             throw new UnsupportedOperationException();
         }
+    }
+
+    @Override
+    public void bind(SocketAddress endpoint, int backlog) throws IOException {
+        bind(endpoint);
+    }
+    @Override
+    public int getLocalPort() {
+        if (TCPListener != null) {
+            return localPort;
+        }
+        return -1;
     }
 
     @Override

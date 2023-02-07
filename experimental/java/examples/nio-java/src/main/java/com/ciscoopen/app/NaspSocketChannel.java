@@ -67,6 +67,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public NaspSocket socket() {
+        if (socket == null) {
+            socket = new NaspSocket(provider(), connection);
+        }
         return socket;
     }
 
@@ -96,13 +99,16 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public boolean finishConnect() throws IOException {
-        connection = dialer.asyncDial();
+        if (connection == null) {
+            connection = dialer.asyncDial();
+        }
         return true;
     }
 
     @Override
     public SocketAddress getRemoteAddress() throws IOException {
-        throw new UnsupportedOperationException();
+//        throw new UnsupportedOperationException();
+        return null;
     }
 
     @Override
@@ -228,6 +234,10 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     public Connection getConnection() {
         return connection;
+    }
+
+    public void setConnection(Connection conn) {
+        connection = conn;
     }
 
     public TCPDialer getTCPDialer() {
