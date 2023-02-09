@@ -83,9 +83,6 @@ class NaspSelector extends SelectorImpl {
                     InetSocketAddress address = naspSockChan.getAddress();
                     naspSockChan.getTCPDialer().startAsyncDial(ski.hashCode(), selector,
                             address.getHostString(), address.getPort());
-                    if (naspSockChan.getConnection() == null) {
-                        naspSockChan.setConnection(naspSockChan.getTCPDialer().asyncDial());
-                    }
                 }
             }
         }
