@@ -12,8 +12,8 @@ import java.util.Set;
 
 public class MyServer {
     public static void main(String[] args) {
-        initializeServer();
-//        initializeClient();
+//        initializeServer();
+        initializeClient();
     }
 
     public static void initializeClient() {

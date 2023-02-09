@@ -9,14 +9,14 @@ import sun.nio.ch.SelectionKeyImpl;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.net.SocketOption;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Set;
+
+import static java.net.StandardProtocolFamily.INET6;
 
 public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
@@ -75,13 +75,12 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public boolean isConnected() {
-        //TODO check this if this is right the whole time
-        return true;
+        return connection != null;
     }
 
     @Override
     public boolean isConnectionPending() {
-        return false;
+        return connection == null;
     }
 
     @Override
@@ -93,30 +92,42 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         } catch (Exception e) {
             throw new IOException("could not get nasp tcp dialer");
         }
-        address = (InetSocketAddress)remote;
+        address = (InetSocketAddress) checkRemote(remote);
         return false;
+    }
+
+    private SocketAddress checkRemote(SocketAddress sa) {
+        InetSocketAddress isa = Net.checkAddress(sa);
+        @SuppressWarnings("removal")
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkConnect(isa.getAddress().getHostAddress(), isa.getPort());
+        }
+        InetAddress address = isa.getAddress();
+        if (address.isAnyLocalAddress()) {
+            int port = isa.getPort();
+            if (address instanceof Inet4Address) {
+                return new InetSocketAddress("127.0.0.1", port);
+            } else {
+                return new InetSocketAddress("::1", port);
+            }
+        } else {
+            return isa;
+        }
     }
 
     @Override
     public boolean finishConnect() throws IOException {
+        connection = dialer.asyncDial();
         if (connection == null) {
-            connection = dialer.asyncDial();
+            return false;
         }
         return true;
     }
 
     @Override
     public SocketAddress getRemoteAddress() throws IOException {
-        try {
-            if (connection == null) {
-                connection = dialer.asyncDial();
-            }
-            return new InetSocketAddress(connection.getRemoteAddress().getHost(),
-                    connection.getRemoteAddress().getPort());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return null;
+        return address;
     }
 
     @Override
@@ -169,7 +180,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public FileDescriptor getFD() {
-
         throw new UnsupportedOperationException();
     }
 
@@ -242,10 +252,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     public Connection getConnection() {
         return connection;
-    }
-
-    public void setConnection(Connection conn) {
-        connection = conn;
     }
 
     public TCPDialer getTCPDialer() {
