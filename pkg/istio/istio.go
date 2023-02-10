@@ -521,6 +521,7 @@ func (h *IstioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error) {
 }
 
 func (h *IstioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConfig {
+	return nil
 	return []api.WasmPluginConfig{
 		{
 			Name:   "tcp-metadata-exchange",
@@ -548,6 +549,7 @@ func (h *IstioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConf
 }
 
 func (h *IstioIntegrationHandler) defaultTCPServerFilters() []api.WasmPluginConfig {
+	return nil
 	return []api.WasmPluginConfig{
 		{
 			Name:   "tcp-metadata-exchange",
