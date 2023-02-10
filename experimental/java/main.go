@@ -96,6 +96,18 @@ func (s *Selector) Select(timeout int64) int {
 	if timeout != -1 {
 		timeoutChan = time.After(time.Duration(timeout) * time.Millisecond)
 	}
+	s.writeAbleKeys.Range(func(key, value any) bool {
+		check := value.(func() bool)
+		if check() {
+			s.selected = append(s.selected, &SelectedKey{
+				SelectedKeyId: key.(int32),
+				Operation:     OP_WRITE,
+			})
+			//TODO revise it with goroutine because it can deadlock
+			s.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: key.(int32)}
+		}
+		return true
+	})
 	select {
 	case c := <-s.queue:
 		if c.Operation == OP_WAKEUP {
@@ -109,17 +121,6 @@ func (s *Selector) Select(timeout int64) int {
 		for i := 0; i < l; i++ {
 			s.selected = append(s.selected, <-s.queue)
 		}
-
-		s.writeAbleKeys.Range(func(key, value any) bool {
-			check := value.(func() bool)
-			if check() {
-				s.selected = append(s.selected, &SelectedKey{
-					SelectedKeyId: key.(int32),
-					Operation:     OP_WRITE,
-				})
-			}
-			return true
-		})
 
 		return l + 1
 	case <-timeoutChan:

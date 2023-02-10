@@ -14,6 +14,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
+import java.util.ArrayList;
 import java.util.Set;
 
 import static java.net.StandardProtocolFamily.INET6;
@@ -132,10 +133,11 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public int read(ByteBuffer dst) throws IOException {
+        //TODO revise this to be more efficient
         try {
             byte[] buff = new byte[dst.remaining()];
             int num = connection.asyncRead(buff);
-            dst.put(buff, 0, num);
+            dst.put(buff, dst.position(), num);
             return num;
         } catch (Exception e) {
             throw new IOException(e);
@@ -160,7 +162,21 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public long write(ByteBuffer[] srcs, int offset, int length) throws IOException {
-        throw new UnsupportedOperationException();
+        //TODO revise this to be more efficient
+        try {
+            int totalLenght = 0;
+            for (int i = 0; i < length; i++) {
+                ByteBuffer buf = srcs[i+offset];
+                if (buf.remaining() > 0) {
+                    byte[] temp = new byte[buf.remaining()];
+                    buf.get(temp, buf.position(), buf.limit());
+                    totalLenght += connection.write(temp);
+                }
+            }
+            return totalLenght;
+        } catch (Exception e) {
+            throw new IOException(e);
+        }
     }
 
     @Override
