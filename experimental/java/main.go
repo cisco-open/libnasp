@@ -35,6 +35,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const MAX_WRITE_BUFFERS = 64
+
 const (
 	OP_READ    = 1 << 0
 	OP_WRITE   = 1 << 2
@@ -80,8 +82,9 @@ type SelectedKey struct {
 }
 
 type Selector struct {
-	queue    chan *SelectedKey
-	selected []*SelectedKey
+	queue         chan *SelectedKey
+	selected      []*SelectedKey
+	writeAbleKeys sync.Map
 }
 
 func NewSelector() *Selector {
@@ -107,10 +110,29 @@ func (s *Selector) Select(timeout int64) int {
 			s.selected = append(s.selected, <-s.queue)
 		}
 
+		s.writeAbleKeys.Range(func(key, value any) bool {
+			check := value.(func() bool)
+			if check() {
+				s.selected = append(s.selected, &SelectedKey{
+					SelectedKeyId: key.(int32),
+					Operation:     OP_WRITE,
+				})
+			}
+			return true
+		})
+
 		return l + 1
 	case <-timeoutChan:
 		return 0
 	}
+}
+
+func (s *Selector) registerWriter(selectedKeyId int32, check func() bool) {
+	s.writeAbleKeys.Store(selectedKeyId, check)
+}
+
+func (s *Selector) unregisterWriter(selectedKeyId int32) {
+	s.writeAbleKeys.Delete(selectedKeyId)
 }
 
 func (s *Selector) WakeUp() {
@@ -174,7 +196,7 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	return &Connection{
 		conn:         c,
 		readBuffer:   new(bytes.Buffer),
-		writeChannel: make(chan []byte, 64),
+		writeChannel: make(chan []byte, MAX_WRITE_BUFFERS),
 		ctx:          ctx,
 		cancel:       cancel,
 	}, nil
@@ -264,6 +286,10 @@ func (c *Connection) AsyncRead(b []byte) (int32, error) {
 }
 
 func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
+	selector.registerWriter(selectedKeyId, func() bool {
+		return len(c.writeChannel) < MAX_WRITE_BUFFERS
+	})
+
 	go func() {
 		for {
 			select {
@@ -282,8 +308,8 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				}
 			case <-c.ctx.Done():
 				c.conn.Close()
+				selector.unregisterWriter(selectedKeyId)
 			}
-			selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
 		}
 	}()
 }
