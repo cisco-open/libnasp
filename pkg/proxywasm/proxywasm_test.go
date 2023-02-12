@@ -42,7 +42,7 @@ func TestProxyOnTickAndSetEffectiveContext(t *testing.T) {
 	})
 
 	vms := proxywasm.NewVMStore(runtimeCreators, logger)
-	pm := proxywasm.NewWasmPluginManager(vms, logger)
+	pm := proxywasm.NewWasmPluginManager(vms, proxywasm.GetBaseContext("test"), logger)
 
 	// the ontick wasm plugin will run at every second and collect the 'test-id' property
 	// from every filter context and eventually store it in the 'test-ids' property.

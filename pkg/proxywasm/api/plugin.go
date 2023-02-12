@@ -60,4 +60,5 @@ type WasmPluginManager interface {
 	GetOrCreate(config WasmPluginConfig) (WasmPlugin, error)
 	Add(config WasmPluginConfig) (WasmPlugin, error)
 	Logger() logr.Logger
+	GetBaseContext() Context
 }

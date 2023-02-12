@@ -255,7 +255,7 @@ func (p *wasmPlugin) GetWasmInstanceContext(instance api.WasmInstance) api.WasmI
 		SetHostFunctionsLogger(p.logger),
 	}
 
-	if val, ok := GetBaseContext().Get("metric.handler"); ok {
+	if val, ok := p.ctx.Get("metric.handler"); ok {
 		if mh, ok := val.(api.MetricHandler); ok {
 			hostOptions = append(hostOptions, SetHostFunctionsMetricHandler(mh))
 		}

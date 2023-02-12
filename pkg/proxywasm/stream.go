@@ -83,7 +83,7 @@ func UsedFiltersStreamOption(filterNames ...string) api.StreamOption {
 
 func (h *streamHandler) NewStream(direction api.ListenerDirection, options ...api.StreamOption) (api.Stream, error) {
 	stream := &stream{
-		PropertyHolder: NewPropertyHolderWrapper(dotn.New(), GetBaseContext()),
+		PropertyHolder: NewPropertyHolderWrapper(dotn.New(), h.pm.GetBaseContext()),
 
 		direction: direction,
 		logger:    h.pm.Logger(),
