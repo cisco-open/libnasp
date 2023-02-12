@@ -15,7 +15,6 @@
 package pool
 
 import (
-	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -46,7 +45,6 @@ func (c *poolConnection) Close() error {
 func (c *poolConnection) Read(b []byte) (n int, err error) {
 	n, err = c.Conn.Read(b)
 	if err != nil {
-		fmt.Println("mark connection failed")
 		c.failed = true
 	}
 
