@@ -122,8 +122,8 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPd
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d h1:Byv0BzEl3/e6D5CLfI0j/7hiIEtvGVFPCZ7Ei2oq8iQ=
-github.com/banzaicloud/proxy-wasm-go-host v1.0.1 h1:4WPHglx1YBk40kNe6AFaMeaeDlhuSCtNxrIwQl61PaU=
-github.com/banzaicloud/proxy-wasm-go-host v1.0.1/go.mod h1:ceg5fs685OwGAGl7gnSdse2YKMiMJBxKuSK8uMmxTqM=
+github.com/banzaicloud/proxy-wasm-go-host v1.0.2 h1:crM+SMUWM0Iy6rHFivwReg2Q/Tt/7wlvJXe13x2lw3I=
+github.com/banzaicloud/proxy-wasm-go-host v1.0.2/go.mod h1:ceg5fs685OwGAGl7gnSdse2YKMiMJBxKuSK8uMmxTqM=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1 h1:kCCEUxvOxFClesgtL+JeBqHq4W6insjajcRtyNLoObs=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1/go.mod h1:LLCsxoNbU88BofPbOWbvxsmnKnqdsv6RVGvYAfKirZc=
 github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3 v3.0.2-c1 h1:JPP2UBToeAeeyBBNeJnAYBY4yrNUapB3Au40xvBjNKQ=

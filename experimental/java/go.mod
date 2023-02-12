@@ -15,7 +15,7 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed // indirect
-	github.com/banzaicloud/proxy-wasm-go-host v1.0.1 // indirect
+	github.com/banzaicloud/proxy-wasm-go-host v1.0.2 // indirect
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1 // indirect
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3 v3.0.2-c1 // indirect
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.8-c1 // indirect

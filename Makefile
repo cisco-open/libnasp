@@ -43,11 +43,11 @@ vet-all:	## go vet all go modules
 
 .PHONY: lint-all
 lint-all: ${REPO_ROOT}/bin/golangci-lint ## lint the whole repo
-	./scripts/for_all_go_modules.sh --parallel 1 -- make lint
+	./scripts/for_all_go_modules.sh --parallel 1 --with-file Makefile -- make lint
 
 .PHONY: lint-fix-all
 lint-fix-all: ${REPO_ROOT}/bin/golangci-lint ## lint --fix the whole repo
-	./scripts/for_all_go_modules.sh --parallel 1 -- make lint-fix
+	./scripts/for_all_go_modules.sh --parallel 1 --with-file Makefile -- make lint-fix
 
 .PHONY: mod-download-all
 mod-download-all:	## go mod download all go modules
