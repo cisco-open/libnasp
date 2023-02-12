@@ -23,6 +23,9 @@ mod node_info_generated;
 const TRAFFIC_DIRECTION_INBOUND: i64 = 1;
 const TRAFFIC_DIRECTION_OUTBOUND: i64 = 2;
 const MAGIC_NUMBER: u32 = 1025705063;
+const MX_ALPN: &str = "istio-peer-exchange";
+const PEER_ID_METADATA_KEY: &str = "x-envoy-peer-metadata-id";
+const PEER_METADATA_KEY: &str = "x-envoy-peer-metadata";
 
 #[no_mangle]
 pub fn _start() {
@@ -32,6 +35,8 @@ pub fn _start() {
             context_id,
             metadata_value: String::new(),
             node_id: String::new(),
+            alpn: String::new(),
+            direction: 0,
             metadata_id_received: false,
             metadata_received: false,
             metadata_exchanged: false,
@@ -44,6 +49,8 @@ struct MetadataFilter {
     context_id: u32,
     metadata_value: String,
     node_id: String,
+    alpn: String,
+    direction: i64,
     metadata_id_received: bool,
     metadata_received: bool,
     metadata_exchanged: bool,
@@ -68,7 +75,7 @@ impl RootContext for MetadataFilter {
         if let Some(node_id) = self.get_property(vec!["node", "id"]) {
             self.node_id = str::from_utf8(&node_id).unwrap().to_string();
         } else {
-            debug!("cannot get node ID");
+            debug!("[context: {}] cannot get node ID", self.context_id);
             return false;
         }
 
@@ -85,6 +92,8 @@ impl RootContext for MetadataFilter {
             context_id: _context_id,
             metadata_value: self.metadata_value.to_string(),
             node_id: self.node_id.to_string(),
+            alpn: self.alpn.to_string(),
+            direction: self.direction,
             metadata_id_received: self.metadata_id_received,
             metadata_received: self.metadata_received,
             metadata_exchanged: self.metadata_exchanged,
@@ -97,196 +106,244 @@ impl RootContext for MetadataFilter {
     }
 }
 
+impl MetadataFilter {
+    fn set_direction(&mut self) {
+        if self.direction == 0 {
+            let direction_buf = self.get_property(vec!["listener_direction"]).unwrap();
+            self.direction = LittleEndian::read_i64(&direction_buf);
+        }
+    }
+
+    fn set_alpn(&mut self) {
+        if self.alpn == "" {
+            let alpn_buf = self
+                .get_property(vec!["upstream.negotiated_protocol"])
+                .unwrap_or(Vec::<u8>::new());
+            self.alpn = str::from_utf8(&alpn_buf).unwrap().to_string();
+        }
+    }
+}
+
 impl StreamContext for MetadataFilter {
     fn on_downstream_data(&mut self, _data_size: usize, _end_of_stream: bool) -> Action {
-        debug!("on downstream data");
+        debug!(
+            "[context: {}] on downstream data ({} bytes)",
+            self.context_id, _data_size
+        );
 
         if self.metadata_exchanged {
-            debug!("metadata already exchanged");
+            debug!("[context: {}] metadata already exchanged", self.context_id);
             return Action::Continue;
         }
 
-        let direction_buf = self.get_property(vec!["listener_direction"]).unwrap();
-        let direction = LittleEndian::read_i64(&direction_buf);
+        self.set_direction();
+        self.set_alpn();
 
-        let alpn_buf = self
-            .get_property(vec!["upstream.negotiated_protocol"])
-            .unwrap_or(Vec::<u8>::new());
-        let alpn = str::from_utf8(&alpn_buf).unwrap();
+        debug!(
+            "[context: {}] ALPN: [{}], direction: [{}]",
+            self.context_id, self.alpn, self.direction
+        );
 
-        debug!("ALPN: [{}]", alpn);
-        debug!("DIRECTION: [{}]", direction);
-
-        // send local metadata by prepending it into the downstream buffer
-        if direction == TRAFFIC_DIRECTION_OUTBOUND {
-            if alpn != "istio-peer-exchange" || self.metadata_sent {
-                return Action::Continue;
-            }
-
-            let mut buffer = Vec::<u8>::new();
-
-            let mut u32buf = [0; 4];
-            BigEndian::write_u32(&mut u32buf, MAGIC_NUMBER);
-            buffer.extend_from_slice(&u32buf);
-
-            let metadata_bytes = base64::decode(&self.metadata_value).unwrap();
-            BigEndian::write_u32(&mut u32buf, metadata_bytes.len() as u32);
-            buffer.extend_from_slice(&u32buf);
-            buffer.extend(&metadata_bytes);
-
-            debug!("prepend metadata value to downstream buffer");
-            self.set_downstream_data(0, 0, &buffer);
-            self.metadata_sent = true;
-
-            return Action::Continue;
-        }
-
-        // parse incoming metadata
-        if direction == TRAFFIC_DIRECTION_INBOUND {
-            // check if we have at least 4 byte
-            let u32buf = self.get_downstream_data(0, 4).unwrap();
-            if u32buf.len() < 4 {
-                return Action::Continue;
-            }
-
-            let magic_number = BigEndian::read_u32(&u32buf);
-            if magic_number == MAGIC_NUMBER {
-                debug!("[context: {}] Magic number found!", self.context_id);
-                let length_buf = self.get_downstream_data(4, 4).unwrap();
-                let length = BigEndian::read_u32(&length_buf);
-                let data = self.get_downstream_data(8, length as usize).unwrap();
-
-                //TODO handle error
-                let md2 = Any::parse_from_bytes(&data).unwrap();
-                let md = Struct::parse_from_bytes(md2.value.as_slice()).unwrap();
-
-                if let Some(downstream_metadata_id) = md.fields.get("x-envoy-peer-metadata-id") {
-                    self.set_property(
-                        vec!["downstream_peer_id"],
-                        Some(downstream_metadata_id.string_value().as_bytes()),
-                    );
-                    self.metadata_id_received = true;
+        match self.direction {
+            // send local metadata by prepending it into the downstream buffer
+            TRAFFIC_DIRECTION_OUTBOUND => {
+                if self.alpn != MX_ALPN || self.metadata_sent {
+                    return Action::Continue;
                 }
 
-                if let Some(downstream_metadata) = md.fields.get("x-envoy-peer-metadata") {
-                    let fb =
-                        extract_node_flat_buffer_from_struct(downstream_metadata.struct_value());
-                    self.set_property(vec!["downstream_peer"], Some(&fb));
-                    self.metadata_received = true;
-                }
+                let mut buffer = Vec::<u8>::new();
+
+                let mut u32buf = [0; 4];
+                BigEndian::write_u32(&mut u32buf, MAGIC_NUMBER);
+                buffer.extend_from_slice(&u32buf);
+
+                let metadata_bytes = base64::decode(&self.metadata_value).unwrap();
+                BigEndian::write_u32(&mut u32buf, metadata_bytes.len() as u32);
+                buffer.extend_from_slice(&u32buf);
+                buffer.extend(&metadata_bytes);
 
                 debug!(
-                    "[context: {}] downstream peer node info set",
-                    self.context_id
+                    "[context: {}] prepend metadata value ({} bytes) to downstream buffer",
+                    self.context_id,
+                    buffer.len()
                 );
+                self.set_downstream_data(0, 0, &buffer);
+                self.metadata_sent = true;
 
-                // the incoming metadata should not be sent to the client
-                // so leave only the rest in the downstream buffer
-                let remainder = self
-                    .get_downstream_data(length as usize + 8, _data_size)
-                    .unwrap();
-                self.set_downstream_data(0, usize::MAX, &remainder);
-
-                // send local metadata back by prepending it into the upstream buffer
-                if self.metadata_received && self.metadata_id_received {
-                    let mut buffer = Vec::<u8>::new();
-
-                    let mut u32buf = [0; 4];
-                    BigEndian::write_u32(&mut u32buf, magic_number);
-                    buffer.extend_from_slice(&u32buf);
-
-                    let metadata_bytes = base64::decode(&self.metadata_value).unwrap();
-                    BigEndian::write_u32(&mut u32buf, metadata_bytes.len() as u32);
-                    buffer.extend_from_slice(&u32buf);
-                    buffer.extend(&metadata_bytes);
-
-                    self.set_upstream_data(0, 0, &buffer);
-                    debug!("upstream data set");
-                }
+                Action::Continue
             }
-        }
+            // parse incoming metadata
+            TRAFFIC_DIRECTION_INBOUND => {
+                // check if we have at least 4 byte
+                let u32buf = self.get_downstream_data(0, 4).unwrap();
+                if u32buf.len() < 4 {
+                    return Action::Continue;
+                }
 
-        Action::Continue
+                debug!("[context: {}] parse incoming metadata", self.context_id);
+
+                let magic_number = BigEndian::read_u32(&u32buf);
+                if magic_number == MAGIC_NUMBER {
+                    debug!("[context: {}] Magic number found!", self.context_id);
+                    let length_buf = self.get_downstream_data(4, 4).unwrap();
+                    let length = BigEndian::read_u32(&length_buf);
+                    let data = self.get_downstream_data(8, length as usize).unwrap();
+
+                    //TODO handle error
+                    let md2 = Any::parse_from_bytes(&data).unwrap();
+                    let md = Struct::parse_from_bytes(md2.value.as_slice()).unwrap();
+
+                    if let Some(downstream_metadata_id) = md.fields.get(PEER_ID_METADATA_KEY) {
+                        self.set_property(
+                            vec!["downstream_peer_id"],
+                            Some(downstream_metadata_id.string_value().as_bytes()),
+                        );
+                        self.metadata_id_received = true;
+                    }
+
+                    if let Some(downstream_metadata) = md.fields.get(PEER_METADATA_KEY) {
+                        let fb = extract_node_flat_buffer_from_struct(
+                            downstream_metadata.struct_value(),
+                        );
+                        self.set_property(vec!["downstream_peer"], Some(&fb));
+                        self.metadata_received = true;
+                    }
+
+                    debug!(
+                        "[context: {}] downstream peer node info set",
+                        self.context_id
+                    );
+
+                    // the incoming metadata should not be sent to the client
+                    // so leave only the rest in the downstream buffer
+                    let remainder = self
+                        .get_downstream_data(length as usize + 8, _data_size)
+                        .unwrap();
+                    debug!(
+                        "[context: {}] remainder in the downstream buf {} bytes",
+                        self.context_id,
+                        remainder.len()
+                    );
+                    self.set_downstream_data(0, usize::MAX, &remainder);
+
+                    // send local metadata back by prepending it into the upstream buffer
+                    if self.metadata_received && self.metadata_id_received && !self.metadata_sent {
+                        let mut buffer = Vec::<u8>::new();
+
+                        let mut u32buf = [0; 4];
+                        BigEndian::write_u32(&mut u32buf, magic_number);
+                        buffer.extend_from_slice(&u32buf);
+
+                        let metadata_bytes = base64::decode(&self.metadata_value).unwrap();
+                        BigEndian::write_u32(&mut u32buf, metadata_bytes.len() as u32);
+                        buffer.extend_from_slice(&u32buf);
+                        buffer.extend(&metadata_bytes);
+
+                        self.set_upstream_data(0, 0, &buffer);
+                        debug!("[context: {}] upstream data set", self.context_id);
+                        self.metadata_sent = true;
+                    }
+                }
+
+                Action::Continue
+            }
+            _ => Action::Continue,
+        }
     }
 
     fn on_upstream_data(&mut self, _data_size: usize, _end_of_stream: bool) -> Action {
-        debug!("on upstream data");
+        debug!(
+            "[context: {}] on upstream data {}",
+            self.context_id, _data_size
+        );
 
         if self.metadata_exchanged {
-            debug!("metadata already exchanged");
+            debug!("[context: {}] metadata already exchanged", self.context_id);
             return Action::Continue;
         }
 
-        let direction_buf = self.get_property(vec!["listener_direction"]).unwrap();
-        let direction = LittleEndian::read_i64(&direction_buf);
+        self.set_direction();
+        self.set_alpn();
 
-        // parse incoming metadata
-        if direction == TRAFFIC_DIRECTION_OUTBOUND {
-            // check if we have at least 4 byte
-            let u32buf = self.get_upstream_data(0, 4).unwrap();
-            if u32buf.len() < 4 {
-                return Action::Continue;
-            }
+        match self.direction {
+            // parse incoming metadata
+            TRAFFIC_DIRECTION_OUTBOUND => {
+                // check if we have at least 4 byte
+                let u32buf = self.get_upstream_data(0, 4).unwrap();
+                if u32buf.len() < 4 {
+                    return Action::Continue;
+                }
 
-            let magic_number = BigEndian::read_u32(&u32buf);
-            if magic_number == MAGIC_NUMBER {
-                debug!("[context: {}] Magic number found!", self.context_id);
-                let length_buf = self.get_upstream_data(4, 4).unwrap();
-                let length = BigEndian::read_u32(&length_buf);
-                let data = self.get_upstream_data(8, length as usize).unwrap();
+                let magic_number = BigEndian::read_u32(&u32buf);
+                if magic_number == MAGIC_NUMBER {
+                    debug!("[context: {}] magic number found!", self.context_id);
+                    let length_buf = self.get_upstream_data(4, 4).unwrap();
+                    let length = BigEndian::read_u32(&length_buf);
+                    let data = self.get_upstream_data(8, length as usize).unwrap();
 
-                //TODO handle error
-                let md2 = Any::parse_from_bytes(&data).unwrap();
-                let md = Struct::parse_from_bytes(md2.value.as_slice()).unwrap();
+                    //TODO handle error
+                    let md2 = Any::parse_from_bytes(&data).unwrap();
+                    let md = Struct::parse_from_bytes(md2.value.as_slice()).unwrap();
 
-                if let Some(upstream_metadata_id) = md.fields.get("x-envoy-peer-metadata-id") {
-                    self.set_property(
-                        vec!["upstream_peer_id"],
-                        Some(upstream_metadata_id.string_value().as_bytes()),
+                    if let Some(upstream_metadata_id) = md.fields.get(PEER_ID_METADATA_KEY) {
+                        self.set_property(
+                            vec!["upstream_peer_id"],
+                            Some(upstream_metadata_id.string_value().as_bytes()),
+                        );
+                    }
+                    if let Some(upstream_metadata) = md.fields.get(PEER_METADATA_KEY) {
+                        let fb =
+                            extract_node_flat_buffer_from_struct(upstream_metadata.struct_value());
+                        self.set_property(vec!["upstream_peer"], Some(&fb));
+                    }
+
+                    debug!("[context: {}] upstream peer node set", self.context_id);
+
+                    // the incoming metadata should not be sent to the client
+                    // so leave only the rest in the downstream buffer
+                    let remainder = self
+                        .get_upstream_data(length as usize + 8, _data_size)
+                        .unwrap();
+
+                    debug!(
+                        "[context: {}] remainder in the upstream buf {} bytes",
+                        self.context_id,
+                        remainder.len()
                     );
-                }
-                if let Some(upstream_metadata) = md.fields.get("x-envoy-peer-metadata") {
-                    let fb = extract_node_flat_buffer_from_struct(upstream_metadata.struct_value());
-                    self.set_property(vec!["upstream_peer"], Some(&fb));
+
+                    self.set_upstream_data(0, usize::MAX, &remainder);
+
+                    self.metadata_exchanged = true;
                 }
 
-                debug!("[context: {}] upstream peer node set", self.context_id);
+                Action::Continue
+            }
+            // send local metadata by prepending it into the downstream buffer
+            TRAFFIC_DIRECTION_INBOUND => {
+                if !self.metadata_received || !self.metadata_id_received || self.metadata_sent {
+                    return Action::Continue;
+                }
 
-                // the incoming metadata should not be sent to the client
-                // so leave only the rest in the downstream buffer
-                let remainder = self
-                    .get_upstream_data(length as usize + 8, _data_size)
-                    .unwrap();
-                self.set_upstream_data(0, usize::MAX, &remainder);
+                let mut buffer = Vec::<u8>::new();
+
+                let mut u32buf = [0; 4];
+                BigEndian::write_u32(&mut u32buf, MAGIC_NUMBER);
+                buffer.extend_from_slice(&u32buf);
+
+                let metadata_bytes = base64::decode(&self.metadata_value).unwrap();
+                BigEndian::write_u32(&mut u32buf, metadata_bytes.len() as u32);
+                buffer.extend_from_slice(&u32buf);
+                buffer.extend(&metadata_bytes);
+
+                self.set_downstream_data(0, 0, &buffer);
 
                 self.metadata_exchanged = true;
+                self.metadata_sent = true;
+
+                Action::Continue
             }
+            _ => Action::Continue,
         }
-
-        // send local metadata by prepending it into the downstream buffer
-        if direction == TRAFFIC_DIRECTION_INBOUND
-            && self.metadata_received
-            && self.metadata_id_received
-            && !self.metadata_sent
-        {
-            let mut buffer = Vec::<u8>::new();
-
-            let mut u32buf = [0; 4];
-            BigEndian::write_u32(&mut u32buf, MAGIC_NUMBER);
-            buffer.extend_from_slice(&u32buf);
-
-            let metadata_bytes = base64::decode(&self.metadata_value).unwrap();
-            BigEndian::write_u32(&mut u32buf, metadata_bytes.len() as u32);
-            buffer.extend_from_slice(&u32buf);
-            buffer.extend(&metadata_bytes);
-
-            self.set_downstream_data(0, 0, &buffer);
-
-            self.metadata_exchanged = true;
-            self.metadata_sent = true;
-        }
-
-        Action::Continue
     }
 }
 
@@ -548,12 +605,12 @@ fn extract_struct_from_node_flat_buffer(
     metadata_value.set_struct_value(peer_metadata);
     metadata
         .fields
-        .insert("x-envoy-peer-metadata".to_string(), metadata_value);
+        .insert(PEER_METADATA_KEY.to_string(), metadata_value);
     let mut metadata_id_value = Value::new();
     metadata_id_value.set_string_value(node_id.to_string());
     metadata
         .fields
-        .insert("x-envoy-peer-metadata-id".to_string(), metadata_id_value);
+        .insert(PEER_ID_METADATA_KEY.to_string(), metadata_id_value);
     let metadata_any = protobuf::well_known_types::any::Any::pack(&metadata).unwrap();
     metadata_any
 }
