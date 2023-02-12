@@ -44,6 +44,8 @@ type wrappedConn struct {
 
 	writeMu sync.Mutex
 	readMu  sync.Mutex
+
+	closed bool
 }
 
 func NewWrappedConn(conn net.Conn, stream api.Stream) net.Conn {
@@ -73,20 +75,36 @@ func (c *wrappedConn) NetConn() net.Conn {
 }
 
 func (c *wrappedConn) Close() error {
+	if c.closed {
+		return nil
+	}
+
+	// close underlying connection first
+	if err := c.Conn.Close(); err != nil {
+		return err
+	}
+
+	c.readMu.Lock()
+	c.writeMu.Lock()
+	defer c.readMu.Unlock()
+	defer c.writeMu.Unlock()
+
+	c.closed = true
+
 	if err := c.stream.HandleTCPCloseConnection(c); err != nil {
 		return err
 	}
 
-	if err := c.stream.Close(); err != nil {
-		return err
-	}
-
-	return c.Conn.Close()
+	return c.stream.Close()
 }
 
 func (c *wrappedConn) Read(b []byte) (int, error) {
 	c.readMu.Lock()
 	defer c.readMu.Unlock()
+
+	if c.closed {
+		return 0, io.EOF
+	}
 
 	// flush the remaining read buffer
 	x, err := c.readCacheBuffer.Read(b)
@@ -139,6 +157,10 @@ func (c *wrappedConn) Read(b []byte) (int, error) {
 func (c *wrappedConn) Write(b []byte) (int, error) {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+
+	if c.closed {
+		return 0, io.EOF
+	}
 
 	if !c.connectionInfoSet {
 		if connection, ok := network.WrappedConnectionFromNetConn(c); ok {

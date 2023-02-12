@@ -17,18 +17,37 @@ package tcp_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"net"
+	"os"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"golang.org/x/net/nettest"
 
-	"github.com/go-logr/logr"
-
+	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero"
+	"github.com/cisco-open/nasp/pkg/environment"
+	"github.com/cisco-open/nasp/pkg/istio/filters"
+	"github.com/cisco-open/nasp/pkg/proxywasm"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
 )
+
+func TestNetConn(t *testing.T) {
+	t.Parallel()
+
+	nettest.TestConn(t, pipemaker())
+}
+
+func TestWrappedNetConn(t *testing.T) {
+	t.Parallel()
+
+	nettest.TestConn(t, wrappedpipemaker())
+}
 
 func BenchmarkNetConn(b *testing.B) {
 	b.Run("plain", func(b *testing.B) {
@@ -88,18 +107,6 @@ func benchmark(b *testing.B, piper nettest.MakePipe) {
 	}
 }
 
-func TestNetConn(t *testing.T) {
-	t.Parallel()
-
-	nettest.TestConn(t, pipemaker())
-}
-
-func TestWrappedNetConn(t *testing.T) {
-	t.Parallel()
-
-	nettest.TestConn(t, wrappedpipemaker())
-}
-
 func pipemaker() nettest.MakePipe {
 	return func() (c1, c2 net.Conn, stop func(), err error) {
 		c1, c2 = net.Pipe()
@@ -112,70 +119,88 @@ func pipemaker() nettest.MakePipe {
 	}
 }
 
+var clientSH = getstream("wazero", "clientStream")
+var serverSH = getstream("wazero", "serverStream")
+
 func wrappedpipemaker() nettest.MakePipe {
 	return func() (c1, c2 net.Conn, stop func(), err error) {
 		c1, c2 = net.Pipe()
+
+		serverStream, err := serverSH.NewStream(api.ListenerDirectionInbound)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		clientStream, err := clientSH.NewStream(api.ListenerDirectionOutbound)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		clientStream.Set("upstream.negotiated_protocol", "istio-peer-exchange")
+		serverStream.Set("upstream.negotiated_protocol", "istio-peer-exchange")
+
+		c1 = tcp.NewWrappedConn(c1, clientStream)
+		c2 = tcp.NewWrappedConn(c2, serverStream)
+
 		stop = func() {
 			c1.Close()
 			c2.Close()
 		}
 
-		c1 = tcp.NewWrappedConn(c1, wasmstream)
-		c2 = tcp.NewWrappedConn(c2, wasmstream)
-
 		return
 	}
 }
 
-var wasmstream api.Stream = NewTestWASMStream()
+func getstream(runtime string, prefix string) api.StreamHandler {
+	for _, env := range []string{
+		prefix + "_NASP_TYPE=sidecar",
+		fmt.Sprintf("%s_NASP_POD_NAME=%s-alpine-efefefef-f5wwf", prefix, prefix),
+		prefix + "_NASP_POD_NAMESPACE=default",
+		prefix + "_NASP_WORKLOAD_NAME=alpine",
+		prefix + "_NASP_INSTANCE_IP=10.20.4.75",
+		prefix + "_NASP_ISTIO_VERSION=1.13.5",
+	} {
+		p := strings.Split(env, "=")
+		if len(p) != 2 {
+			continue
+		}
+		os.Setenv(p[0], p[1])
+	}
 
-func NewTestWASMStream() api.Stream {
-	return &teststream{}
-}
+	e, err := environment.GetIstioEnvironment(prefix + "_NASP_")
+	if err != nil {
+		panic(err)
+	}
 
-type teststream struct {
-}
+	logger := logr.Discard()
 
-func (s *teststream) Get(key string) (interface{}, bool) {
-	return nil, false
-}
+	runtimeCreators := proxywasm.NewRuntimeCreatorStore()
+	runtimeCreators.Set("wazero", func() api.WasmRuntime {
+		return wazero.NewVM(context.Background(), wazero.VMWithLogger(logger))
+	})
+	baseContext := proxywasm.GetBaseContext(prefix)
+	baseContext.Set("node", e.GetNodePropertiesFromEnvironment())
 
-func (s *teststream) Set(key string, value interface{}) {
+	vms := proxywasm.NewVMStore(runtimeCreators, logger)
+	pm := proxywasm.NewWasmPluginManager(vms, baseContext, logger)
+	sh, err := proxywasm.NewStreamHandler(pm,
+		[]api.WasmPluginConfig{
+			{
+				Name:   "tcp-metadata-exchange",
+				RootID: "tcp-metadata-exchange",
+				VMConfig: api.WasmVMConfig{
+					Runtime: runtime,
+					ID:      "",
+					Code:    proxywasm.NewFileDataSource(filters.Filters, "tcp-metadata-exchange-filter.wasm"),
+				},
+				Configuration: api.JsonnableMap{},
+				InstanceCount: 1,
+			},
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
 
-}
-
-func (s *teststream) Logger() logr.Logger {
-	return logr.Discard()
-}
-
-func (s *teststream) Close() error {
-	return nil
-}
-
-func (s *teststream) Direction() api.ListenerDirection {
-	return api.ListenerDirectionInbound
-}
-
-func (s *teststream) HandleHTTPRequest(req api.HTTPRequest) error {
-	return nil
-}
-
-func (s *teststream) HandleHTTPResponse(resp api.HTTPResponse) error {
-	return nil
-}
-
-func (s *teststream) HandleTCPNewConnection(conn net.Conn) error {
-	return nil
-}
-
-func (s *teststream) HandleTCPCloseConnection(conn net.Conn) error {
-	return nil
-}
-
-func (s *teststream) HandleDownstreamData(conn net.Conn, n int) error {
-	return nil
-}
-
-func (s *teststream) HandleUpstreamData(conn net.Conn, n int) error {
-	return nil
+	return sh
 }
