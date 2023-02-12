@@ -41,7 +41,7 @@ func NewFilterContext(plugin api.WasmPlugin, properties api.PropertyHolder) (api
 		SetHostFunctionsLogger(plugin.Logger()),
 	}
 
-	if val, ok := GetBaseContext().Get("metric.handler"); ok {
+	if val, ok := plugin.Context().Get("metric.handler"); ok {
 		if mh, ok := val.(api.MetricHandler); ok {
 			hostOptions = append(hostOptions, SetHostFunctionsMetricHandler(mh))
 		}

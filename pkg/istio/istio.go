@@ -166,7 +166,8 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 
 	registry := prometheus.NewRegistry()
 	s.metricHandler = proxywasm.NewPrometheusMetricHandler(registry, logger)
-	proxywasm.GetBaseContext().Set("metric.handler", s.metricHandler)
+	baseContext := proxywasm.GetBaseContext("root")
+	baseContext.Set("metric.handler", s.metricHandler)
 	if config.UseTLS {
 		if istioCAConfig, err := config.IstioCAConfigGetter(e); err != nil {
 			return nil, err
@@ -175,7 +176,7 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 		}
 	}
 
-	proxywasm.GetBaseContext().Set("node", e.GetNodePropertiesFromEnvironment())
+	baseContext.Set("node", e.GetNodePropertiesFromEnvironment())
 
 	runtimeCreators := proxywasm.NewRuntimeCreatorStore()
 	runtimeCreators.Set("wazero", func() api.WasmRuntime {
@@ -193,7 +194,7 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 	}
 	vms := proxywasm.NewVMStore(runtimeCreators, logger)
 
-	s.pluginManager = proxywasm.NewWasmPluginManager(vms, logger)
+	s.pluginManager = proxywasm.NewWasmPluginManager(vms, baseContext, logger)
 
 	s.discoveryClient = discovery.NewXDSDiscoveryClient(e, s.caClient, s.logger.WithName("xds-discovery"))
 	if err := s.discoveryClient.Connect(context.Background()); err != nil {

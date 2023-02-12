@@ -26,18 +26,20 @@ import (
 )
 
 type wasmPluginManager struct {
-	vms    api.VMStore
-	logger logr.Logger
+	vms         api.VMStore
+	baseContext api.Context
+	logger      logr.Logger
 
 	plugins sync.Map
 
 	mu sync.Mutex
 }
 
-func NewWasmPluginManager(vms api.VMStore, logger logr.Logger) api.WasmPluginManager {
+func NewWasmPluginManager(vms api.VMStore, baseContext api.Context, logger logr.Logger) api.WasmPluginManager {
 	return &wasmPluginManager{
-		vms:    vms,
-		logger: logger,
+		vms:         vms,
+		baseContext: baseContext,
+		logger:      logger,
 
 		plugins: sync.Map{},
 	}
@@ -135,7 +137,7 @@ func (m *wasmPluginManager) Add(config api.WasmPluginConfig) (api.WasmPlugin, er
 		plugin.module = module
 	}
 
-	plugin.ctx = GetBaseContext().GetOrCreateContext(plugin.config.RootID)
+	plugin.ctx = m.baseContext.GetOrCreateContext(plugin.config.RootID)
 
 	plugin.ctx.Set("plugin_root_id", config.RootID)
 	plugin.ctx.Set("plugin_vm_id", config.VMConfig.ID)
@@ -152,4 +154,8 @@ func (m *wasmPluginManager) Add(config api.WasmPluginConfig) (api.WasmPlugin, er
 	m.plugins.Store(plugin.config.Key(), plugin)
 
 	return plugin, nil
+}
+
+func (m *wasmPluginManager) GetBaseContext() api.Context {
+	return m.baseContext
 }

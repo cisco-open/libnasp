@@ -15,6 +15,7 @@
 package proxywasm
 
 import (
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -27,10 +28,6 @@ import (
 
 var contexts sync.Map
 
-const (
-	BaseContextID = "nasp-root"
-)
-
 type context struct {
 	api.PropertyHolder
 
@@ -38,32 +35,16 @@ type context struct {
 	latestContextID int32
 	logger          logr.Logger
 	parentContext   *context
+
+	rootID string
 }
 
-func StoreContext(rootID string, ctx api.Context) {
-	contexts.Store(rootID, ctx)
-}
-
-func GetBaseContext() api.Context {
-	if ctx, found := GetContext(BaseContextID); found {
+func GetBaseContext(id string) api.Context {
+	if ctx, found := getContext(id); found {
 		return ctx
 	}
 
-	return NewContext(BaseContextID)
-}
-
-func GetContext(rootID string) (api.Context, bool) {
-	if val, ok := contexts.Load(rootID); ok {
-		if ctx, ok := val.(api.Context); ok {
-			return ctx, true
-		}
-	}
-
-	return nil, false
-}
-
-func DeleteContext(rootID string) {
-	contexts.Delete(rootID)
+	return NewContext(id)
 }
 
 func NewContext(rootID string) api.Context {
@@ -73,9 +54,11 @@ func NewContext(rootID string) api.Context {
 		id:              1,
 		latestContextID: 1,
 		logger:          klog.Background(),
+
+		rootID: rootID,
 	}
 
-	StoreContext(rootID, c)
+	contexts.Store(rootID, c)
 
 	return c
 }
@@ -89,11 +72,13 @@ func (c *context) NewContextID() int32 {
 }
 
 func (c *context) GetOrCreateContext(rootID string) api.Context {
-	if ctx, found := GetContext(rootID); found {
+	id := strings.Join([]string{c.rootID, ".", rootID}, "")
+
+	if ctx, found := getContext(id); found {
 		return ctx
 	}
 
-	return c.newContext(rootID)
+	return c.newContext(id)
 }
 
 func (c *context) newContext(rootID string) api.Context {
@@ -107,4 +92,14 @@ func (c *context) newContext(rootID string) api.Context {
 	}
 
 	return ctx
+}
+
+func getContext(rootID string) (api.Context, bool) {
+	if val, ok := contexts.Load(rootID); ok {
+		if ctx, ok := val.(api.Context); ok {
+			return ctx, true
+		}
+	}
+
+	return nil, false
 }
