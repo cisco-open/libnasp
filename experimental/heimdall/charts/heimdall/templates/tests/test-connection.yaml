@@ -1,3 +1,4 @@
+{{- if .Values.testConnection.enabled }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -13,3 +14,4 @@ spec:
       command: ['wget']
       args: ['{{ include "heimdall.fullname" . }}:{{ .Values.service.port }}']
   restartPolicy: Never
+{{- end }}
