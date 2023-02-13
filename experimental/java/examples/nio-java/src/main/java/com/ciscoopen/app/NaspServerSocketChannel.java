@@ -59,7 +59,7 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
 
     @Override
     protected void implCloseSelectableChannel() throws IOException {
-        throw new UnsupportedOperationException();
+        socket.getTCPListener().close();
     }
 
     public SocketChannel accept() throws IOException {
@@ -130,6 +130,6 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
 
     @Override
     public void kill() throws IOException {
-        throw new UnsupportedOperationException();
+        socket.getTCPListener().close();
     }
 }

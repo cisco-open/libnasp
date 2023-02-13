@@ -9,6 +9,8 @@ import sun.nio.ch.SelectionKeyImpl;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -199,12 +201,20 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public FileDescriptor getFD() {
-        throw new UnsupportedOperationException();
+        try {
+            Constructor<FileDescriptor> ctor = FileDescriptor.class.getDeclaredConstructor(Integer.TYPE);
+            ctor.setAccessible(true);
+            FileDescriptor fd = ctor.newInstance(dialer.getFD());
+            ctor.setAccessible(false);
+            return fd;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public int getFDVal() {
-        throw new UnsupportedOperationException();
+        return dialer.getFD();
     }
 
     public boolean translateReadyOps(int ops, int initialOps, SelectionKeyImpl ski) {
@@ -266,7 +276,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public void kill() throws IOException {
-        throw new UnsupportedOperationException();
+        connection.close();
     }
 
     public Connection getConnection() {
