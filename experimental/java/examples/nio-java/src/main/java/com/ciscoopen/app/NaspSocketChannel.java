@@ -152,9 +152,14 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public int write(ByteBuffer src) throws IOException {
         try {
-            byte[] tempArray = new byte[src.limit()];
-            src.get(tempArray, 0, src.limit());
-            return connection.asyncWrite(tempArray);
+            int rem = src.remaining();
+            if (rem == 0) {
+                return 0;
+            }
+
+            byte[] temp = new byte[rem];
+            src.get(temp, src.position(), src.limit());
+            return connection.asyncWrite(temp);
         } catch (Exception e) {
             throw new IOException(e);
         }
@@ -162,20 +167,18 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public long write(ByteBuffer[] srcs, int offset, int length) throws IOException {
-        //TODO revise this to be more efficient
+        assert(offset >= 0 && length >= 0);
+        assert(offset < srcs.length);
+
         try {
-            int totalLenght = 0;
-            for (int i = 0; i < length; i++) {
-                ByteBuffer buf = srcs[i+offset];
-                if (buf.remaining() > 0) {
-                    byte[] temp = new byte[buf.remaining()];
-                    buf.get(temp, buf.position(), buf.limit());
-                    totalLenght += connection.write(temp);
-                }
+            int totalLength = 0;
+            for (int i = offset; i < offset + length; i++) {
+                ByteBuffer src = srcs[i];
+                totalLength += write(src);
             }
-            return totalLenght;
-        } catch (Exception e) {
-            throw new IOException(e);
+            return totalLength;
+        } catch (IOException e) {
+            throw e;
         }
     }
 
