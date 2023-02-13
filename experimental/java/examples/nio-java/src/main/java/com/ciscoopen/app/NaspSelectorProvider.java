@@ -57,7 +57,7 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     protected void implClose() throws IOException {
-        throw new UnsupportedOperationException();
+        selector.close();
     }
 
     @Override

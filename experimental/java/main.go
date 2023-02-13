@@ -54,6 +54,7 @@ type TCPListener struct {
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
+	terminated           bool
 }
 
 type NaspIntegrationHandler struct {
@@ -89,6 +90,12 @@ type Selector struct {
 
 func NewSelector() *Selector {
 	return &Selector{queue: make(chan *SelectedKey, 64)}
+}
+
+func (s *Selector) Close() {
+	close(s.queue)
+	s.writeAbleKeys = sync.Map{}
+	s.selected = nil
 }
 
 func (s *Selector) Select(timeout int64) int {
@@ -188,6 +195,11 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 	}, nil
 }
 
+func (l *TCPListener) Close() {
+	l.terminated = true
+	l.listener.Close()
+}
+
 func (l *TCPListener) Accept() (*Connection, error) {
 	c, err := l.listener.Accept()
 	if err != nil {
@@ -207,6 +219,9 @@ func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) 
 	go func() {
 		for {
 			conn, err := l.Accept()
+			if l.terminated {
+				break
+			}
 			if err != nil {
 				println(err.Error())
 				continue
@@ -340,6 +355,8 @@ type TCPDialer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
+	fd int32
+
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
 }
@@ -381,12 +398,23 @@ func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, addr
 			return
 		}
 
+		file, err := conn.conn.(*net.TCPConn).File()
+		if err != nil {
+			println(err.Error())
+			return
+		}
+		d.fd = int32(file.Fd())
+
 		d.asyncConnectionsLock.Lock()
 		d.asyncConnections = append(d.asyncConnections, conn)
 		d.asyncConnectionsLock.Unlock()
 
 		selector.queue <- &SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
 	}()
+}
+
+func (d *TCPDialer) GetFD() int32 {
+	return d.fd
 }
 
 func (d *TCPDialer) AsyncDial() *Connection {
