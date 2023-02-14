@@ -18,6 +18,8 @@ COPY ./go.sum /go/src/app/
 # Copy the Heimdall Go Modules manifests
 COPY experimental/heimdall/go.mod experimental/heimdall/go.mod
 COPY experimental/heimdall/go.sum experimental/heimdall/go.sum
+# Copy the charts Go Modules manifests
+COPY experimental/heimdall/charts/go.mod experimental/heimdall/charts/go.mod
 
 # hadolint ignore=DL3059
 RUN go mod download
