@@ -111,7 +111,7 @@ func (s *Selector) Select(timeout int64) int {
 				SelectedKeyId: key.(int32),
 				Operation:     OP_WRITE,
 			})
-			//TODO revise it with goroutine because it can deadlock
+			// TODO revise it with goroutine because it can deadlock
 			s.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: key.(int32)}
 		}
 		return true
