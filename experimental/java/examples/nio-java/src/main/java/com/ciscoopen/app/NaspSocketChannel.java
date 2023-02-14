@@ -96,6 +96,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
             throw new IOException("could not get nasp tcp dialer");
         }
         address = (InetSocketAddress) checkRemote(remote);
+        socket.setAddress(address);
         return false;
     }
 

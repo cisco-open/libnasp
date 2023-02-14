@@ -54,6 +54,7 @@ type TCPListener struct {
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
+	terminatedLock       sync.Mutex
 	terminated           bool
 }
 
@@ -64,12 +65,14 @@ type NaspIntegrationHandler struct {
 }
 
 type Connection struct {
-	conn         net.Conn
-	readBuffer   *bytes.Buffer
-	readLock     sync.Mutex
-	writeChannel chan []byte
-	ctx          context.Context
-	cancel       context.CancelFunc
+	conn           net.Conn
+	readBuffer     *bytes.Buffer
+	readLock       sync.Mutex
+	writeChannel   chan []byte
+	ctx            context.Context
+	cancel         context.CancelFunc
+	terminated     bool
+	terminatedLock sync.Mutex
 }
 
 type Address struct {
@@ -185,6 +188,10 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 		return nil, err
 	}
 
+	return &TCPListener{
+		listener: listener,
+	}, nil
+
 	listener, err = h.iih.GetTCPListener(listener)
 	if err != nil {
 		return nil, err
@@ -196,7 +203,9 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 }
 
 func (l *TCPListener) Close() {
+	l.terminatedLock.Lock()
 	l.terminated = true
+	l.terminatedLock.Unlock()
 	l.listener.Close()
 }
 
@@ -219,10 +228,13 @@ func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) 
 	go func() {
 		for {
 			conn, err := l.Accept()
-			if l.terminated {
-				break
-			}
 			if err != nil {
+				l.terminatedLock.Lock()
+				if l.terminated {
+					l.terminatedLock.Unlock()
+					break
+				}
+				l.terminatedLock.Unlock()
 				println(err.Error())
 				continue
 			}
@@ -313,6 +325,16 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				for {
 					num, err := c.Write(buff)
 					if err != nil {
+						c.terminatedLock.Lock()
+						if c.terminated {
+							c.terminatedLock.Unlock()
+							break
+						}
+						c.terminatedLock.Unlock()
+						if errors.Is(err, io.EOF) {
+							c.conn.Close()
+							break
+						}
 						println(err.Error())
 						continue
 					}
@@ -331,6 +353,9 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 }
 
 func (c *Connection) Close() {
+	c.terminatedLock.Lock()
+	c.terminated = true
+	c.terminatedLock.Unlock()
 	c.cancel()
 }
 
@@ -372,10 +397,12 @@ func NewTCPDialer(heimdallURL, clientID, clientSecret string) (*TCPDialer, error
 		return nil, err
 	}
 
-	dialer, err := iih.GetTCPDialer()
-	if err != nil {
-		return nil, err
-	}
+	dialer := &net.Dialer{}
+
+	// dialer, err := iih.GetTCPDialer()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go iih.Run(ctx)
