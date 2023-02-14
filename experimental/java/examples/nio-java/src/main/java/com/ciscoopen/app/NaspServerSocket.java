@@ -16,7 +16,7 @@ public class NaspServerSocket extends ServerSocket {
     private final SelectorProvider selectorProvider;
 
     private int localPort;
-    private String localAddress;
+    private InetSocketAddress address;
 
     public NaspServerSocket(SelectorProvider selectorProvider) throws IOException {
         try {
@@ -35,9 +35,9 @@ public class NaspServerSocket extends ServerSocket {
     public void bind(SocketAddress endpoint) throws IOException {
         if (endpoint instanceof InetSocketAddress) {
             try {
-                localAddress = ((InetSocketAddress) endpoint).getHostString();
+                address = (InetSocketAddress)endpoint;
                 localPort = ((InetSocketAddress) endpoint).getPort();
-                TCPListener = NaspIntegrationHandler.bind(localAddress, localPort);
+                TCPListener = NaspIntegrationHandler.bind(((InetSocketAddress) endpoint).getHostString(), localPort);
             } catch (Exception e) {
                 throw new IOException(e);
             }
