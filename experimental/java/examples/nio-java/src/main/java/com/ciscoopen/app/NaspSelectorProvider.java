@@ -1,10 +1,12 @@
 package com.ciscoopen.app;
 
+import sun.nio.ch.FileChannelImpl;
 import sun.nio.ch.SelectionKeyImpl;
 import sun.nio.ch.SelectorImpl;
 import sun.nio.ch.SelectorProviderImpl;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -90,6 +92,17 @@ class NaspSelector extends SelectorImpl {
 }
 
 public class NaspSelectorProvider extends SelectorProviderImpl {
+
+    static {
+        try {
+            Field transf = FileChannelImpl.class.getDeclaredField("transferSupported");
+            transf.setAccessible(true);
+            transf.setBoolean(null, false);
+            transf.setAccessible(false);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     @Override
     public AbstractSelector openSelector() throws IOException {

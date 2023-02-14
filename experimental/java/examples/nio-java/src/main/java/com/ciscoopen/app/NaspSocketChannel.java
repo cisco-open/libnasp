@@ -201,20 +201,12 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public FileDescriptor getFD() {
-        try {
-            Constructor<FileDescriptor> ctor = FileDescriptor.class.getDeclaredConstructor(Integer.TYPE);
-            ctor.setAccessible(true);
-            FileDescriptor fd = ctor.newInstance(dialer.getFD());
-            ctor.setAccessible(false);
-            return fd;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public int getFDVal() {
-        return dialer.getFD();
+        throw new UnsupportedOperationException();
     }
 
     public boolean translateReadyOps(int ops, int initialOps, SelectionKeyImpl ski) {

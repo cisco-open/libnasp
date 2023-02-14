@@ -355,8 +355,6 @@ type TCPDialer struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	fd int32
-
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
 }
@@ -397,13 +395,10 @@ func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, addr
 			println(err.Error())
 			return
 		}
-
-		file, err := conn.conn.(*net.TCPConn).File()
 		if err != nil {
 			println(err.Error())
 			return
 		}
-		d.fd = int32(file.Fd())
 
 		d.asyncConnectionsLock.Lock()
 		d.asyncConnections = append(d.asyncConnections, conn)
@@ -411,10 +406,6 @@ func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, addr
 
 		selector.queue <- &SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
 	}()
-}
-
-func (d *TCPDialer) GetFD() int32 {
-	return d.fd
 }
 
 func (d *TCPDialer) AsyncDial() *Connection {
