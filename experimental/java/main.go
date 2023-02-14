@@ -103,6 +103,7 @@ func (s *Selector) Select(timeout int64) int {
 	if timeout != -1 {
 		timeoutChan = time.After(time.Duration(timeout) * time.Millisecond)
 	}
+	//nolint:forcetypeassert
 	s.writeAbleKeys.Range(func(key, value any) bool {
 		check := value.(func() bool)
 		if check() {
