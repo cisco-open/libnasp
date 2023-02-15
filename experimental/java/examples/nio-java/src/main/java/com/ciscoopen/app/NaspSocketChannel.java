@@ -17,6 +17,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.Set;
 
 import static java.net.StandardProtocolFamily.INET6;
@@ -170,8 +171,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public long write(ByteBuffer[] srcs, int offset, int length) throws IOException {
-        assert(offset >= 0 && length >= 0);
-        assert(offset < srcs.length);
+        Objects.checkFromIndexSize(offset, length, srcs.length);
 
         try {
             int totalLength = 0;
