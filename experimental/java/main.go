@@ -106,6 +106,7 @@ func (s *Selector) Select(timeout int64) int {
 	if timeout != -1 {
 		timeoutChan = time.After(time.Duration(timeout) * time.Millisecond)
 	}
+	//nolint:forcetypeassert
 	s.writeAbleKeys.Range(func(key, value any) bool {
 		check := value.(func() bool)
 		if check() {
@@ -113,7 +114,7 @@ func (s *Selector) Select(timeout int64) int {
 				SelectedKeyId: key.(int32),
 				Operation:     OP_WRITE,
 			})
-			//TODO revise it with goroutine because it can deadlock
+			// TODO revise it with goroutine because it can deadlock
 			s.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: key.(int32)}
 		}
 		return true
