@@ -101,24 +101,26 @@ func (s *Selector) Close() {
 	s.selected = nil
 }
 
-func (s *Selector) Select(timeout int64) int {
-	timeoutChan := make(<-chan time.Time)
-	if timeout != -1 {
-		timeoutChan = time.After(time.Duration(timeout) * time.Millisecond)
-	}
-	//nolint:forcetypeassert
-	s.writeAbleKeys.Range(func(key, value any) bool {
-		check := value.(func() bool)
-		if check() {
-			s.selected = append(s.selected, &SelectedKey{
-				SelectedKeyId: key.(int32),
-				Operation:     OP_WRITE,
-			})
-			// TODO revise it with goroutine because it can deadlock
-			s.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: key.(int32)}
-		}
-		return true
-	})
+func (s *Selector) Select(timeoutMs int64) int {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+	defer cancel()
+
+	go func() {
+		//nolint:forcetypeassert
+		s.writeAbleKeys.Range(func(key, value any) bool {
+			check := value.(func() bool)
+			if check() {
+				selectedKey := &SelectedKey{
+					SelectedKeyId: key.(int32),
+					Operation:     OP_WRITE,
+				}
+				s.selected = append(s.selected, selectedKey)
+				s.queue <- selectedKey
+			}
+			return true
+		})
+	}()
+
 	select {
 	case c := <-s.queue:
 		if c.Operation == OP_WAKEUP {
@@ -134,7 +136,7 @@ func (s *Selector) Select(timeout int64) int {
 		}
 
 		return l + 1
-	case <-timeoutChan:
+	case <-ctx.Done():
 		return 0
 	}
 }
@@ -459,7 +461,7 @@ func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
 	return &Connection{
 		conn:         c,
 		readBuffer:   new(bytes.Buffer),
-		writeChannel: make(chan []byte, 64),
+		writeChannel: make(chan []byte, MAX_WRITE_BUFFERS),
 		ctx:          ctx,
 		cancel:       cancel,
 	}, nil
