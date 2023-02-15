@@ -365,8 +365,12 @@ func (c *Connection) Close() {
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
 	bCopy := make([]byte, len(b))
 	copy(bCopy, b)
-	c.writeChannel <- bCopy
-	return int32(len(bCopy)), nil
+	select {
+	case c.writeChannel <- bCopy:
+		return int32(len(bCopy)), nil
+	default:
+		return 0, nil
+	}
 }
 
 func (c *Connection) Read(b []byte) (int, error) {
