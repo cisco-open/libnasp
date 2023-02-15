@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/cisco-open/cluster-registry-controller/api v0.2.5
-	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
+	github.com/cisco-open/nasp v0.1.0
 	github.com/gin-gonic/gin v1.8.1
 	k8s.io/api v0.24.2
 	k8s.io/apimachinery v0.24.2
