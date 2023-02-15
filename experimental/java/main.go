@@ -54,7 +54,7 @@ type TCPListener struct {
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
-	terminatedLock       sync.Mutex
+	terminatedLock       sync.RWMutex
 	terminated           bool
 }
 
@@ -72,7 +72,7 @@ type Connection struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	terminated     bool
-	terminatedLock sync.Mutex
+	terminatedLock sync.RWMutex
 }
 
 type Address struct {
@@ -205,10 +205,21 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 	}, nil
 }
 
+// isTerminated returns whether this TCPListener is terminated or not. This method is thread-safe.
+func (l *TCPListener) isTerminated() bool {
+	l.terminatedLock.RLock()
+	defer l.terminatedLock.RUnlock()
+
+	return l.terminated
+}
+
 func (l *TCPListener) Close() {
 	l.terminatedLock.Lock()
+	defer l.terminatedLock.Unlock()
+
 	l.terminated = true
-	l.terminatedLock.Unlock()
+
+	// TODO: should we handle (or at least log) or return the error returned by l.listener.Close()
 	l.listener.Close()
 }
 
@@ -232,12 +243,9 @@ func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) 
 		for {
 			conn, err := l.Accept()
 			if err != nil {
-				l.terminatedLock.Lock()
-				if l.terminated {
-					l.terminatedLock.Unlock()
+				if l.isTerminated() {
 					break
 				}
-				l.terminatedLock.Unlock()
 				println(err.Error())
 				continue
 			}
@@ -295,6 +303,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
 				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
+					// TODO: should we handle or at least log the error returned by c.readBuffer.Write(tempBuffer[:num])
 					c.conn.Close()
 					break
 				}
@@ -303,6 +312,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 				continue
 			}
 			c.readLock.Lock()
+			// TODO: should we handle or at least log the error returned by c.readBuffer.Write(tempBuffer[:num])
 			c.readBuffer.Write(tempBuffer[:num])
 			c.readLock.Unlock()
 			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
@@ -328,13 +338,11 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				for {
 					num, err := c.Write(buff)
 					if err != nil {
-						c.terminatedLock.Lock()
-						if c.terminated {
-							c.terminatedLock.Unlock()
+						if c.isTerminated() {
 							break
 						}
-						c.terminatedLock.Unlock()
 						if errors.Is(err, io.EOF) {
+							// TODO: should we handle the error returned by c.conn.Close() or at least log it?
 							c.conn.Close()
 							break
 						}
@@ -348,6 +356,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 					}
 				}
 			case <-c.ctx.Done():
+				// TODO: should we handle the error returned by c.conn.Close() or at least log it?
 				c.conn.Close()
 				selector.unregisterWriter(selectedKeyId)
 			}
@@ -355,10 +364,19 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	}()
 }
 
+// isTerminated returns whether this Connection is terminated or not. This method is thread-safe.
+func (c *Connection) isTerminated() bool {
+	c.terminatedLock.RLock()
+	defer c.terminatedLock.RUnlock()
+
+	return c.terminated
+}
+
 func (c *Connection) Close() {
 	c.terminatedLock.Lock()
+	defer c.terminatedLock.Unlock()
+
 	c.terminated = true
-	c.terminatedLock.Unlock()
 	c.cancel()
 }
 
