@@ -8,6 +8,35 @@
     <artifactId>nio-tcp-java</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <profiles>
+        <profile>
+            <id>os-darwin</id>
+            <activation>
+                <property>
+                    <name>os.name</name>
+                    <value>Mac OS X</value>
+                </property>
+            </activation>
+
+            <properties>
+                <nasp.os>darwin</nasp.os>
+            </properties>
+        </profile>
+        <profile>
+            <id>os-linux</id>
+            <activation>
+                <property>
+                    <name>os.name</name>
+                    <value>Linux</value>
+                </property>
+            </activation>
+
+            <properties>
+                <nasp.os>linux</nasp.os>
+            </properties>
+        </profile>
+    </profiles>
+
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -37,6 +66,7 @@
             <groupId>nasp</groupId>
             <artifactId>nasp</artifactId>
             <version>0.0.0</version>
+            <classifier>${nasp.os}</classifier>
             <scope>compile</scope>
         </dependency>
     </dependencies>
