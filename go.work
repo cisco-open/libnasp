@@ -1,0 +1,10 @@
+go 1.19
+
+use (
+	.
+	./components/bifrost
+	./experimental/heimdall
+	./experimental/java
+	./experimental/mobile
+	./pkg/proxywasm/testdata/filters
+)
