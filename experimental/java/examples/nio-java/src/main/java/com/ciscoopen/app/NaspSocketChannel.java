@@ -1,26 +1,21 @@
 package com.ciscoopen.app;
 
 import nasp.Connection;
-import nasp.TCPDialer;
 import nasp.Nasp;
+import nasp.TCPDialer;
 import sun.nio.ch.Net;
 import sun.nio.ch.SelChImpl;
 import sun.nio.ch.SelectionKeyImpl;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
-import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Set;
-
-import static java.net.StandardProtocolFamily.INET6;
 
 public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
@@ -182,20 +177,24 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     public long write(ByteBuffer[] srcs, int offset, int length) throws IOException {
         Objects.checkFromIndexSize(offset, length, srcs.length);
 
+        int totalLength = 0;
+        for (int i = offset; i < offset + length; i++) {
+            totalLength += srcs[i].remaining();
+        }
+
+        if (totalLength == 0) {
+            return 0;
+        }
+    
         try {
-            int totalLength = 0;
-            for (int i = offset; i < offset + length; i++) {
-                byte[] src = srcs[i].array();
-                totalLength += src.length;
-            }
             ByteBuffer temp = ByteBuffer.allocate(totalLength);
             for (int i = offset; i < offset + length; i++) {
                 temp.put(srcs[i]);
             }
             temp.flip();
-            return write(temp);
-        } catch (IOException e) {
-            throw e;
+            return connection.asyncWrite(temp.array());
+        } catch (Exception e) {
+            throw new IOException(e);
         }
     }
 
