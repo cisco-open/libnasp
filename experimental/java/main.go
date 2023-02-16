@@ -217,10 +217,15 @@ func (l *TCPListener) Close() {
 	l.terminatedLock.Lock()
 	defer l.terminatedLock.Unlock()
 
+	if l.terminated {
+		return // listener already terminated
+	}
 	l.terminated = true
 
-	// TODO: should we handle (or at least log) or return the error returned by l.listener.Close()
-	l.listener.Close()
+	err := l.listener.Close()
+	if err != nil {
+		logger.Error(err, "couldn't close listener", "address", l.listener.Addr())
+	}
 }
 
 func (l *TCPListener) Accept() (*Connection, error) {
@@ -297,23 +302,29 @@ func (c *Connection) GetRemoteAddress() (*Address, error) {
 }
 
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
+	logCtx := []interface{}{
+		"selected key id", selectedKeyId,
+	}
 	go func() {
 		tempBuffer := make([]byte, 1024)
 		for {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
+				logger.Error(err, "reading from data from connection failed", logCtx...)
 				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
-					// TODO: should we handle or at least log the error returned by c.readBuffer.Write(tempBuffer[:num])
-					c.conn.Close()
+					err = c.conn.Close()
+					if err != nil {
+						logger.Error(err, "couldn't close connection", logCtx...)
+					}
 					break
 				}
-				println("Error received:")
-				println(err.Error())
 				continue
 			}
 			c.readLock.Lock()
-			// TODO: should we handle or at least log the error returned by c.readBuffer.Write(tempBuffer[:num])
-			c.readBuffer.Write(tempBuffer[:num])
+			_, err = c.readBuffer.Write(tempBuffer[:num])
+			if err != nil {
+				logger.Error(err, "couldn't write data to read buffer", logCtx...)
+			}
 			c.readLock.Unlock()
 			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
 		}
@@ -327,6 +338,9 @@ func (c *Connection) AsyncRead(b []byte) (int32, error) {
 }
 
 func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
+	logCtx := []interface{}{
+		"selected key id", selectedKeyId,
+	}
 	selector.registerWriter(selectedKeyId, func() bool {
 		return len(c.writeChannel) < MAX_WRITE_BUFFERS
 	})
@@ -338,15 +352,17 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				for {
 					num, err := c.Write(buff)
 					if err != nil {
+						logger.Error(err, "received error while writing data to connection", logCtx...)
 						if c.isTerminated() {
 							break
 						}
 						if errors.Is(err, io.EOF) {
-							// TODO: should we handle the error returned by c.conn.Close() or at least log it?
-							c.conn.Close()
+							err = c.conn.Close()
+							if err != nil {
+								logger.Error(err, "couldn't close connection", logCtx...)
+							}
 							break
 						}
-						println(err.Error())
 						continue
 					}
 					if len(buff) == num {
@@ -356,8 +372,10 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 					}
 				}
 			case <-c.ctx.Done():
-				// TODO: should we handle the error returned by c.conn.Close() or at least log it?
-				c.conn.Close()
+				err := c.conn.Close()
+				if err != nil {
+					logger.Error(err, "couldn't close connection upon context cancellation", logCtx...)
+				}
 				selector.unregisterWriter(selectedKeyId)
 			}
 		}
@@ -376,6 +394,9 @@ func (c *Connection) Close() {
 	c.terminatedLock.Lock()
 	defer c.terminatedLock.Unlock()
 
+	if c.terminated {
+		return // connection already closed
+	}
 	c.terminated = true
 	c.cancel()
 }
