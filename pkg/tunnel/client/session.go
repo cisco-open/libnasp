@@ -79,7 +79,7 @@ func (s *session) OpenTCPStream(port int, id string) (net.Conn, error) {
 		return nil, errors.WrapIf(err, "could not decode message")
 	}
 
-	switch msg.Type {
+	switch msg.Type { //nolint:exhaustive
 	case api.ErrInvalidStreamIDMessageType:
 		stream.Close()
 
