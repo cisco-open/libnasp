@@ -20,10 +20,11 @@ jobs:
         uses: magnetikonline/action-golang-cache@v3
         with:
           go-version: ${{ env.GO_VERSION }}
-      
+
       - name: Setup custom gomobile
         run: |
           git clone -b plainjava https://github.com/bonifaido/mobile.git
+          go work use ./mobile
           cd mobile
           go install ./cmd/gomobile
           go install ./cmd/gobind
