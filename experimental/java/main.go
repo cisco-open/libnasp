@@ -124,6 +124,7 @@ func (s *Selector) Select(timeoutMs int64) int {
 			}
 			select {
 			case s.queue <- selectedKey:
+				// TODO: do we miss the default case here?
 			}
 		}
 		return true
@@ -166,7 +167,6 @@ func (s *Selector) WakeUp() {
 }
 
 func (s *Selector) NextSelectedKey() *SelectedKey {
-	println("NextSelectedKey len(s.selected) = ", len(s.selected))
 	if len(s.selected) != 0 {
 		selected := s.selected[0]
 		s.selected = s.selected[1:]
@@ -310,7 +310,10 @@ func (c *Connection) GetRemoteAddress() (*Address, error) {
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	logCtx := []interface{}{
 		"selected key id", selectedKeyId,
+		"id", c.ctx.Value("id"),
 	}
+	logger := logger.WithName("StartAsyncRead")
+	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 	go func() {
 		tempBuffer := make([]byte, 1024)
 		for {
@@ -320,14 +323,20 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 					c.setEofOnRead()
 					break
 				}
-				logger.Error(err, "reading from data from connection failed", logCtx...)
+				logger.Error(err, "reading data from connection failed", logCtx...)
 				continue
 			}
+			if num == 0 {
+				logger.Info("received 0 bytes on connection", logCtx...)
+			}
 			c.readLock.Lock()
-			_, err = c.readBuffer.Write(tempBuffer[:num])
+			n, err := c.readBuffer.Write(tempBuffer[:num])
 			c.readLock.Unlock()
 			if err != nil {
 				logger.Error(err, "couldn't write data to read buffer", logCtx...)
+			}
+			if n != num {
+				logger.Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
 			}
 			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
 		}
@@ -348,8 +357,14 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	logCtx := []interface{}{
 		"selected key id", selectedKeyId,
 	}
+	logger := logger.WithName("StartAsyncWrite")
+
 	selector.registerWriter(selectedKeyId, func() bool {
-		return len(c.writeChannel) < MAX_WRITE_BUFFERS
+		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
+		if !b {
+			logger.Info("write channel is full !!!")
+		}
+		return b
 	})
 
 	go func() {
@@ -376,7 +391,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 					}
 				}
 			case <-c.ctx.Done():
-				logger.Info("CANCEL CONTEXT RECEIVED", "id", c.ctx.Value("id"))
+				logger.Info("CANCEL CONTEXT RECEIVED", "id", c.ctx.Value("id"), "selected key id", selectedKeyId)
 				selector.unregisterWriter(selectedKeyId)
 				return
 			}
