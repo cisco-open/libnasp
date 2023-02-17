@@ -136,15 +136,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         try {
             byte[] buff = new byte[dst.remaining()];
             int num = connection.asyncRead(buff);
-//            System.out.println("!!!!!!!!!!!!!!!!!!!!!!!");
-//            if (num == 4) {
-//                System.out.println("Coming Size");
-//                for(byte b : buff){
-//                    System.out.println(b);
-//                }
-//            } else {
-//                System.out.println("Actual size coming:" + num);
-//            }
+            if (num == -1) {
+                return -1;
+            }
             dst.put(buff, dst.position(), num);
             return num;
         } catch (Exception e) {
@@ -185,7 +179,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         if (totalLength == 0) {
             return 0;
         }
-    
+
         try {
             ByteBuffer temp = ByteBuffer.allocate(totalLength);
             for (int i = offset; i < offset + length; i++) {
