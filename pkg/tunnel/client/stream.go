@@ -46,7 +46,7 @@ func NewControlStream(client *client, str *smux.Stream) api.ControlStream {
 }
 
 func (s *ctrlStream) ping(msg []byte) error {
-	s.client.logger.Info("ping arrived, send pong")
+	s.client.logger.V(3).Info("ping arrived, send pong")
 
 	_, _, err := api.SendMessage(s, api.PongMessageType, nil)
 	if err != nil {
@@ -78,7 +78,7 @@ func (s *ctrlStream) requestConnection(msg []byte) error {
 		return errors.WrapIfWithDetails(err, "could not open tcp stream", "port", req.Port, "id", req.Identifier)
 	}
 
-	s.client.logger.V(2).Info("put stream into the connection channel", "port", mp.port, "remoteAddress", mp.remoteAddress)
+	s.client.logger.V(3).Info("put stream into the connection channel", "port", mp.port, "remoteAddress", mp.remoteAddress)
 
 	mp.connChan <- conn
 

@@ -45,6 +45,7 @@ const (
 
 	ErrCtrlStreamAlreadyExistsMessageType MessageType = "errCtrlStreamAlreadyExists"
 	ErrInvalidStreamTypeMessageType       MessageType = "errInvalidStreamType"
+	ErrInvalidStreamIDMessageType         MessageType = "errInvalidStreamID"
 )
 
 type OpenTCPStreamMessage struct {

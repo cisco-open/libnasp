@@ -27,6 +27,7 @@ var (
 	ErrInvalidMessageType  = errors.New("invalid message type")
 	ErrInvalidPort         = errors.New("invalid port")
 	ErrInvalidStreamType   = errors.New("invalid stream type")
+	ErrInvalidStreamID     = errors.New("invalid stream id")
 	ErrSessionTimeout      = errors.New("timeout getting session")
 )
 

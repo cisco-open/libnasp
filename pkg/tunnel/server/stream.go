@@ -33,6 +33,8 @@ type ctrlStream struct {
 	stream  *smux.Stream
 
 	lastPong time.Time
+
+	keepaliveTimer *time.Timer
 }
 
 func NewControlStream(session *session, str *smux.Stream) api.ControlStream {
@@ -49,12 +51,21 @@ func NewControlStream(session *session, str *smux.Stream) api.ControlStream {
 	cs.AddMessageHandler("pong", s.pong)
 
 	go func() {
-		if err := s.keepalive(session.server.sessionTimeout); err != nil {
+		if err := s.keepalive(session.server.keepaliveTimeout); err != nil {
 			session.server.logger.Error(err, "keepalive error")
 		}
 	}()
 
 	return s
+}
+
+func (s *ctrlStream) Close() error {
+	if s.keepaliveTimer != nil {
+		stopped := s.keepaliveTimer.Stop()
+		s.session.server.logger.V(3).Info("stop keepalive timer", "stopped", stopped)
+	}
+
+	return s.ControlStream.Close()
 }
 
 func (s *ctrlStream) keepalive(timeout time.Duration) error {
@@ -68,7 +79,7 @@ func (s *ctrlStream) keepalive(timeout time.Duration) error {
 
 	s.session.server.logger.V(3).Info("send ping")
 
-	time.AfterFunc(time.Second*1, func() {
+	s.keepaliveTimer = time.AfterFunc(time.Second*1, func() {
 		if err := s.keepalive(timeout); err != nil {
 			s.session.server.logger.Error(err, "keepalive error")
 		}
@@ -87,7 +98,7 @@ func (s *ctrlStream) keepalive(timeout time.Duration) error {
 }
 
 func (s *ctrlStream) pong(msg []byte) error {
-	s.session.server.logger.Info("pong arrived")
+	s.session.server.logger.V(3).Info("pong arrived")
 
 	s.lastPong = time.Now()
 
