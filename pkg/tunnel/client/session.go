@@ -79,7 +79,16 @@ func (s *session) OpenTCPStream(port int, id string) (net.Conn, error) {
 		return nil, errors.WrapIf(err, "could not decode message")
 	}
 
-	return stream, nil
+	switch msg.Type {
+	case api.ErrInvalidStreamIDMessageType:
+		stream.Close()
+
+		return nil, errors.WithStack(api.ErrInvalidStreamID)
+	case api.StreamOpenedResponseMessageType:
+		return stream, nil
+	default:
+		return nil, errors.WithDetails(api.ErrInvalidMessageType, "type", msg.Type)
+	}
 }
 
 func (s *session) createControlStream() error {

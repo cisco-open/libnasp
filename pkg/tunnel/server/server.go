@@ -28,8 +28,9 @@ import (
 )
 
 var (
-	defaultLogger         = logr.Discard()
-	defaultSessionTimeout = time.Second * 60
+	defaultLogger           = logr.Discard()
+	defaultSessionTimeout   = time.Second * 10
+	defaultKeepaliveTimeout = time.Second * 60
 )
 
 type server struct {
@@ -38,8 +39,9 @@ type server struct {
 	sessions     sync.Map
 	portProvider PortProvider
 
-	logger         logr.Logger
-	sessionTimeout time.Duration
+	logger           logr.Logger
+	sessionTimeout   time.Duration
+	keepaliveTimeout time.Duration
 }
 
 type ServerOption func(*server)
@@ -62,11 +64,18 @@ func ServerWithSessionTimeout(timeout time.Duration) ServerOption {
 	}
 }
 
+func ServerWithKeepaliveTimeout(timeout time.Duration) ServerOption {
+	return func(s *server) {
+		s.keepaliveTimeout = timeout
+	}
+}
+
 func NewServer(listenAddress string, options ...ServerOption) (api.Server, error) {
 	s := &server{
-		listenAddress:  listenAddress,
-		sessions:       sync.Map{},
-		sessionTimeout: defaultSessionTimeout,
+		listenAddress:    listenAddress,
+		sessions:         sync.Map{},
+		sessionTimeout:   defaultSessionTimeout,
+		keepaliveTimeout: defaultKeepaliveTimeout,
 	}
 
 	for _, option := range options {
