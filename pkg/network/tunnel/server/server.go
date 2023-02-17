@@ -24,7 +24,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/xtaci/smux"
 
-	"github.com/cisco-open/nasp/pkg/tunnel/api"
+	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 )
 
 var (

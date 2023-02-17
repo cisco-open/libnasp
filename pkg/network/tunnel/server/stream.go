@@ -22,8 +22,8 @@ import (
 	"emperror.dev/errors"
 	"github.com/xtaci/smux"
 
-	"github.com/cisco-open/nasp/pkg/tunnel/api"
-	"github.com/cisco-open/nasp/pkg/tunnel/common"
+	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/nasp/pkg/network/tunnel/common"
 )
 
 type ctrlStream struct {

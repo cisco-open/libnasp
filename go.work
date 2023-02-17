@@ -4,6 +4,7 @@ use (
 	.
 	./components/bifrost
 	./experimental/heimdall
+	./experimental/heimdall/charts
 	./experimental/java
 	./experimental/mobile
 	./pkg/proxywasm/testdata/filters
