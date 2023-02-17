@@ -1,0 +1,13 @@
+apiVersion: v1
+name: nasp-webhook
+description: NASP webhook controller for K8s
+home: https://eti.cisco.com/
+
+maintainers:
+  - email: ciscoeti@cisco.com
+    name: Cisco
+sources:
+  - https://github.com/cisco-open/nasp-webhook
+
+version: 0.0.1
+appVersion: v0.0.1
