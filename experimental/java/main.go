@@ -95,9 +95,9 @@ type SelectedKey struct {
 }
 
 type Selector struct {
-	queue         chan *SelectedKey
-	selected      []*SelectedKey
-	writeAbleKeys sync.Map
+	queue        chan *SelectedKey
+	selected     []*SelectedKey
+	writableKeys sync.Map
 }
 
 func NewSelector() *Selector {
@@ -106,7 +106,7 @@ func NewSelector() *Selector {
 
 func (s *Selector) Close() {
 	close(s.queue)
-	s.writeAbleKeys = sync.Map{}
+	s.writableKeys = sync.Map{}
 	s.selected = nil
 }
 
@@ -117,21 +117,20 @@ func (s *Selector) Select(timeoutMs int64) int {
 	}
 	defer cancel()
 
-	go func() {
-		//nolint:forcetypeassert
-		s.writeAbleKeys.Range(func(key, value any) bool {
-			check := value.(func() bool)
-			if check() {
-				selectedKey := &SelectedKey{
-					SelectedKeyId: key.(int32),
-					Operation:     OP_WRITE,
-				}
-				s.selected = append(s.selected, selectedKey)
-				s.queue <- selectedKey
+	//nolint:forcetypeassert
+	s.writableKeys.Range(func(key, value any) bool {
+		check := value.(func() bool)
+		if check() {
+			selectedKey := &SelectedKey{
+				SelectedKeyId: key.(int32),
+				Operation:     OP_WRITE,
 			}
-			return true
-		})
-	}()
+			select {
+			case s.queue <- selectedKey:
+			}
+		}
+		return true
+	})
 
 	if (timeoutMs == 0) && len(s.queue) == 0 {
 		return 0
@@ -158,11 +157,11 @@ func (s *Selector) Select(timeoutMs int64) int {
 }
 
 func (s *Selector) registerWriter(selectedKeyId int32, check func() bool) {
-	s.writeAbleKeys.Store(selectedKeyId, check)
+	s.writableKeys.Store(selectedKeyId, check)
 }
 
 func (s *Selector) unregisterWriter(selectedKeyId int32) {
-	s.writeAbleKeys.Delete(selectedKeyId)
+	s.writableKeys.Delete(selectedKeyId)
 }
 
 func (s *Selector) WakeUp() {
