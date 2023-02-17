@@ -25,8 +25,10 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/cisco-open/nasp/pkg/network/proxy"
-	"github.com/cisco-open/nasp/pkg/tunnel/client"
+	"github.com/cisco-open/nasp/pkg/network/tunnel/client"
 )
+
+var ErrLocalAddressNotSpecified = errors.New("at least one local address must be specified")
 
 func NewClientCommand() *cobra.Command {
 	var serverAddress string
@@ -42,7 +44,7 @@ func NewClientCommand() *cobra.Command {
 			cmd.SilenceUsage = true
 
 			if len(localAddresses) == 0 {
-				return errors.New("at least one local address must be specified")
+				return ErrLocalAddressNotSpecified
 			}
 			c := client.NewClient(serverAddress, client.ClientWithLogger(logger))
 			go func() {
