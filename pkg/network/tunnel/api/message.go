@@ -34,14 +34,14 @@ func (m Message) Decode(v any) error {
 type MessageType string
 
 const (
-	OpenTCPStreamMessageType        MessageType = "openTCPStream"
-	OpenControlStreamMessageType    MessageType = "openControlStream"
-	AddPortMessageType              MessageType = "addPort"
-	AddPortResponseMessageType      MessageType = "addPortResponse"
-	PongMessageType                 MessageType = "pong"
-	PingMessageType                 MessageType = "ping"
-	RequestConnectionMessageType    MessageType = "requestConnection"
-	StreamOpenedResponseMessageType MessageType = "streamOpened"
+	OpenTCPStreamMessageType     MessageType = "openTCPStream"
+	OpenControlStreamMessageType MessageType = "openControlStream"
+	AddPortMessageType           MessageType = "addPort"
+	AddPortResponseMessageType   MessageType = "addPortResponse"
+	PongMessageType              MessageType = "pong"
+	PingMessageType              MessageType = "ping"
+	RequestConnectionMessageType MessageType = "requestConnection"
+	StreamOpenedMessageType      MessageType = "streamOpened"
 
 	ErrCtrlStreamAlreadyExistsMessageType MessageType = "errCtrlStreamAlreadyExists"
 	ErrInvalidStreamTypeMessageType       MessageType = "errInvalidStreamType"
