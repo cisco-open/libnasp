@@ -78,9 +78,13 @@ func (s *ctrlStream) requestConnection(msg []byte) error {
 		return errors.WrapIfWithDetails(err, "could not open tcp stream", "port", req.Port, "id", req.Identifier)
 	}
 
-	s.client.logger.V(3).Info("put stream into the connection channel", "port", mp.port, "remoteAddress", mp.remoteAddress)
+	if conn, err := newconn(conn, "tcp", req.LocalAddress, req.RemoteAddress); err != nil {
+		return errors.WrapIf(err, "could not create wrapped connection")
+	} else {
+		s.client.logger.V(3).Info("put stream into the connection channel", "port", mp.port, "remoteAddress", conn.RemoteAddr())
 
-	mp.connChan <- conn
+		mp.connChan <- conn
+	}
 
 	return nil
 }
