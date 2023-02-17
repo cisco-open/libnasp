@@ -25,6 +25,7 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/xtaci/smux"
 
+	"github.com/cisco-open/nasp/pkg/network/proxy"
 	"github.com/cisco-open/nasp/pkg/tunnel/api"
 )
 
@@ -83,11 +84,15 @@ func (s *session) Close() error {
 	}
 	s.mu.Unlock()
 
+	if err := s.ctrlStream.Close(); err != nil {
+		s.server.logger.Error(err, "could not close control stream")
+	}
+
 	return s.session.Close()
 }
 
 func (s *session) handleStream(stream *smux.Stream) error {
-	s.server.logger.V(2).Info("handle stream", "id", stream.ID())
+	s.server.logger.V(3).Info("handle stream", "id", stream.ID())
 
 	var msg api.Message
 	if err := json.NewDecoder(stream).Decode(&msg); err != nil {
@@ -117,16 +122,27 @@ func (s *session) handleStream(stream *smux.Stream) error {
 			return errors.WrapIfWithDetails(err, "could not decode message", "type", api.OpenTCPStreamMessageType)
 		}
 
+		var ch chan io.ReadWriteCloser
+		var ok bool
 		s.mu2.Lock()
-		if c, ok := s.backChannels[m.ID]; ok {
+		if ch, ok = s.backChannels[m.ID]; ok {
 			delete(s.backChannels, m.ID)
-			s.mu2.Unlock()
-			c <- stream
+		}
+		s.mu2.Unlock()
+
+		if !ok {
+			if _, _, err := api.SendMessage(stream, api.ErrInvalidStreamIDMessageType, nil); err != nil {
+				return errors.WrapIfWithDetails(err, "could not send message", "type", api.ErrInvalidStreamIDMessageType)
+			}
+
+			return errors.WithStack(api.ErrInvalidStreamID)
 		}
 
 		if _, _, err := api.SendMessage(stream, api.StreamOpenedResponseMessageType, nil); err != nil {
 			return errors.WrapIfWithDetails(err, "could not send message", "type", api.StreamOpenedResponseMessageType)
 		}
+
+		ch <- stream
 
 		return nil
 	default:
@@ -134,7 +150,7 @@ func (s *session) handleStream(stream *smux.Stream) error {
 			return errors.WrapIfWithDetails(err, "could not send message", "type", api.ErrInvalidStreamTypeMessageType)
 		}
 
-		return errors.New("invalid stream type")
+		return errors.WithStack(api.ErrInvalidStreamType)
 	}
 }
 
@@ -178,29 +194,15 @@ func (s *session) RequestConn(port int, c net.Conn) error {
 
 	select {
 	case tcpStream = <-ch:
-	case <-time.After(time.Second * 1):
+	case <-time.After(s.server.sessionTimeout):
+		s.mu2.Lock()
+		delete(s.backChannels, id)
+		s.mu2.Unlock()
+
 		return errors.WithStackIf(api.ErrSessionTimeout)
 	}
 
-	go func() {
-		defer c.Close()
-
-		var wg sync.WaitGroup
-		wg.Add(2)
-
-		go s.proxy(&wg, c, tcpStream)
-		go s.proxy(&wg, tcpStream, c)
-
-		wg.Wait()
-	}()
+	go proxy.New(c, tcpStream).Start()
 
 	return err
-}
-
-func (s *session) proxy(wg *sync.WaitGroup, dst, src io.ReadWriteCloser) {
-	defer wg.Done()
-
-	if _, err := io.Copy(dst, src); err != nil {
-		s.server.logger.Error(err, "could not copy data")
-	}
 }

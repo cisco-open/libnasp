@@ -120,7 +120,7 @@ func (l *multipleListeners) Accept() (net.Conn, error) {
 	for {
 		select {
 		case accept := <-l.acceptChan:
-			l.logger.V(2).Info("connection on listener", "id", accept.listenerID, "address", accept.listener.Addr().String())
+			l.logger.V(3).Info("connection on listener", "id", accept.listenerID, "address", accept.listener.Addr().String())
 
 			return accept.conn, accept.err
 		default:
