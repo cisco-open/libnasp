@@ -111,8 +111,8 @@ func (s *session) handleStream(stream *smux.Stream) error {
 			return errors.New("control stream already established")
 		}
 
-		if _, _, err := api.SendMessage(stream, api.StreamOpenedResponseMessageType, nil); err != nil {
-			return errors.WrapIfWithDetails(err, "could not send message", "type", api.StreamOpenedResponseMessageType)
+		if _, _, err := api.SendMessage(stream, api.StreamOpenedMessageType, nil); err != nil {
+			return errors.WrapIfWithDetails(err, "could not send message", "type", api.StreamOpenedMessageType)
 		}
 
 		s.ctrlStream = NewControlStream(s, stream)
@@ -140,8 +140,8 @@ func (s *session) handleStream(stream *smux.Stream) error {
 			return errors.WithStack(api.ErrInvalidStreamID)
 		}
 
-		if _, _, err := api.SendMessage(stream, api.StreamOpenedResponseMessageType, nil); err != nil {
-			return errors.WrapIfWithDetails(err, "could not send message", "type", api.StreamOpenedResponseMessageType)
+		if _, _, err := api.SendMessage(stream, api.StreamOpenedMessageType, nil); err != nil {
+			return errors.WrapIfWithDetails(err, "could not send message", "type", api.StreamOpenedMessageType)
 		}
 
 		ch <- stream

@@ -84,7 +84,7 @@ func (s *session) OpenTCPStream(port int, id string) (net.Conn, error) {
 		stream.Close()
 
 		return nil, errors.WithStack(api.ErrInvalidStreamID)
-	case api.StreamOpenedResponseMessageType:
+	case api.StreamOpenedMessageType:
 		return stream, nil
 	default:
 		return nil, errors.WithDetails(api.ErrInvalidMessageType, "type", msg.Type)
@@ -108,7 +108,7 @@ func (s *session) createControlStream() error {
 	}
 
 	switch msg.Type { //nolint:exhaustive
-	case api.StreamOpenedResponseMessageType:
+	case api.StreamOpenedMessageType:
 	default:
 		return errors.WithStackIf(api.ErrCtrlInvalidResponse)
 	}
