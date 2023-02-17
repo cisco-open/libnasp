@@ -24,6 +24,7 @@ import (
 	"math"
 	"net"
 	"strconv"
+	"sync/atomic"
 
 	"net/http"
 	"strings"
@@ -56,8 +57,7 @@ type TCPListener struct {
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
-	terminatedLock       sync.RWMutex
-	terminated           bool
+	terminated           atomic.Bool
 }
 
 type NaspIntegrationHandler struct {
@@ -74,14 +74,11 @@ type Connection struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 
-	terminated     bool
-	terminatedLock sync.RWMutex
+	terminated atomic.Bool
 
-	readEOF     bool
-	readEOFLock sync.RWMutex
+	readEOF atomic.Bool
 
-	writeEOF     bool
-	writeEOFLock sync.RWMutex
+	writeEOF atomic.Bool
 }
 
 type Address struct {
@@ -169,6 +166,7 @@ func (s *Selector) WakeUp() {
 }
 
 func (s *Selector) NextSelectedKey() *SelectedKey {
+	println("NextSelectedKey len(s.selected) = ", len(s.selected))
 	if len(s.selected) != 0 {
 		selected := s.selected[0]
 		s.selected = s.selected[1:]
@@ -222,20 +220,13 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 
 // isTerminated returns whether this TCPListener is terminated or not. This method is thread-safe.
 func (l *TCPListener) isTerminated() bool {
-	l.terminatedLock.RLock()
-	defer l.terminatedLock.RUnlock()
-
-	return l.terminated
+	return l.terminated.Load()
 }
 
 func (l *TCPListener) Close() {
-	l.terminatedLock.Lock()
-	defer l.terminatedLock.Unlock()
-
-	if l.terminated {
+	if !l.terminated.CompareAndSwap(false, true) {
 		return // listener already terminated
 	}
-	l.terminated = true
 
 	err := l.listener.Close()
 	if err != nil {
@@ -395,50 +386,31 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 
 // isTerminated returns whether this Connection is terminated or not. This method is thread-safe.
 func (c *Connection) isTerminated() bool {
-	c.terminatedLock.RLock()
-	defer c.terminatedLock.RUnlock()
-
-	return c.terminated
+	return c.terminated.Load()
 }
 
 // writeEOFReceived returns true if EOF was received while writing data to connection
 func (c *Connection) writeEOFReceived() bool {
-	c.writeEOFLock.RLock()
-	defer c.writeEOFLock.RUnlock()
-
-	return c.writeEOF
+	return c.writeEOF.Load()
 }
 
 func (c *Connection) setEofOnWrite() {
-	c.writeEOFLock.Lock()
-	defer c.writeEOFLock.Unlock()
-
-	c.writeEOF = true
+	c.writeEOF.Store(true)
 }
 
 // readEOFReceived returns true if EOF was received while reading data from connection
 func (c *Connection) readEOFReceived() bool {
-	c.readEOFLock.RLock()
-	defer c.readEOFLock.RUnlock()
-
-	return c.readEOF
+	return c.readEOF.Load()
 }
 
 func (c *Connection) setEofOnRead() {
-	c.readEOFLock.Lock()
-	defer c.readEOFLock.Unlock()
-
-	c.readEOF = true
+	c.readEOF.Store(true)
 }
 
 func (c *Connection) Close() {
-	c.terminatedLock.Lock()
-	defer c.terminatedLock.Unlock()
-
-	if c.terminated {
+	if !c.terminated.CompareAndSwap(false, true) {
 		return // connection already closed
 	}
-	c.terminated = true
 
 	logger.Info("CLOSING CONNECTION", "id", c.ctx.Value("id"))
 	c.cancel()
