@@ -53,18 +53,20 @@ type OpenTCPStreamMessage struct {
 }
 
 type AddPortRequestMessage struct {
-	Type string `json:"type"`
-	Port int    `json:"port"`
+	Type          string `json:"type"`
+	ID            string `json:"id"`
+	RequestedPort int    `json:"port"`
 }
 
 type AddPortResponseMessage struct {
-	Type    string `json:"tcp"`
-	Port    int    `json:"port"`
-	Address string `json:"address"`
+	Type         string `json:"tcp"`
+	ID           string `json:"id"`
+	AssignedPort int    `json:"port"`
+	Address      string `json:"address"`
 }
 
 type RequestConnectionMessage struct {
-	Port          int    `json:"port"`
+	PortID        string `json:"portID"`
 	Identifier    string `json:"identifier"`
 	RemoteAddress string `json:"remoteAddress"`
 	LocalAddress  string `json:"localAddress"`

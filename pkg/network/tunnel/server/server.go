@@ -37,7 +37,7 @@ type server struct {
 	listenAddress string
 
 	sessions     sync.Map
-	portProvider PortProvider
+	portProvider api.PortProvider
 
 	logger           logr.Logger
 	sessionTimeout   time.Duration
@@ -52,7 +52,7 @@ func ServerWithLogger(logger logr.Logger) ServerOption {
 	}
 }
 
-func ServerWithPortProvider(provider PortProvider) ServerOption {
+func ServerWithPortProvider(provider api.PortProvider) ServerOption {
 	return func(s *server) {
 		s.portProvider = provider
 	}

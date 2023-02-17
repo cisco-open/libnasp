@@ -17,7 +17,10 @@ package commands
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"regexp"
+	"strconv"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -25,10 +28,13 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/cisco-open/nasp/pkg/network/proxy"
+	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 	"github.com/cisco-open/nasp/pkg/network/tunnel/client"
 )
 
 var ErrLocalAddressNotSpecified = errors.New("at least one local address must be specified")
+
+var addrRegex = regexp.MustCompile(`^((\d+):)?(.*):(\d+)$`)
 
 func NewClientCommand() *cobra.Command {
 	var serverAddress string
@@ -56,26 +62,42 @@ func NewClientCommand() *cobra.Command {
 			wg := sync.WaitGroup{}
 
 			for k, addr := range localAddresses {
+				var requestedPort int
+				v := addrRegex.FindStringSubmatch(addr)
+				if len(v) < 5 {
+					logger.Info("invalid local address", "address", addr)
+					continue
+				}
+				if v, err := strconv.Atoi(v[2]); err == nil {
+					requestedPort = v
+				}
+				addr = fmt.Sprintf("%s:%s", v[3], v[4])
 				tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
 				if err != nil {
 					return err
 				}
 
-				l, err := c.AddTCPPort(k + 1)
+				name := fmt.Sprintf("port-%d", k+1)
+
+				l, err := c.AddTCPPort(name, requestedPort)
 				if err != nil {
 					return err
 				}
 
 				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				go func(logger logr.Logger) {
+					logger.Info("start proxying", "destination", tcpAddr.String())
+					defer func() {
+						logger.Info("proxying stopped")
+						wg.Done()
+					}()
 					(&proxyclient{
 						Listener: l,
 
 						logger:  logger,
 						tcpAddr: tcpAddr,
 					}).Run()
-				}()
+				}(logger.WithName(name))
 			}
 
 			wg.Wait()
@@ -101,7 +123,10 @@ func (p *proxyclient) Run() {
 	for {
 		rconn, err := p.Listener.Accept()
 		if err != nil {
-			p.logger.Error(err, "could not accept")
+			p.logger.Error(err, "accept error")
+			if errors.Is(err, api.ErrListenerStopped) {
+				break
+			}
 			continue
 		}
 

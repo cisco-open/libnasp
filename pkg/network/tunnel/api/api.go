@@ -29,11 +29,13 @@ var (
 	ErrInvalidStreamType   = errors.New("invalid stream type")
 	ErrInvalidStreamID     = errors.New("invalid stream id")
 	ErrSessionTimeout      = errors.New("timeout getting session")
+	ErrListenerStopped     = errors.New("listener stopped")
+	ErrInvalidConnection   = errors.New("invalid connection")
 )
 
 type Client interface {
 	Connect(ctx context.Context) error
-	AddTCPPort(port int) (net.Listener, error)
+	AddTCPPort(id string, requestedPort int) (net.Listener, error)
 }
 
 type Server interface {
@@ -44,7 +46,7 @@ type Session interface {
 	Close() error
 	Handle() error
 	GetControlStream() io.ReadWriter
-	OpenTCPStream(port int, id string) (net.Conn, error)
+	OpenTCPStream(id string) (net.Conn, error)
 }
 
 type Dialer interface {
@@ -61,4 +63,10 @@ type ControlStream interface {
 type Stream interface {
 	io.ReadWriteCloser
 	Handle() error
+}
+
+type PortProvider interface {
+	GetFreePort() int
+	GetPort(port int) bool
+	ReleasePort(int)
 }
