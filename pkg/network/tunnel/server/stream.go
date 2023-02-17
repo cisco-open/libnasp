@@ -106,26 +106,33 @@ func (s *ctrlStream) pong(msg []byte) error {
 }
 
 func (s *ctrlStream) addPort(msg []byte) error {
-	var a api.AddPortRequestMessage
-	if err := json.Unmarshal(msg, &a); err != nil {
+	var req api.AddPortRequestMessage
+	if err := json.Unmarshal(msg, &req); err != nil {
 		return err
 	}
 
-	if a.Port > 0 {
-		pp := s.session.AddPort(a.Port)
-
-		_, _, err := api.SendMessage(s.stream, api.AddPortResponseMessageType, &api.AddPortResponseMessage{
-			Type: "tcp",
-			Port: a.Port,
-			Address: (&net.TCPAddr{
-				IP:   net.ParseIP("0.0.0.0"),
-				Port: pp,
-			}).String(),
-		})
-		if err != nil {
-			return errors.WrapIf(err, "could not send addPortResponse message")
-		}
+	if req.ID == "" {
+		return nil
 	}
 
-	return nil
+	assignedPort := s.session.AddPort(req.ID, req.RequestedPort)
+	var addPortErr error
+	if assignedPort == 0 {
+		addPortErr = errors.NewWithDetails("could not assign port", "portID", req.ID, "requestedPort", req.RequestedPort)
+	}
+
+	_, _, err := api.SendMessage(s.stream, api.AddPortResponseMessageType, &api.AddPortResponseMessage{
+		Type:         "tcp",
+		ID:           req.ID,
+		AssignedPort: assignedPort,
+		Address: (&net.TCPAddr{
+			IP:   net.ParseIP("0.0.0.0"),
+			Port: assignedPort,
+		}).String(),
+	})
+	if err != nil {
+		return errors.WrapIf(err, "could not send addPortResponse message")
+	}
+
+	return addPortErr
 }

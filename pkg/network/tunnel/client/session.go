@@ -62,7 +62,7 @@ func (s *session) GetControlStream() io.ReadWriter {
 	return s.stream
 }
 
-func (s *session) OpenTCPStream(port int, id string) (net.Conn, error) {
+func (s *session) OpenTCPStream(id string) (net.Conn, error) {
 	stream, err := s.session.OpenStream()
 	if err != nil {
 		return nil, errors.WrapIf(err, "could not open stream")

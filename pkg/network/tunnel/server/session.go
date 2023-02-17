@@ -34,7 +34,7 @@ type session struct {
 	session    *smux.Session
 	ctrlStream api.ControlStream
 
-	ports map[int]*port
+	ports map[string]*port
 
 	backChannels map[string]chan io.ReadWriteCloser
 
@@ -46,7 +46,7 @@ func NewSession(srv *server, sess *smux.Session) *session {
 	return &session{
 		server:       srv,
 		session:      sess,
-		ports:        make(map[int]*port),
+		ports:        make(map[string]*port),
 		mu:           sync.Mutex{},
 		backChannels: make(map[string]chan io.ReadWriteCloser),
 	}
@@ -75,8 +75,8 @@ func (s *session) Close() error {
 
 	s.mu.Lock()
 	for p, mp := range s.ports {
-		s.server.logger.V(2).Info("release port", "port", mp.servicePort)
-		s.server.portProvider.ReleasePort(p)
+		s.server.logger.V(2).Info("release port", "portID", mp.id, "assignedPort", mp.assignedPort)
+		s.server.portProvider.ReleasePort(mp.assignedPort)
 		if err := mp.Close(); err != nil {
 			s.server.logger.Error(err, "could not gracefully close managed port")
 		}
@@ -156,15 +156,27 @@ func (s *session) handleStream(stream *smux.Stream) error {
 	}
 }
 
-func (s *session) AddPort(port int) int {
-	p := s.server.portProvider.GetFreePort()
+func (s *session) AddPort(id string, requestedPort int) int {
+	var assignedPort int
 
-	s.server.logger.V(2).Info("get free port", "targetPort", port, "servicePort", p)
+	if requestedPort > 0 {
+		if s.server.portProvider.GetPort(requestedPort) {
+			assignedPort = requestedPort
+		}
+	} else {
+		assignedPort = s.server.portProvider.GetFreePort()
+	}
 
-	mp := NewPort(s, p, port)
+	if assignedPort == 0 {
+		return 0
+	}
+
+	s.server.logger.V(2).Info("get free port", "portID", id, "assignedPort", assignedPort)
+
+	mp := NewPort(s, id, assignedPort)
 
 	s.mu.Lock()
-	s.ports[p] = mp
+	s.ports[id] = mp
 	s.mu.Unlock()
 
 	go func() {
@@ -173,13 +185,13 @@ func (s *session) AddPort(port int) int {
 		}
 	}()
 
-	return p
+	return assignedPort
 }
 
-func (s *session) RequestConn(port int, c net.Conn) error {
+func (s *session) RequestConn(portID string, c net.Conn) error {
 	id := uuid.NewUUID().String()
 	_, _, err := api.SendMessage(s.ctrlStream, api.RequestConnectionMessageType, &api.RequestConnectionMessage{
-		Port:          port,
+		PortID:        portID,
 		Identifier:    id,
 		RemoteAddress: c.RemoteAddr().String(),
 		LocalAddress:  c.LocalAddr().String(),
