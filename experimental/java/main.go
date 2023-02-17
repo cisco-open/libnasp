@@ -326,11 +326,11 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		for {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
-				logger.Error(err, "reading from data from connection failed", logCtx...)
 				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
 					c.setEofOnRead()
 					break
 				}
+				logger.Error(err, "reading from data from connection failed", logCtx...)
 				continue
 			}
 			c.readLock.Lock()
@@ -369,7 +369,6 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				for {
 					num, err := c.Write(buff)
 					if err != nil {
-						logger.Error(err, "received error while writing data to connection", logCtx...)
 						if c.isTerminated() {
 							break
 						}
@@ -377,6 +376,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 							c.setEofOnWrite()
 							break
 						}
+						logger.Error(err, "received error while writing data to connection", logCtx...)
 						continue
 					}
 					if len(buff) == num {
