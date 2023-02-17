@@ -179,8 +179,10 @@ func (s *session) AddPort(port int) int {
 func (s *session) RequestConn(port int, c net.Conn) error {
 	id := uuid.NewUUID().String()
 	_, _, err := api.SendMessage(s.ctrlStream, api.RequestConnectionMessageType, &api.RequestConnectionMessage{
-		Port:       port,
-		Identifier: id,
+		Port:          port,
+		Identifier:    id,
+		RemoteAddress: c.RemoteAddr().String(),
+		LocalAddress:  c.LocalAddr().String(),
 	})
 	if err != nil {
 		return errors.WrapIfWithDetails(err, "could not send message", "type", api.RequestConnectionMessageType)

@@ -112,6 +112,8 @@ func (p *proxyclient) Run() {
 			continue
 		}
 
+		p.logger.V(3).Info("start proxying", "client", rconn.RemoteAddr(), "server", lconn.RemoteAddr())
+
 		go proxy.New(rconn, lconn).Start()
 	}
 }
