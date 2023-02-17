@@ -110,7 +110,10 @@ func (s *Selector) Close() {
 }
 
 func (s *Selector) Select(timeoutMs int64) int {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	if timeoutMs != -1 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+	}
 	defer cancel()
 
 	go func() {
@@ -128,6 +131,10 @@ func (s *Selector) Select(timeoutMs int64) int {
 			return true
 		})
 	}()
+
+	if (timeoutMs == 0) && len(s.queue) == 0 {
+		return 0
+	}
 
 	select {
 	case c := <-s.queue:
