@@ -31,6 +31,7 @@ import (
 
 	"github.com/cisco-open/nasp/pkg/istio"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
+	"github.com/pborman/uuid"
 
 	"k8s.io/klog/v2"
 )
@@ -73,6 +74,10 @@ type Connection struct {
 	cancel         context.CancelFunc
 	terminated     bool
 	terminatedLock sync.RWMutex
+	readEOF        bool
+	writeEOF       bool
+	readEOFLock    sync.Mutex
+	writeEOFLock   sync.Mutex
 }
 
 type Address struct {
@@ -233,7 +238,7 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), "id", uuid.New()))
 	return &Connection{
 		conn:         c,
 		readBuffer:   new(bytes.Buffer),
@@ -312,27 +317,30 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if err != nil {
 				logger.Error(err, "reading from data from connection failed", logCtx...)
 				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
-					err = c.conn.Close()
-					if err != nil {
-						logger.Error(err, "couldn't close connection", logCtx...)
-					}
+					c.readEOFLock.Lock()
+					c.readEOF = true
+					c.readEOFLock.Unlock()
 					break
 				}
 				continue
 			}
-			c.readLock.Lock()
 			_, err = c.readBuffer.Write(tempBuffer[:num])
 			if err != nil {
 				logger.Error(err, "couldn't write data to read buffer", logCtx...)
 			}
-			c.readLock.Unlock()
 			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
 		}
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
-	c.readLock.Lock()
-	defer c.readLock.Unlock()
+	c.readEOFLock.Lock()
+	if c.readEOF {
+		c.readEOFLock.Unlock()
+		return -1, nil
+	}
+	c.readEOFLock.Unlock()
+	// c.readLock.Lock()
+	// defer c.readLock.Unlock()
 	n, err := c.readBuffer.Read(b)
 	return int32(n), err
 }
@@ -357,10 +365,9 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 							break
 						}
 						if errors.Is(err, io.EOF) {
-							err = c.conn.Close()
-							if err != nil {
-								logger.Error(err, "couldn't close connection", logCtx...)
-							}
+							c.writeEOFLock.Lock()
+							c.writeEOF = true
+							c.writeEOFLock.Unlock()
 							break
 						}
 						continue
@@ -372,11 +379,9 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 					}
 				}
 			case <-c.ctx.Done():
-				err := c.conn.Close()
-				if err != nil {
-					logger.Error(err, "couldn't close connection upon context cancellation", logCtx...)
-				}
+				logger.Info("CANCEL CONTEXT RECEIVED", "id", c.ctx.Value("id"))
 				selector.unregisterWriter(selectedKeyId)
+				return
 			}
 		}
 	}()
@@ -398,10 +403,22 @@ func (c *Connection) Close() {
 		return // connection already closed
 	}
 	c.terminated = true
+
+	logger.Info("CLOSING CONNECTION", "id", c.ctx.Value("id"))
 	c.cancel()
+	err := c.conn.Close()
+	if err != nil {
+		logger.Error(err, "couldn't close connection")
+	}
 }
 
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
+	c.writeEOFLock.Lock()
+	if c.writeEOF {
+		c.readEOFLock.Unlock()
+		return -1, nil
+	}
+	c.writeEOFLock.Unlock()
 	bCopy := make([]byte, len(b))
 	copy(bCopy, b)
 	select {
@@ -495,7 +512,7 @@ func (d *TCPDialer) AsyncDial() *Connection {
 }
 
 func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
-	backgroundCtx := context.Background()
+	backgroundCtx := context.WithValue(context.Background(), "id", uuid.New())
 	c, err := d.dialer.DialContext(backgroundCtx, "tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, err
