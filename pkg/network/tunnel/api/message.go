@@ -64,8 +64,10 @@ type AddPortResponseMessage struct {
 }
 
 type RequestConnectionMessage struct {
-	Port       int    `json:"port"`
-	Identifier string `json:"identifier"`
+	Port          int    `json:"port"`
+	Identifier    string `json:"identifier"`
+	RemoteAddress string `json:"remoteAddress"`
+	LocalAddress  string `json:"localAddress"`
 }
 
 func CreateMessage(messageType MessageType, message interface{}) (Message, []byte, error) {
