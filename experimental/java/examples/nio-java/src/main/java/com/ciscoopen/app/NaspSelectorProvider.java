@@ -95,12 +95,29 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
 
     static {
         try {
-            Field transf = FileChannelImpl.class.getDeclaredField("transferSupported");
-            transf.setAccessible(true);
-            transf.setBoolean(null, false);
-            transf.setAccessible(false);
+            boolean sendfileTurnedOff = false;
+            loop:
+            for (Field field : FileChannelImpl.class.getDeclaredFields()) {
+                switch (field.getName()) {
+                    case "transferToNotSupported":
+                        field.setAccessible(true);
+                        field.setBoolean(null, true);
+                        field.setAccessible(false);
+                        sendfileTurnedOff = true;
+                        break loop;
+                    case "transferSupported":
+                        field.setAccessible(true);
+                        field.setBoolean(null, false);
+                        field.setAccessible(false);
+                        sendfileTurnedOff = true;
+                        break loop;
+                }
+            }
+            if (!sendfileTurnedOff) {
+                throw new IllegalStateException("couldn't turn off sendfile support");
+            }
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
