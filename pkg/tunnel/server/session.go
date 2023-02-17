@@ -84,8 +84,10 @@ func (s *session) Close() error {
 	}
 	s.mu.Unlock()
 
-	if err := s.ctrlStream.Close(); err != nil {
-		s.server.logger.Error(err, "could not close control stream")
+	if s.ctrlStream != nil {
+		if err := s.ctrlStream.Close(); err != nil {
+			s.server.logger.Error(err, "could not close control stream")
+		}
 	}
 
 	return s.session.Close()
