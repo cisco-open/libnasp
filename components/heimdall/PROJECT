@@ -1,6 +1,6 @@
 domain: nasp.k8s.cisco.com
 layout:
   - go.kubebuilder.io/v3
-projectName: nasp-webhook
-repo: wwwin-github.cisco.com/eti/nasp-webhook
+projectName: heimdall
+repo: github.com/cisco-open/nasp/components/heimdall
 version: "3"

@@ -62,7 +62,7 @@ type Certificate struct {
 	ServerPrivateKey []byte
 }
 
-// NewCertificate returns a self signed certificate generated for the specified
+// NewCertificate returns a self-signed certificate generated for the specified
 // DNS names or alternatively an error.
 func NewCertificate(dnsNames []string) (*Certificate, error) {
 	certificate := new(Certificate)

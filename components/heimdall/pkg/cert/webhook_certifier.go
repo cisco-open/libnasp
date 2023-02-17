@@ -283,17 +283,13 @@ func (certifier *WebhookCertifier) startWebhookConfigurationInformer() error {
 // updateCertificate updates the webhook's certificate with the renewer's
 // current one.
 func (certifier *WebhookCertifier) updateCertificate() error {
+	if certifier == nil {
+		return errors.New("invalid nil certifier")
+	}
+
 	logger := certifier.logger
 
 	logger.Info("updating webhook certificate")
-
-	if certifier == nil {
-		err := errors.New("invalid nil certifier")
-
-		logger.Error(err, "updating webhook certificate failed")
-
-		return err
-	}
 
 	var desiredConfig runtimeclient.Object
 	var currentConfig runtimeclient.Object
