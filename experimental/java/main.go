@@ -66,18 +66,21 @@ type NaspIntegrationHandler struct {
 }
 
 type Connection struct {
-	conn           net.Conn
-	readBuffer     *bytes.Buffer
-	readLock       sync.Mutex
-	writeChannel   chan []byte
-	ctx            context.Context
-	cancel         context.CancelFunc
+	conn         net.Conn
+	readBuffer   *bytes.Buffer
+	readLock     sync.Mutex
+	writeChannel chan []byte
+	ctx          context.Context
+	cancel       context.CancelFunc
+
 	terminated     bool
 	terminatedLock sync.RWMutex
-	readEOF        bool
-	writeEOF       bool
-	readEOFLock    sync.Mutex
-	writeEOFLock   sync.Mutex
+
+	readEOF     bool
+	readEOFLock sync.RWMutex
+
+	writeEOF     bool
+	writeEOFLock sync.RWMutex
 }
 
 type Address struct {
@@ -324,9 +327,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if err != nil {
 				logger.Error(err, "reading from data from connection failed", logCtx...)
 				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
-					c.readEOFLock.Lock()
-					c.readEOF = true
-					c.readEOFLock.Unlock()
+					c.setEofOnRead()
 					break
 				}
 				continue
@@ -340,12 +341,10 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
-	c.readEOFLock.Lock()
-	if c.readEOF {
-		c.readEOFLock.Unlock()
+	if c.readEOFReceived() {
 		return -1, nil
 	}
-	c.readEOFLock.Unlock()
+
 	// c.readLock.Lock()
 	// defer c.readLock.Unlock()
 	n, err := c.readBuffer.Read(b)
@@ -372,9 +371,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 							break
 						}
 						if errors.Is(err, io.EOF) {
-							c.writeEOFLock.Lock()
-							c.writeEOF = true
-							c.writeEOFLock.Unlock()
+							c.setEofOnWrite()
 							break
 						}
 						continue
@@ -402,6 +399,36 @@ func (c *Connection) isTerminated() bool {
 	return c.terminated
 }
 
+// writeEOFReceived returns true if EOF was received while writing data to connection
+func (c *Connection) writeEOFReceived() bool {
+	c.writeEOFLock.RLock()
+	defer c.writeEOFLock.RUnlock()
+
+	return c.writeEOF
+}
+
+func (c *Connection) setEofOnWrite() {
+	c.writeEOFLock.Lock()
+	defer c.writeEOFLock.Unlock()
+
+	c.writeEOF = true
+}
+
+// readEOFReceived returns true if EOF was received while reading data from connection
+func (c *Connection) readEOFReceived() bool {
+	c.readEOFLock.RLock()
+	defer c.readEOFLock.RUnlock()
+
+	return c.readEOF
+}
+
+func (c *Connection) setEofOnRead() {
+	c.readEOFLock.Lock()
+	defer c.readEOFLock.Unlock()
+
+	c.readEOF = true
+}
+
 func (c *Connection) Close() {
 	c.terminatedLock.Lock()
 	defer c.terminatedLock.Unlock()
@@ -420,12 +447,10 @@ func (c *Connection) Close() {
 }
 
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
-	c.writeEOFLock.Lock()
-	if c.writeEOF {
-		c.readEOFLock.Unlock()
+	if c.writeEOFReceived() {
 		return -1, nil
 	}
-	c.writeEOFLock.Unlock()
+
 	bCopy := make([]byte, len(b))
 	copy(bCopy, b)
 	select {
