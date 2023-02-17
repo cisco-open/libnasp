@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
-	"github.com/cisco-open/nasp/pkg/tunnel/server"
+	"github.com/cisco-open/nasp/pkg/network/tunnel/server"
 )
 
 func NewServerCommand() *cobra.Command {
