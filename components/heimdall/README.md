@@ -1,4 +1,4 @@
-# nasp-webhook
+# Heimdall
 
 // TODO(user): Add simple overview of use/purpose
 
@@ -8,7 +8,8 @@
 
 ## Getting Started
 
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
+You’ll need a Kubernetes cluster to run against. 
+You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
 **Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
 
 ### Running on the cluster
@@ -56,7 +57,7 @@ make undeploy
 This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 
 It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/) 
-which provides a reconcile function responsible for synchronizing resources untile the desired state is reached on the cluster 
+which provides a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster 
 
 ### Test It Out
 

@@ -50,7 +50,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	clusterregistryv1alpha1.AddToScheme(scheme)
+	_ = clusterregistryv1alpha1.AddToScheme(scheme)
 
 	//+kubebuilder:scaffold:scheme
 }

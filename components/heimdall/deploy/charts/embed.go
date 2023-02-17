@@ -23,13 +23,13 @@ var (
 	//go:embed nasp-webhook nasp-webhook/templates/_helpers.tpl
 	naspWebhookEmbed embed.FS
 
-	// NASPWebhoook exposes the nasp-webhook chart using relative file paths from the chart root
-	NASPWebhoook fs.FS
+	// NASPWebhook exposes the nasp-webhook chart using relative file paths from the chart root
+	NASPWebhook fs.FS
 )
 
 func init() {
 	var err error
-	NASPWebhoook, err = fs.Sub(naspWebhookEmbed, "nasp-webhook")
+	NASPWebhook, err = fs.Sub(naspWebhookEmbed, "nasp-webhook")
 	if err != nil {
 		panic(err)
 	}

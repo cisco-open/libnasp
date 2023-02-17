@@ -23,7 +23,7 @@ import (
 )
 
 func TestEmbed(t *testing.T) {
-	file, err := charts.NASPWebhoook.Open("Chart.yaml")
+	file, err := charts.NASPWebhook.Open("Chart.yaml")
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}

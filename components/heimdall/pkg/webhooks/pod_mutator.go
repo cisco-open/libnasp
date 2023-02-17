@@ -55,8 +55,6 @@ type PodMutatorConfig struct {
 	IstioCAAddress string
 	IstioNetwork   string
 	IstioRevision  string
-
-	istioCAConfigmapName string
 }
 
 func NewPodMutator(config PodMutatorConfig, logger logr.Logger, manager ctrl.Manager) *PodMutator {
@@ -115,7 +113,7 @@ func (m *PodMutator) Handle(ctx context.Context, request admission.Request) admi
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	m.logger.Info("pod mutation successfull", "request", request)
+	m.logger.Info("pod mutation successful", "request", request)
 
 	return admission.PatchResponseFromRaw(request.Object.Raw, marshaledPod)
 }
@@ -145,7 +143,6 @@ func (m *PodMutator) setVolumeMounts(pod *corev1.Pod) {
 
 		pod.Spec.Containers[i] = container
 	}
-
 }
 
 func (m *PodMutator) setVolumes(pod *corev1.Pod, istioCAConfigmap corev1.ConfigMap) {
@@ -188,7 +185,7 @@ func (m *PodMutator) setVolumes(pod *corev1.Pod, istioCAConfigmap corev1.ConfigM
 	}...)
 }
 
-func (m *PodMutator) getPodOwnerAndWorkloadName(pod *corev1.Pod, request admission.Request) (owner string, workload string) {
+func (m *PodMutator) getPodOwnerAndWorkloadName(pod *corev1.Pod, _ admission.Request) (owner string, workload string) {
 	deploy, typeMeta := k8sutil.GetDeployMetaFromPod(pod)
 
 	owner = fmt.Sprintf("kubernetes://apis/%s/namespaces/%s/%ss/%s", typeMeta.APIVersion, deploy.GetNamespace(), strings.ToLower(typeMeta.Kind), deploy.GetName())
@@ -309,12 +306,8 @@ func (m *PodMutator) setEnvs(pod *corev1.Pod, request admission.Request) {
 				Value: strings.Join(containerNames, ","),
 			},
 			{
-				Name: "NASP_INSTANCE_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "status.podIPs",
-					},
-				},
+				Name:  "NASP_INSTANCE_IP",
+				Value: strings.Join(podIPs, ","),
 			},
 			{
 				Name:  "NASP_LABELS",
