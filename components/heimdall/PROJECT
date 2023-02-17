@@ -1,0 +1,6 @@
+domain: nasp.k8s.cisco.com
+layout:
+  - go.kubebuilder.io/v3
+projectName: nasp-webhook
+repo: wwwin-github.cisco.com/eti/nasp-webhook
+version: "3"
