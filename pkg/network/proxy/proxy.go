@@ -43,13 +43,13 @@ func (p *proxy) Start() {
 	wg.Add(2)
 
 	go func() {
-		p.proxy(&wg, p.lconn, p.rconn)
-		p.closeConnections()
+		_ = p.proxy(&wg, p.lconn, p.rconn)
+		_ = p.closeConnections()
 	}()
 
 	go func() {
-		p.proxy(&wg, p.rconn, p.lconn)
-		p.closeConnections()
+		_ = p.proxy(&wg, p.rconn, p.lconn)
+		_ = p.closeConnections()
 	}()
 
 	wg.Wait()
@@ -96,7 +96,7 @@ func (p *proxy) copy(src, dst io.ReadWriter) error {
 		}
 		b := buff[:n]
 
-		n, err = dst.Write(b)
+		_, err = dst.Write(b)
 		if err != nil {
 			return err
 		}
