@@ -76,7 +76,7 @@
                 <configuration>
                     <artifactSet>
                         <includes>
-                            <include>nasp:nasp</include>
+                            <include>nasp:nasp:${nasp.os}</include>
                         </includes>
                     </artifactSet>
                 </configuration>
