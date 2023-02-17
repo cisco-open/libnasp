@@ -67,6 +67,9 @@ public class NaspServerSocket extends ServerSocket {
     public Socket accept() throws IOException {
         try {
             Connection conn = TCPListener.asyncAccept();
+            if (conn == null) {
+                return null;
+            }
             return new NaspSocket(selectorProvider, conn);
         } catch (Exception e) {
             throw new IOException("could not bound to nasp tcp listener");
