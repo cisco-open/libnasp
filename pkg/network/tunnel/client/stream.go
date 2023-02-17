@@ -38,9 +38,9 @@ func NewControlStream(client *client, str *smux.Stream) api.ControlStream {
 		client:        client,
 	}
 
-	cs.AddMessageHandler("addPortResponse", s.addPortResponse)
-	cs.AddMessageHandler("requestConnection", s.requestConnection)
-	cs.AddMessageHandler("ping", s.ping)
+	cs.AddMessageHandler(api.AddPortResponseMessageType, s.addPortResponse)
+	cs.AddMessageHandler(api.RequestConnectionMessageType, s.requestConnection)
+	cs.AddMessageHandler(api.PingMessageType, s.ping)
 
 	return s
 }

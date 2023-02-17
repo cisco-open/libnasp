@@ -48,7 +48,7 @@ func NewControlStream(session *session, str *smux.Stream) api.ControlStream {
 	}
 
 	cs.AddMessageHandler(api.AddPortMessageType, s.addPort)
-	cs.AddMessageHandler("pong", s.pong)
+	cs.AddMessageHandler(api.PongMessageType, s.pong)
 
 	go func() {
 		if err := s.keepalive(session.server.keepaliveTimeout); err != nil {
