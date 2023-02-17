@@ -98,7 +98,7 @@ func NewServer(listenAddress string, options ...ServerOption) (api.Server, error
 }
 
 func (s *server) Start(ctx context.Context) error {
-	s.logger.Info("start server")
+	s.logger.Info("start server", "address", s.listenAddress)
 	defer s.logger.Info("server stopped")
 
 	l, err := net.Listen("tcp", s.listenAddress)
