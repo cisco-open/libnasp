@@ -63,7 +63,7 @@ func (s *ctrlStream) requestConnection(msg []byte) error {
 	}
 
 	var mp *managedPort
-	if v, ok := s.client.managedPorts.Load(req.Port); ok {
+	if v, ok := s.client.managedPorts.Load(req.PortID); ok {
 		if p, ok := v.(*managedPort); ok {
 			mp = p
 		}
@@ -73,15 +73,15 @@ func (s *ctrlStream) requestConnection(msg []byte) error {
 		return errors.WithStackIf(api.ErrInvalidPort)
 	}
 
-	conn, err := s.client.session.OpenTCPStream(req.Port, req.Identifier)
+	conn, err := s.client.session.OpenTCPStream(req.Identifier)
 	if err != nil {
-		return errors.WrapIfWithDetails(err, "could not open tcp stream", "port", req.Port, "id", req.Identifier)
+		return errors.WrapIfWithDetails(err, "could not open tcp stream", "portID", req.PortID, "id", req.Identifier)
 	}
 
 	if conn, err := newconn(conn, "tcp", req.LocalAddress, req.RemoteAddress); err != nil {
 		return errors.WrapIf(err, "could not create wrapped connection")
 	} else {
-		s.client.logger.V(3).Info("put stream into the connection channel", "port", mp.port, "remoteAddress", conn.RemoteAddr())
+		s.client.logger.V(3).Info("put stream into the connection channel", "portID", mp.id, "requestedPort", mp.requestedPort, "remoteAddress", conn.RemoteAddr())
 
 		mp.connChan <- conn
 	}
@@ -95,12 +95,20 @@ func (s *ctrlStream) addPortResponse(msg []byte) error {
 		return errors.WrapIf(err, "could not unmarshal addPortResponse message")
 	}
 
-	if v, ok := s.client.managedPorts.Load(resp.Port); ok {
+	if v, ok := s.client.managedPorts.Load(resp.ID); ok {
 		if mp, ok := v.(*managedPort); ok {
+			if resp.AssignedPort == 0 {
+				_ = mp.Close()
+
+				s.client.managedPorts.Delete(resp.ID)
+
+				return errors.NewWithDetails("could not assign port", "portID", resp.ID)
+			}
+
 			mp.remoteAddress = resp.Address
 			mp.initialized = true
 
-			s.client.logger.V(2).Info("port added", "port", resp.Port, "remoteAddress", resp.Address)
+			s.client.logger.V(2).Info("port added", "portID", resp.ID, "remoteAddress", resp.Address)
 
 			return nil
 		}

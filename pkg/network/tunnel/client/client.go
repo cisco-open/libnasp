@@ -100,10 +100,10 @@ func NewClient(serverAddress string, options ...ClientOption) api.Client {
 	return c
 }
 
-func (c *client) AddTCPPort(port int) (net.Listener, error) {
-	c.logger.V(2).Info("add port", "port", port)
+func (c *client) AddTCPPort(id string, requestedPort int) (net.Listener, error) {
+	c.logger.V(2).Info("add port", "id", id, "requestedPort", requestedPort)
 
-	return c.addOrGetManagedPort(port)
+	return c.addOrGetManagedPort(id, requestedPort)
 }
 
 func (c *client) Connect(ctx context.Context) error {
@@ -141,28 +141,29 @@ func (c *client) connect(ctx context.Context) error {
 	return errors.WithStackIf(api.ErrConnectionClosed)
 }
 
-func (c *client) sendAddPortMessage(port int) error {
+func (c *client) sendAddPortMessage(id string, requestedPort int) error {
 	_, _, err := api.SendMessage(c.session.GetControlStream(), api.AddPortMessageType, &api.AddPortRequestMessage{
-		Type: "tcp",
-		Port: port,
+		Type:          "tcp",
+		ID:            id,
+		RequestedPort: requestedPort,
 	})
 
 	return errors.WrapIfWithDetails(err, "could not send message", "type", api.AddPortMessageType)
 }
 
-func (c *client) addOrGetManagedPort(port int) (net.Listener, error) {
+func (c *client) addOrGetManagedPort(id string, requestedPort int) (net.Listener, error) {
 	var mp *managedPort
 
-	v, _ := c.managedPorts.Load(port)
+	v, _ := c.managedPorts.Load(id)
 	if p, ok := v.(*managedPort); ok {
 		mp = p
 	}
 	if mp == nil {
-		mp = NewManagedPort(port)
-		c.managedPorts.Store(port, mp)
+		mp = NewManagedPort(id, requestedPort)
+		c.managedPorts.Store(id, mp)
 
 		if c.connected {
-			if err := c.sendAddPortMessage(port); err != nil {
+			if err := c.sendAddPortMessage(id, requestedPort); err != nil {
 				return nil, err
 			}
 		}
@@ -183,7 +184,7 @@ func (c *client) onControlStreamConnected() {
 	c.managedPorts.Range(func(key any, value any) bool {
 		if mp, ok := value.(*managedPort); ok {
 			if !mp.initialized {
-				if err := c.sendAddPortMessage(mp.port); err != nil {
+				if err := c.sendAddPortMessage(mp.id, mp.requestedPort); err != nil {
 					c.logger.Error(err, "")
 				}
 			}

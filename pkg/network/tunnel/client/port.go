@@ -16,12 +16,15 @@ package client
 
 import (
 	"net"
+
+	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 )
 
 var _ net.Listener = &managedPort{}
 
 type managedPort struct {
-	port          int
+	id            string
+	requestedPort int
 	remoteAddress string
 
 	connChan chan net.Conn
@@ -29,16 +32,25 @@ type managedPort struct {
 	initialized bool
 }
 
-func NewManagedPort(port int) *managedPort {
+func NewManagedPort(id string, requestedPort int) *managedPort {
 	return &managedPort{
-		port: port,
+		id:            id,
+		requestedPort: requestedPort,
 
 		connChan: make(chan net.Conn, 1),
 	}
 }
 
 func (p *managedPort) Accept() (net.Conn, error) {
-	conn := <-p.connChan
+	conn, open := <-p.connChan
+
+	if !open {
+		return nil, api.ErrListenerStopped
+	}
+
+	if conn == nil {
+		return nil, api.ErrInvalidConnection
+	}
 
 	return conn, nil
 }
@@ -57,6 +69,6 @@ func (p *managedPort) Addr() net.Addr {
 	}
 
 	return &net.TCPAddr{
-		Port: p.port,
+		Port: p.requestedPort,
 	}
 }

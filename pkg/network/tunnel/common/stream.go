@@ -60,7 +60,7 @@ func (s *ctrlStream) Handle() error {
 		}
 
 		if err := s.handleMessage(msg); err != nil {
-			s.logger.Error(err, "error during message handling", "type", msg.Type)
+			s.logger.Error(err, "error during message handling", append([]interface{}{"type", msg.Type}, errors.GetDetails(err)...)...)
 		}
 	}
 }

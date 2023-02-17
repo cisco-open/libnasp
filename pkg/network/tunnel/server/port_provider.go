@@ -18,6 +18,8 @@ import (
 	"sync"
 
 	"emperror.dev/errors"
+
+	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 )
 
 var ErrInvalidPortRange = errors.New("invalid port range")
@@ -30,12 +32,7 @@ type portProvider struct {
 	mu sync.Mutex
 }
 
-type PortProvider interface {
-	GetFreePort() int
-	ReleasePort(int)
-}
-
-func NewPortProvider(portMin, portMax int) (PortProvider, error) {
+func NewPortProvider(portMin, portMax int) (api.PortProvider, error) {
 	if portMin > portMax {
 		return nil, errors.WithStackIf(ErrInvalidPortRange)
 	}
@@ -60,6 +57,23 @@ func (p *portProvider) GetFreePort() int {
 	}
 
 	return 0
+}
+
+func (p *portProvider) GetPort(port int) bool {
+	if port < p.portMin || port > p.portMax {
+		return false
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if _, ok := p.ports[port]; ok {
+		return false
+	}
+
+	p.ports[port] = true
+
+	return true
 }
 
 func (p *portProvider) ReleasePort(port int) {

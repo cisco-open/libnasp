@@ -25,19 +25,19 @@ import (
 type port struct {
 	session *session
 
-	targetPort  int
-	servicePort int
+	id           string
+	assignedPort int
 
 	ctx  context.Context
 	ctxc context.CancelFunc
 }
 
-func NewPort(session *session, servicePort, targetPort int) *port {
+func NewPort(session *session, id string, assignedPort int) *port {
 	port := &port{
 		session: session,
 
-		servicePort: servicePort,
-		targetPort:  targetPort,
+		id:           id,
+		assignedPort: assignedPort,
 	}
 
 	port.ctx, port.ctxc = context.WithCancel(context.Background())
@@ -52,7 +52,7 @@ func (p *port) Close() error {
 }
 
 func (p *port) Listen() error {
-	address := fmt.Sprintf(":%d", p.servicePort)
+	address := fmt.Sprintf(":%d", p.assignedPort)
 
 	l, err := net.Listen("tcp", address)
 	if err != nil {
@@ -88,7 +88,7 @@ func (p *port) Listen() error {
 				continue
 			}
 
-			if err := p.session.RequestConn(p.targetPort, c); err != nil {
+			if err := p.session.RequestConn(p.id, c); err != nil {
 				p.session.server.logger.Error(err, "could not request connection")
 				c.Close()
 			}
