@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"strconv"
 
@@ -332,7 +333,9 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 				}
 				continue
 			}
+			c.readLock.Lock()
 			_, err = c.readBuffer.Write(tempBuffer[:num])
+			c.readLock.Unlock()
 			if err != nil {
 				logger.Error(err, "couldn't write data to read buffer", logCtx...)
 			}
@@ -344,10 +347,10 @@ func (c *Connection) AsyncRead(b []byte) (int32, error) {
 	if c.readEOFReceived() {
 		return -1, nil
 	}
-
-	// c.readLock.Lock()
-	// defer c.readLock.Unlock()
-	n, err := c.readBuffer.Read(b)
+	c.readLock.Lock()
+	defer c.readLock.Unlock()
+	max := int(math.Min(float64(c.readBuffer.Len()), float64(len(b))))
+	n, err := c.readBuffer.Read(b[:max])
 	return int32(n), err
 }
 
