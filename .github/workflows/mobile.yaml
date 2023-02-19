@@ -1,7 +1,9 @@
 name: Mobile and Java build
 
-on:
-  pull_request:
+on: 
+  push:
+    # only trigger on branches, not on tags
+    branches: '**'
 
 env:
   GO_VERSION: 1.19
