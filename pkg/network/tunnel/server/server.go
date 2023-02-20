@@ -39,12 +39,15 @@ type server struct {
 	sessions     sync.Map
 	portProvider api.PortProvider
 
-	logger           logr.Logger
-	sessionTimeout   time.Duration
-	keepaliveTimeout time.Duration
+	logger              logr.Logger
+	sessionTimeout      time.Duration
+	keepaliveTimeout    time.Duration
+	listenerWrapperFunc ListenerWrapperFunc
 }
 
 type ServerOption func(*server)
+
+type ListenerWrapperFunc func(l net.Listener) (net.Listener, error)
 
 func ServerWithLogger(logger logr.Logger) ServerOption {
 	return func(s *server) {
@@ -70,12 +73,21 @@ func ServerWithKeepaliveTimeout(timeout time.Duration) ServerOption {
 	}
 }
 
+func ServerWithListenerWrapperFunc(listenerWrapperFunc ListenerWrapperFunc) ServerOption {
+	return func(srv *server) {
+		srv.listenerWrapperFunc = listenerWrapperFunc
+	}
+}
+
 func NewServer(listenAddress string, options ...ServerOption) (api.Server, error) {
 	s := &server{
 		listenAddress:    listenAddress,
 		sessions:         sync.Map{},
 		sessionTimeout:   defaultSessionTimeout,
 		keepaliveTimeout: defaultKeepaliveTimeout,
+		listenerWrapperFunc: func(l net.Listener) (net.Listener, error) {
+			return l, nil
+		},
 	}
 
 	for _, option := range options {
@@ -104,6 +116,11 @@ func (s *server) Start(ctx context.Context) error {
 	l, err := net.Listen("tcp", s.listenAddress)
 	if err != nil {
 		return errors.WrapIf(err, "could not listen")
+	}
+
+	l, err = s.listenerWrapperFunc(l)
+	if err != nil {
+		return errors.WrapIf(err, "could not wrap listener")
 	}
 
 	for {

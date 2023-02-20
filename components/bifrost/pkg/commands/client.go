@@ -16,17 +16,20 @@ package commands
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"regexp"
 	"strconv"
 	"sync"
+	"time"
 
+	"emperror.dev/errors"
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
+	"github.com/cisco-open/nasp/pkg/istio"
+	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
 	"github.com/cisco-open/nasp/pkg/network/proxy"
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 	"github.com/cisco-open/nasp/pkg/network/tunnel/client"
@@ -39,6 +42,7 @@ var addrRegex = regexp.MustCompile(`^((\d+):)?(.*):(\d+)$`)
 func NewClientCommand() *cobra.Command {
 	var serverAddress string
 	localAddresses := []string{}
+	var naspSupportEnabled bool
 
 	logger := klog.Background()
 
@@ -52,7 +56,28 @@ func NewClientCommand() *cobra.Command {
 			if len(localAddresses) == 0 {
 				return ErrLocalAddressNotSpecified
 			}
-			c := client.NewClient(serverAddress, client.ClientWithLogger(logger))
+
+			options := []client.ClientOption{client.ClientWithLogger(logger)}
+
+			var dialer itcp.Dialer
+			dialer = &net.Dialer{
+				Timeout: time.Second * 5,
+			}
+
+			if naspSupportEnabled {
+				istioConfig := istio.DefaultIstioIntegrationHandlerConfig
+				ih, err := istio.NewIstioIntegrationHandler(&istioConfig, logger)
+				if err != nil {
+					return errors.WrapIf(err, "could not instantiate NASP istio integration handler")
+				}
+				dialer, err = ih.GetTCPDialer()
+				if err != nil {
+					return errors.WrapIf(err, "could not get NASP tcp dialer")
+				}
+				options = append(options, client.ClientWithDialer(dialer))
+			}
+
+			c := client.NewClient(serverAddress, options...)
 			go func() {
 				if err := c.Connect(context.Background()); err != nil {
 					panic(err)
@@ -108,6 +133,7 @@ func NewClientCommand() *cobra.Command {
 
 	cmd.Flags().StringVarP(&serverAddress, "server-address", "s", "127.0.0.1:8001", "Server address")
 	cmd.Flags().StringSliceVarP(&localAddresses, "local-address", "l", []string{}, "Local address to expose")
+	cmd.Flags().BoolVar(&naspSupportEnabled, "with-nasp-support", false, "Enables NASP support")
 
 	return cmd
 }

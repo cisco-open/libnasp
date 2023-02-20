@@ -19,21 +19,40 @@ import (
 	"net"
 	"net/http"
 
+	"emperror.dev/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
+	"github.com/cisco-open/nasp/pkg/istio"
 	"github.com/cisco-open/nasp/pkg/network/tunnel/server"
 )
 
 func NewServerCommand() *cobra.Command {
 	var serverAddress string
 	var healthcheckAddress string
+	var naspSupportEnabled bool
+
+	logger := klog.Background()
 
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "tcp tunneling server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			srv, err := server.NewServer(serverAddress, server.ServerWithLogger(klog.Background()))
+			cmd.SilenceErrors = true
+			cmd.SilenceUsage = true
+
+			options := []server.ServerOption{server.ServerWithLogger(logger)}
+
+			if naspSupportEnabled {
+				istioConfig := istio.DefaultIstioIntegrationHandlerConfig
+				ih, err := istio.NewIstioIntegrationHandler(&istioConfig, logger)
+				if err != nil {
+					return errors.WrapIf(err, "could not instantiate NASP istio integration handler")
+				}
+				options = append(options, server.ServerWithListenerWrapperFunc(ih.GetTCPListener))
+			}
+
+			srv, err := server.NewServer(serverAddress, options...)
 			if err != nil {
 				return err
 			}
@@ -51,6 +70,7 @@ func NewServerCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(&serverAddress, "server-address", "0.0.0.0:8001", "Control server address.")
 	cmd.Flags().StringVar(&healthcheckAddress, "healthcheck-address", "0.0.0.0:8002", "HTTP healthcheck address.")
+	cmd.Flags().BoolVar(&naspSupportEnabled, "with-nasp-support", false, "Enables NASP support")
 
 	return cmd
 }
