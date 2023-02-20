@@ -118,6 +118,7 @@ func (c *client) Connect(ctx context.Context) error {
 }
 
 func (c *client) connect(ctx context.Context) error {
+	c.logger.V(2).Info("connecting to server", "server", c.serverAddress)
 	conn, err := c.dialer.DialContext(ctx, "tcp", c.serverAddress)
 	if err != nil {
 		return err
@@ -175,11 +176,11 @@ func (c *client) addOrGetManagedPort(id string, requestedPort int) (net.Listener
 func (c *client) onConnected() {
 	c.connected = true
 
-	c.logger.V(2).Info("client connected")
+	c.logger.V(2).Info("client connected", "server", c.serverAddress)
 }
 
 func (c *client) onControlStreamConnected() {
-	c.logger.V(2).Info("control stream connected")
+	c.logger.V(2).Info("control stream connected", "server", c.serverAddress)
 
 	c.managedPorts.Range(func(key any, value any) bool {
 		if mp, ok := value.(*managedPort); ok {
@@ -205,5 +206,5 @@ func (c *client) onDisconnected() {
 		return true
 	})
 
-	c.logger.V(2).Info("client disconnected")
+	c.logger.V(2).Info("client disconnected", "server", c.serverAddress)
 }
