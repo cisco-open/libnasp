@@ -74,8 +74,9 @@ func NewClientCommand() *cobra.Command {
 				if err != nil {
 					return errors.WrapIf(err, "could not get NASP tcp dialer")
 				}
-				options = append(options, client.ClientWithDialer(dialer))
 			}
+
+			options = append(options, client.ClientWithDialer(dialer))
 
 			c := client.NewClient(serverAddress, options...)
 			go func() {
