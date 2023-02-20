@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -55,6 +56,8 @@ var DefaultIstioIntegrationHandlerConfig = IstioIntegrationHandlerConfig{
 	MetricsPath:    "/stats/prometheus",
 	MetricsAddress: ":15090",
 	UseTLS:         true,
+
+	IstioCAConfigGetter: IstioCAConfigGetterAuto,
 }
 
 type IstioCAConfigGetterFunc func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error)
@@ -82,6 +85,27 @@ var (
 
 			return c.CAClientConfig, nil
 		}
+	}
+	IstioCAConfigGetterAuto = func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
+		fe := func(filename string) bool {
+			info, err := os.Stat(filename)
+			if os.IsNotExist(err) {
+				return false
+			}
+			return !info.IsDir()
+		}
+
+		if fe(istio_ca.K8sSATrustworthyJWTFileName) {
+			return IstioCAConfigGetterLocal(e)
+		}
+
+		if heimdallURL := os.Getenv("NASP_HEIMDALL_URL"); heimdallURL != "" {
+			c := IstioCAConfigGetterHeimdall(heimdallURL, os.Getenv("NASP_HEIMDALL_CLIENT_ID"), os.Getenv("NASP_HEIMDALL_CLIENT_SECRET"), os.Getenv("NASP_HEIMDALL_APP_VERSION"))
+
+			return c(e)
+		}
+
+		return IstioCAConfigGetterRemote(e)
 	}
 )
 
