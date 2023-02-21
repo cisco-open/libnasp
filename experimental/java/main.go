@@ -67,12 +67,11 @@ type NaspIntegrationHandler struct {
 }
 
 type Connection struct {
+	id           string
 	conn         net.Conn
 	readBuffer   *bytes.Buffer
 	readLock     sync.Mutex
 	writeChannel chan []byte
-	ctx          context.Context
-	cancel       context.CancelFunc
 
 	terminated atomic.Bool
 
@@ -237,13 +236,11 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(context.WithValue(context.Background(), "id", uuid.New()))
 	return &Connection{
 		conn:         c,
 		readBuffer:   new(bytes.Buffer),
 		writeChannel: make(chan []byte, MAX_WRITE_BUFFERS),
-		ctx:          ctx,
-		cancel:       cancel,
+		id:           uuid.New(),
 	}, nil
 }
 
@@ -308,7 +305,7 @@ func (c *Connection) GetRemoteAddress() (*Address, error) {
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	logCtx := []interface{}{
 		"selected key id", selectedKeyId,
-		"id", c.ctx.Value("id"),
+		"id", c.id,
 	}
 	logger := logger.WithName("StartAsyncRead")
 	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
@@ -339,7 +336,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			selector.queue <- SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
 		}
 
-		logger.Info("StartAsyncRead finished", "id", c.ctx.Value("id"), "selected key id", selectedKeyId)
+		logger.Info("StartAsyncRead finished", "id", c.id, "selected key id", selectedKeyId)
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
@@ -369,35 +366,29 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 
 	go func() {
 	out:
-		for {
-			select {
-			case buff := <-c.writeChannel:
-				for {
-					num, err := c.Write(buff)
-					if err != nil {
-						if c.isTerminated() {
-							break out
-						}
-						if errors.Is(err, io.EOF) {
-							c.setEofReceived()
-							break out
-						}
-						logger.Error(err, "received error while writing data to connection", logCtx...)
-						continue
+		for buff := range c.writeChannel {
+			for {
+				num, err := c.Write(buff)
+				if err != nil {
+					if c.isTerminated() {
+						break out
 					}
-					if len(buff) == num {
-						break
-					} else {
-						buff = buff[num:]
+					if errors.Is(err, io.EOF) {
+						c.setEofReceived()
+						break out
 					}
+					logger.Error(err, "received error while writing data to connection", logCtx...)
+					continue
 				}
-			case <-c.ctx.Done():
-				logger.Info("CANCEL CONTEXT RECEIVED", "id", c.ctx.Value("id"), "selected key id", selectedKeyId)
-				selector.unregisterWriter(selectedKeyId)
-				return
+				if len(buff) == num {
+					break
+				} else {
+					buff = buff[num:]
+				}
 			}
 		}
-		logger.Info("StartAsyncWrite finished", "id", c.ctx.Value("id"), "selected key id", selectedKeyId)
+		selector.unregisterWriter(selectedKeyId)
+		logger.Info("StartAsyncWrite finished", "id", c.id, "selected key id", selectedKeyId)
 	}()
 }
 
@@ -412,7 +403,9 @@ func (c *Connection) eofReceived() bool {
 }
 
 func (c *Connection) setEofReceived() {
-	c.EOF.Store(true)
+	if c.EOF.CompareAndSwap(false, true) {
+		close(c.writeChannel)
+	}
 }
 
 func (c *Connection) Close() {
@@ -420,8 +413,11 @@ func (c *Connection) Close() {
 		return // connection already closed
 	}
 
-	logger.Info("CLOSING CONNECTION", "id", c.ctx.Value("id"))
-	c.cancel()
+	if !c.eofReceived() {
+		close(c.writeChannel)
+	}
+
+	logger.Info("CLOSING CONNECTION", "id", c.id)
 	err := c.conn.Close()
 	if err != nil {
 		logger.Error(err, "couldn't close connection")
@@ -526,18 +522,15 @@ func (d *TCPDialer) AsyncDial() *Connection {
 }
 
 func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
-	backgroundCtx := context.WithValue(context.Background(), "id", uuid.New())
-	c, err := d.dialer.DialContext(backgroundCtx, "tcp", fmt.Sprintf("%s:%d", address, port))
+	c, err := d.dialer.DialContext(context.Background(), "tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(backgroundCtx)
 	return &Connection{
 		conn:         c,
 		readBuffer:   new(bytes.Buffer),
 		writeChannel: make(chan []byte, MAX_WRITE_BUFFERS),
-		ctx:          ctx,
-		cancel:       cancel,
+		id:           uuid.New(),
 	}, nil
 }
 
