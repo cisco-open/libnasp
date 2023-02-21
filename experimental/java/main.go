@@ -76,9 +76,7 @@ type Connection struct {
 
 	terminated atomic.Bool
 
-	readEOF atomic.Bool
-
-	writeEOF atomic.Bool
+	EOF atomic.Bool
 }
 
 type Address struct {
@@ -319,7 +317,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
 				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
-					c.setEofOnRead()
+					c.setEofReceived()
 					break
 				}
 				logger.Error(err, "reading data from connection failed", logCtx...)
@@ -339,10 +337,12 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			}
 			selector.queue <- SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
 		}
+
+		logger.Info("StartAsyncRead finished", "id", c.ctx.Value("id"), "selected key id", selectedKeyId)
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
-	if c.readEOFReceived() {
+	if c.eofReceived() {
 		return -1, nil
 	}
 	c.readLock.Lock()
@@ -367,6 +367,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	})
 
 	go func() {
+	out:
 		for {
 			select {
 			case buff := <-c.writeChannel:
@@ -374,11 +375,11 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 					num, err := c.Write(buff)
 					if err != nil {
 						if c.isTerminated() {
-							break
+							break out
 						}
 						if errors.Is(err, io.EOF) {
-							c.setEofOnWrite()
-							break
+							c.setEofReceived()
+							break out
 						}
 						logger.Error(err, "received error while writing data to connection", logCtx...)
 						continue
@@ -395,6 +396,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				return
 			}
 		}
+		logger.Info("StartAsyncWrite finished", "id", c.ctx.Value("id"), "selected key id", selectedKeyId)
 	}()
 }
 
@@ -403,22 +405,13 @@ func (c *Connection) isTerminated() bool {
 	return c.terminated.Load()
 }
 
-// writeEOFReceived returns true if EOF was received while writing data to connection
-func (c *Connection) writeEOFReceived() bool {
-	return c.writeEOF.Load()
+// eofReceived returns true if EOF was received while writing/reading data to/from connection
+func (c *Connection) eofReceived() bool {
+	return c.EOF.Load()
 }
 
-func (c *Connection) setEofOnWrite() {
-	c.writeEOF.Store(true)
-}
-
-// readEOFReceived returns true if EOF was received while reading data from connection
-func (c *Connection) readEOFReceived() bool {
-	return c.readEOF.Load()
-}
-
-func (c *Connection) setEofOnRead() {
-	c.readEOF.Store(true)
+func (c *Connection) setEofReceived() {
+	c.EOF.Store(true)
 }
 
 func (c *Connection) Close() {
@@ -435,7 +428,7 @@ func (c *Connection) Close() {
 }
 
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
-	if c.writeEOFReceived() {
+	if c.eofReceived() {
 		return -1, nil
 	}
 
