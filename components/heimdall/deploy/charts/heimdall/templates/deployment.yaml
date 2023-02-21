@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "heimdall.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "heimdall.labels" . | nindent 4 }}
 spec:
@@ -33,6 +34,8 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /app
           ports:
             - name: http
               containerPort: 8080
@@ -58,6 +61,42 @@ spec:
               value: "{{ .Values.istio.version }}"
             - name: NASP_ISTIO_REVISION
               value: "{{ .Values.istio.revision }}"
+        - name: webhook
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /manager
+          args:
+            - "--webhook-name={{ include "heimdall-webhook-controller.fullname" . }}"
+            - "--webhook-port={{ .Values.webhook.port }}"
+            - "--istio-ca-address={{ .Values.istio.caAddress | required ".Values.istio.caAddress is required." }}"
+            - "--istio-version={{ .Values.istio.version | required ".Values.istio.version is required." }}"
+            - "--istio-mesh-id={{ .Values.istio.meshID | required ".Values.istio.meshID is required." }}"
+            - "--istio-network={{ .Values.istio.network | required ".Values.istio.network is required." }}"
+            - "--istio-revision={{ .Values.istio.revision | required ".Values.istio.revision is required." }}"
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            - name: healthz
+              containerPort: {{ .Values.healthz.port }}
+              protocol: TCP
+            - containerPort: {{ .Values.webhook.port }}
+              name: http-webhook
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: healthz
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

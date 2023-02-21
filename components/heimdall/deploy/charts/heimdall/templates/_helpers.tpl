@@ -60,3 +60,27 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "heimdall-webhook-controller.fullname" -}}
+{{ include "heimdall.fullname" . }}-controller
+{{- end }}
+
+{{- define "heimdall-webhook-controller.name" -}}
+{{ include "heimdall.name" . }}-controller
+{{- end }}
+
+{{- define "heimdall-webhook-controller.labels" }}
+app: {{ include "heimdall-webhook-controller.fullname" . }}
+app.kubernetes.io/name: {{ include "heimdall-webhook-controller.name" . }}
+helm.sh/chart: {{ include "heimdall.chart" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | replace "+" "_" }}
+app.kubernetes.io/component: heimdall-webhook-controller
+app.kubernetes.io/part-of: {{ include "heimdall.name" . }}
+{{- end }}
+
+{{- define "heimdall-webhook-controller.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "heimdall-webhook-controller.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

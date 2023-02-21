@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "nasp-webhook-controller.fullname" . }}
+  name: {{ include "heimdall.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "nasp-webhook-controller.labels" . | nindent 4 }}
+    {{- include "heimdall.labels" . | nindent 4 }}
   {{- with .Values.serviceAccount.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -13,9 +13,9 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "nasp-webhook-controller.fullname" . }}
+  name: {{ include "heimdall.fullname" . }}
   labels:
-    {{- include "nasp-webhook-controller.labels" . | nindent 4 }}
+    {{- include "heimdall.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - coordination.k8s.io
@@ -69,14 +69,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "nasp-webhook-controller.fullname" . }}
+  name: {{ include "heimdall.fullname" . }}
   labels:
-    {{- include "nasp-webhook-controller.labels" . | nindent 4 }}
+    {{- include "heimdall.labels" . | nindent 4 }}
 roleRef:
   kind: ClusterRole
-  name: {{ include "nasp-webhook-controller.fullname" . }}
+  name: {{ include "heimdall.fullname" . }}
   apiGroup: rbac.authorization.k8s.io
 subjects:
 - kind: ServiceAccount
-  name: {{ include "nasp-webhook-controller.fullname" . }}
+  name: {{ include "heimdall.fullname" . }}
   namespace: {{ .Release.Namespace }}

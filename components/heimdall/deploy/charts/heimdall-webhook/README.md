@@ -1,1 +1,0 @@
-# NASP webhook chart

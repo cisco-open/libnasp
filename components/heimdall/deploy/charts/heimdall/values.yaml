@@ -21,10 +21,13 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
+podSecurityContext:
+  runAsUser: 65534
+  runAsGroup: 65534
   # fsGroup: 2000
 
-securityContext: {}
+securityContext:
+  allowPrivilegeEscalation: false
   # capabilities:
   #   drop:
   #   - ALL
@@ -32,9 +35,18 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+podDisruptionBudget:
+  enabled: false
+
 service:
   type: ClusterIP
   port: 8080
+
+metrics:
+  port: 8080
+
+healthz:
+  port: 8081
 
 ingress:
   enabled: false
@@ -52,17 +64,13 @@ ingress:
   #    hosts:
   #      - chart-example.local
 
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
+resources:
+  requests:
+    memory: "100Mi"
+    cpu: "100m"
+  limits:
+    memory: "200Mi"
+    cpu: "300m"
 
 autoscaling:
   enabled: false
@@ -86,6 +94,18 @@ istio:
   version: "1.15.2"
   revision: cp-v115x.istio-system
   clusterId: kind-kind
+  meshID: "mesh1"
+  network: "network1"
+  caAddress: "istiod-cp-v115x.istio-system.svc:15012"
   meshGateway:
     enabled: false
     # nodePort: "16443"
+
+
+controller:
+  leaderElection:
+    enabled: true
+    name: "heimdall-webhook-leader-election"
+
+webhook:
+  port: 9443

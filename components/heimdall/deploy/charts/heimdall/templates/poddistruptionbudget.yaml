@@ -2,13 +2,13 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "nasp-webhook-controller.fullname" . }}
+  name: {{ include "heimdall.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "nasp-webhook-controller.labels" . | nindent 4 }}
+    {{- include "heimdall.labels" . | nindent 4 }}
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      {{- include "nasp-webhook-controller.selectorLabels" . | nindent 6 }}
+      {{- include "heimdall.selectorLabels" . | nindent 6 }}
 {{- end }}
