@@ -20,16 +20,27 @@ import (
 )
 
 var (
-	//go:embed nasp-webhook nasp-webhook/templates/_helpers.tpl
-	naspWebhookEmbed embed.FS
+	//go:embed heimdall-webhook heimdall-webhook/templates/_helpers.tpl
+	heimdallWebhookEmbed embed.FS
 
-	// NASPWebhook exposes the nasp-webhook chart using relative file paths from the chart root
-	NASPWebhook fs.FS
+	// HeimdallWebhook exposes the heimdall-webhook chart using relative file paths from the chart root
+	HeimdallWebhook fs.FS
+
+	//go:embed heimdall heimdall/templates/_helpers.tpl
+	heimdallEmbed embed.FS
+
+	// Heimdall exposes the heimdall chart using relative file paths from the chart root
+	Heimdall fs.FS
 )
 
 func init() {
 	var err error
-	NASPWebhook, err = fs.Sub(naspWebhookEmbed, "nasp-webhook")
+	HeimdallWebhook, err = fs.Sub(heimdallWebhookEmbed, "heimdall-webhook")
+	if err != nil {
+		panic(err)
+	}
+
+	Heimdall, err = fs.Sub(heimdallEmbed, "heimdall")
 	if err != nil {
 		panic(err)
 	}

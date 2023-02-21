@@ -107,7 +107,7 @@ require (
 
 replace (
 	github.com/banzaicloud/operator-tools => github.com/banzaicloud/operator-tools v0.28.8
-	github.com/cisco-open/nasp => ../..
+	github.com/cisco-open/nasp => ../../..
 	github.com/spf13/cobra => github.com/spf13/cobra v1.6.0
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.12.2
 )

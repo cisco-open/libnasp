@@ -45,7 +45,7 @@ fi
 
 log "setup and update helm repositories"
 helm repo add metallb https://metallb.github.io/metallb
-helm repo add banzaicloud-stable https://kubernetes-charts.banzaicloud.com
+#helm repo add banzaicloud-stable https://kubernetes-charts.banzaicloud.com
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 
