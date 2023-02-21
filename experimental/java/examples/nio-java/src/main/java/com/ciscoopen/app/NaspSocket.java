@@ -25,11 +25,21 @@ public class NaspSocket extends Socket {
     @Override
     public int getPort() {
         try {
+            return conn.getRemoteAddress().getPort();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    @Override
+    public int getLocalPort() {
+        try {
             return conn.getAddress().getPort();
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return 0;
+        return -1;
     }
 
     @Override
