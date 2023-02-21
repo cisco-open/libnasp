@@ -434,9 +434,7 @@ func (c *Connection) Close() {
 		return // connection already closed
 	}
 
-	if !c.eofReceived() {
-		close(c.writeChannel)
-	}
+	c.setEofReceived()
 
 	logger.Info("CLOSING CONNECTION", "id", c.id)
 	err := c.conn.Close()
