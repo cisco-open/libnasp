@@ -92,13 +92,13 @@ type SelectedKey struct {
 }
 
 type Selector struct {
-	queue        chan *SelectedKey
-	selected     []*SelectedKey
+	queue        chan SelectedKey
+	selected     map[SelectedKey]struct{}
 	writableKeys sync.Map
 }
 
 func NewSelector() *Selector {
-	return &Selector{queue: make(chan *SelectedKey, 64)}
+	return &Selector{queue: make(chan SelectedKey, 64), selected: map[SelectedKey]struct{}{}}
 }
 
 func (s *Selector) Close() {
@@ -118,7 +118,7 @@ func (s *Selector) Select(timeoutMs int64) int {
 	s.writableKeys.Range(func(key, value any) bool {
 		check := value.(func() bool)
 		if check() {
-			selectedKey := &SelectedKey{
+			selectedKey := SelectedKey{
 				SelectedKeyId: key.(int32),
 				Operation:     OP_WRITE,
 			}
@@ -140,12 +140,12 @@ func (s *Selector) Select(timeoutMs int64) int {
 			return 0
 		}
 
-		s.selected = append(s.selected, c)
+		s.selected[c] = struct{}{}
 
 		l := len(s.queue)
 
 		for i := 0; i < l; i++ {
-			s.selected = append(s.selected, <-s.queue)
+			s.selected[<-s.queue] = struct{}{}
 		}
 
 		return l + 1
@@ -163,14 +163,13 @@ func (s *Selector) unregisterWriter(selectedKeyId int32) {
 }
 
 func (s *Selector) WakeUp() {
-	s.queue <- &SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: -1}
+	s.queue <- SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: -1}
 }
 
 func (s *Selector) NextSelectedKey() *SelectedKey {
-	if len(s.selected) != 0 {
-		selected := s.selected[0]
-		s.selected = s.selected[1:]
-		return selected
+	for k := range s.selected {
+		delete(s.selected, k)
+		return &k
 	}
 	return nil
 }
@@ -265,7 +264,7 @@ func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) 
 			l.asyncConnections = append(l.asyncConnections, conn)
 			l.asyncConnectionsLock.Unlock()
 
-			selector.queue <- &SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: selectedKeyId}
+			selector.queue <- SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: selectedKeyId}
 		}
 	}()
 }
@@ -338,7 +337,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if n != num {
 				logger.Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
 			}
-			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
+			selector.queue <- SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
 		}
 	}()
 }
@@ -515,7 +514,7 @@ func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, addr
 		d.asyncConnections = append(d.asyncConnections, conn)
 		d.asyncConnectionsLock.Unlock()
 
-		selector.queue <- &SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
+		selector.queue <- SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
 	}()
 }
 
