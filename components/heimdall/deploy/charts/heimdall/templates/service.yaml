@@ -11,5 +11,17 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: {{ .Values.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: http-metrics
+    - port: {{ .Values.healthz.port }}
+      targetPort: healthz
+      protocol: TCP
+      name: http-healthz
+    - port: 443
+      targetPort: http-webhook
+      protocol: TCP
+      name: http-webhook
   selector:
     {{- include "heimdall.selectorLabels" . | nindent 4 }}

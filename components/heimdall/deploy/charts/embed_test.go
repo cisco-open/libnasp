@@ -22,7 +22,7 @@ import (
 )
 
 func TestEmbed(t *testing.T) {
-	file, err := charts.HeimdallWebhook.Open("Chart.yaml")
+	file, err := charts.Heimdall.Open("Chart.yaml")
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}
@@ -32,26 +32,7 @@ func TestEmbed(t *testing.T) {
 		t.Fatalf("%+v", err)
 	}
 
-	localContent, err := os.ReadFile("heimdall-webhook/Chart.yaml")
-	if err != nil {
-		t.Fatalf("%+v", err)
-	}
-
-	if string(embeddedContent) != string(localContent) {
-		t.Fatalf("embedded content %s does not equal local content %s", string(embeddedContent), string(localContent))
-	}
-
-	file, err = charts.Heimdall.Open("Chart.yaml")
-	if err != nil {
-		t.Fatalf("%+v", err)
-	}
-
-	embeddedContent, err = io.ReadAll(file)
-	if err != nil {
-		t.Fatalf("%+v", err)
-	}
-
-	localContent, err = os.ReadFile("heimdall/Chart.yaml")
+	localContent, err := os.ReadFile("heimdall/Chart.yaml")
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}
