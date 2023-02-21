@@ -58,6 +58,8 @@ type TCPListener struct {
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
 	terminated           atomic.Bool
+
+	acceptInProgress atomic.Bool
 }
 
 type NaspIntegrationHandler struct {
@@ -248,11 +250,16 @@ func (l *TCPListener) Accept() (*Connection, error) {
 }
 
 func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
+
+	if !l.acceptInProgress.CompareAndSwap(false, true) {
+		return
+	}
 	go func() {
 		for {
 			conn, err := l.Accept()
 			if err != nil {
 				if l.isTerminated() {
+					l.acceptInProgress.Store(false)
 					break
 				}
 				println(err.Error())
@@ -310,10 +317,10 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 		"id", c.id,
 	}
-	if c.readInProgress.Load() {
+	if !c.readInProgress.CompareAndSwap(false, true) {
 		return
 	}
-	c.readInProgress.Store(true)
+
 	logger := logger.WithName("StartAsyncRead")
 	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 	go func() {
@@ -363,10 +370,9 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 	}
 	logger := logger.WithName("StartAsyncWrite")
-	if c.writeInProgress.Load() {
+	if !c.writeInProgress.CompareAndSwap(false, true) {
 		return
 	}
-	c.writeInProgress.Store(true)
 
 	selector.registerWriter(selectedKeyId, func() bool {
 		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
