@@ -43,10 +43,10 @@ service:
   port: 8080
 
 metrics:
-  port: 8080
+  port: 8081
 
 healthz:
-  port: 8081
+  port: 8082
 
 ingress:
   enabled: false

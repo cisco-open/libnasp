@@ -20,5 +20,5 @@ DIRECTORY=`dirname $(readlink -f $0)`
 IMAGE="${IMAGE:-heimdall:test}"
 
 DOCKER_BUILDKIT=${DOCKER_BUILDKIT:-1} docker build "${DIRECTORY}/.." \
-    -f "${DIRECTORY}/../experimental/heimdall/Dockerfile" \
+    -f "${DIRECTORY}/../components/heimdall/Dockerfile" \
     -t "${IMAGE}"

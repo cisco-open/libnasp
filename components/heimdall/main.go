@@ -25,8 +25,8 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"wwwin-github.cisco.com/eti/nasp-webhook/pkg/cert"
-	"wwwin-github.cisco.com/eti/nasp-webhook/pkg/webhooks"
+	"github.com/cisco-open/heimdall-webhook/pkg/cert"
+	"github.com/cisco-open/heimdall-webhook/pkg/webhooks"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -38,7 +38,7 @@ import (
 
 	clusterregistryv1alpha1 "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
 
-	"wwwin-github.cisco.com/eti/nasp-webhook/pkg/k8sutil"
+	"github.com/cisco-open/heimdall-webhook/pkg/k8sutil"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -67,8 +67,8 @@ func main() {
 	var istioRevision string
 	var webhookPort int
 	var webhookName string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8081", "The address the metric endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8082", "The address the probe endpoint binds to.")
 	flag.StringVar(&clusterName, "cluster-name", "", "The name of the cluster.")
 	flag.StringVar(&istioMeshID, "istio-mesh-id", "", "The mesh id of the istio mesh.")
 	flag.StringVar(&istioVersion, "istio-version", "", "The version of the istio mesh.")
