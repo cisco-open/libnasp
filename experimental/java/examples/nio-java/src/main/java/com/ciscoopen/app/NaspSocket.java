@@ -31,6 +31,17 @@ public class NaspSocket extends Socket {
         }
         return -1;
     }
+    @Override
+    public InetAddress getLocalAddress() {
+        if (conn != null) {
+            try {
+                return InetAddress.getByName(conn.getAddress().getHost());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return address.getAddress();
+    }
 
     @Override
     public int getLocalPort() {
