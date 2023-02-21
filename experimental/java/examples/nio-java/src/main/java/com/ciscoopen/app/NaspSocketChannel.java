@@ -269,7 +269,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public void kill() throws IOException {
-        connection.close();
+        if (connection != null) {
+            connection.close();
+        }
     }
 
     public Connection getConnection() {
