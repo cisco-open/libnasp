@@ -58,6 +58,8 @@ type TCPListener struct {
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
 	terminated           atomic.Bool
+
+	acceptInProgress atomic.Bool
 }
 
 type NaspIntegrationHandler struct {
@@ -72,6 +74,9 @@ type Connection struct {
 	readBuffer   *bytes.Buffer
 	readLock     sync.Mutex
 	writeChannel chan []byte
+
+	readInProgress  atomic.Bool
+	writeInProgress atomic.Bool
 
 	terminated atomic.Bool
 
@@ -245,11 +250,16 @@ func (l *TCPListener) Accept() (*Connection, error) {
 }
 
 func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
+
+	if !l.acceptInProgress.CompareAndSwap(false, true) {
+		return
+	}
 	go func() {
 		for {
 			conn, err := l.Accept()
 			if err != nil {
 				if l.isTerminated() {
+					l.acceptInProgress.Store(false)
 					break
 				}
 				println(err.Error())
@@ -307,6 +317,10 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 		"id", c.id,
 	}
+	if !c.readInProgress.CompareAndSwap(false, true) {
+		return
+	}
+
 	logger := logger.WithName("StartAsyncRead")
 	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 	go func() {
@@ -316,6 +330,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if err != nil {
 				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
 					c.setEofReceived()
+					c.readInProgress.Store(false)
 					break
 				}
 				logger.Error(err, "reading data from connection failed", logCtx...)
@@ -355,6 +370,9 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 	}
 	logger := logger.WithName("StartAsyncWrite")
+	if !c.writeInProgress.CompareAndSwap(false, true) {
+		return
+	}
 
 	selector.registerWriter(selectedKeyId, func() bool {
 		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
@@ -371,10 +389,12 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				num, err := c.Write(buff)
 				if err != nil {
 					if c.isTerminated() {
+						c.writeInProgress.Store(false)
 						break out
 					}
 					if errors.Is(err, io.EOF) {
 						c.setEofReceived()
+						c.writeInProgress.Store(false)
 						break out
 					}
 					logger.Error(err, "received error while writing data to connection", logCtx...)
@@ -388,6 +408,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 			}
 		}
 		selector.unregisterWriter(selectedKeyId)
+		c.writeInProgress.Store(false)
 		logger.Info("StartAsyncWrite finished", "id", c.id, "selected key id", selectedKeyId)
 	}()
 }
