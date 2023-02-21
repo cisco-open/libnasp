@@ -1,4 +1,4 @@
-# Default values for nasp-webhook-controller
+# Default values for heimdall-webhook-controller
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -53,7 +53,7 @@ podDisruptionBudget:
 controller:
   leaderElection:
     enabled: true
-    name: "nasp-webhook-leader-election"
+    name: "heimdall-webhook-leader-election"
 
 webhook:
   port: 9443

@@ -174,32 +174,35 @@ func main() {
 			clientIP = "127.0.0.1"
 		}
 
-		e.Environment.IstioCAAddress = e.CAClientConfig.CAEndpoint
-		e.Environment.ClusterID = e.CAClientConfig.ClusterID
-		e.Environment.DNSDomain = "cluster.local"
-		e.Environment.Type = "sidecar"
-		e.Environment.IstioVersion = istioVersion
-		e.Environment.IstioRevision = istioRevision
-		e.Environment.InstanceIPs = []string{clientIP}
-		e.Environment.WorkloadName = client.WorkloadName
-		e.Environment.PodName = client.WorkloadName + "-" + configRequest.ClientID
-		e.Environment.PodNamespace = client.PodNamespace
-		e.Environment.Network = client.Network
-		e.Environment.MeshID = client.MeshID
-		e.Environment.IstioVersion = istioVersion
-		e.Environment.SearchDomains = []string{"svc.cluster.local", "cluster.local"}
-		e.Environment.Labels = map[string]string{
-			"security.istio.io/tlsMode":           "istio",
-			"service.istio.io/canonical-revision": "latest",
-			"istio.io/rev":                        e.CAClientConfig.Revision,
-			"topology.istio.io/network":           e.Environment.Network,
-			"k8s-app":                             client.WorkloadName,
-			"service.istio.io/canonical-name":     client.ServiceName,
-			"app":                                 client.WorkloadName,
-			"version":                             client.Version,
+		e.Environment = environment.IstioEnvironment{
+			Type:              "sidecar",
+			PodName:           client.WorkloadName + "-" + configRequest.ClientID,
+			PodNamespace:      client.PodNamespace,
+			PodOwner:          fmt.Sprintf("kubernetes://apis/v1/namespaces/%s/pods/%s", client.PodNamespace, client.WorkloadName),
+			PodServiceAccount: client.ServiceAccountName,
+			WorkloadName:      client.WorkloadName,
+			AppContainers:     nil,
+			InstanceIPs:       []string{clientIP},
+			Labels: map[string]string{
+				"security.istio.io/tlsMode":           "istio",
+				"service.istio.io/canonical-revision": "latest",
+				"istio.io/rev":                        e.CAClientConfig.Revision,
+				"topology.istio.io/network":           e.Environment.Network,
+				"k8s-app":                             client.WorkloadName,
+				"service.istio.io/canonical-name":     client.ServiceName,
+				"app":                                 client.WorkloadName,
+				"version":                             client.Version,
+			},
+			PlatformMetadata: nil,
+			Network:          client.Network,
+			SearchDomains:    []string{"svc.cluster.local", "cluster.local"},
+			ClusterID:        e.CAClientConfig.ClusterID,
+			DNSDomain:        "cluster.local",
+			MeshID:           client.MeshID,
+			IstioCAAddress:   e.CAClientConfig.CAEndpoint,
+			IstioVersion:     istioVersion,
+			IstioRevision:    istioRevision,
 		}
-		e.Environment.PodServiceAccount = client.ServiceAccountName
-		e.Environment.PodOwner = fmt.Sprintf("kubernetes://apis/v1/namespaces/%s/pods/%s", client.PodNamespace, client.WorkloadName)
 
 		c.JSON(http.StatusOK, e)
 	})

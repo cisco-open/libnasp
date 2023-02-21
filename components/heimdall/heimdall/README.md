@@ -1,6 +1,6 @@
 # Heimdall
 
-A small microservice to allow external services to obtain an Istio configuration based on some external authentication mechanism, like database or OAuth, etc...
+A small microservice to allow external services to obtain an Istio configuration based on some external authentication mechanism, like database or OAuth, etc.
 
 Heimdall is meant to run on Kubernetes.
 
@@ -18,7 +18,7 @@ Install the Helm chart of Heimdall configure it beforehand:
 helm install -n heimdall --create-namespace heimdall ./experimental/heimdall/charts/heimdall
 ```
 
-Take note of the exposed Heimdall service, this can be used in mobile applications for example, to get get an Istio entry confgiuration:
+Take note of the exposed Heimdall service, this can be used in mobile applications for example to get an Istio entry configuration:
 
 ```bash
 kubectl describe services -n heimdall heimdall-gw | grep Ingress | awk '{print $3}'
@@ -26,7 +26,7 @@ kubectl describe services -n heimdall heimdall-gw | grep Ingress | awk '{print $
 
 ## Populate the client database
 
-The client database holds the list of clients (indexed by ClientID) and their attributes/configuration for the mesh.A
+The client database holds the list of clients (indexed by ClientID) and their attributes/configuration for the mesh.
 
 A sample entry:
 
@@ -44,9 +44,9 @@ A sample entry:
     }
 ```
 
-## Create the identity service account of the workload
+### Create the identity service account of the workload
 
-Create the service account referenced in the client entry in the pod namespace.
+Create the service account in the pod namespace referenced by the client entry above.
 
 ```bash
 kubectl create sa -n external ios-mobile
