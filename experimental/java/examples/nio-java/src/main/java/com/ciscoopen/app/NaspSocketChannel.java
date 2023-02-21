@@ -173,23 +173,14 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
         int totalLength = 0;
         for (int i = offset; i < offset + length; i++) {
-            totalLength += srcs[i].remaining();
-        }
-
-        if (totalLength == 0) {
-            return 0;
-        }
-
-        try {
-            ByteBuffer temp = ByteBuffer.allocate(totalLength);
-            for (int i = offset; i < offset + length; i++) {
-                temp.put(srcs[i]);
+            int writtenBytes = write(srcs[i]);
+            if (writtenBytes == -1) {
+                return -1;
             }
-            temp.flip();
-            return connection.asyncWrite(temp.array());
-        } catch (Exception e) {
-            throw new IOException(e);
+            totalLength += writtenBytes;
+
         }
+        return totalLength;
     }
 
     @Override
@@ -199,7 +190,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     protected void implCloseSelectableChannel() throws IOException {
-        connection.close();
+        if (connection != null) {
+            connection.close();
+        }
     }
 
     @Override

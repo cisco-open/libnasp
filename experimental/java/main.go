@@ -73,6 +73,9 @@ type Connection struct {
 	readLock     sync.Mutex
 	writeChannel chan []byte
 
+	readInProgress  atomic.Bool
+	writeInProgress atomic.Bool
+
 	terminated atomic.Bool
 
 	EOF atomic.Bool
@@ -307,6 +310,10 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 		"id", c.id,
 	}
+	if c.readInProgress.Load() {
+		return
+	}
+	c.readInProgress.Store(true)
 	logger := logger.WithName("StartAsyncRead")
 	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 	go func() {
@@ -316,6 +323,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if err != nil {
 				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
 					c.setEofReceived()
+					c.readInProgress.Store(false)
 					break
 				}
 				logger.Error(err, "reading data from connection failed", logCtx...)
@@ -355,6 +363,10 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 	}
 	logger := logger.WithName("StartAsyncWrite")
+	if c.writeInProgress.Load() {
+		return
+	}
+	c.writeInProgress.Store(true)
 
 	selector.registerWriter(selectedKeyId, func() bool {
 		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
@@ -371,10 +383,12 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				num, err := c.Write(buff)
 				if err != nil {
 					if c.isTerminated() {
+						c.writeInProgress.Store(false)
 						break out
 					}
 					if errors.Is(err, io.EOF) {
 						c.setEofReceived()
+						c.writeInProgress.Store(false)
 						break out
 					}
 					logger.Error(err, "received error while writing data to connection", logCtx...)
@@ -388,6 +402,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 			}
 		}
 		selector.unregisterWriter(selectedKeyId)
+		c.writeInProgress.Store(false)
 		logger.Info("StartAsyncWrite finished", "id", c.id, "selected key id", selectedKeyId)
 	}()
 }
