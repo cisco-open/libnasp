@@ -122,7 +122,8 @@ func (s *Selector) Select(timeoutMs int64) int {
 			}
 			select {
 			case s.queue <- selectedKey:
-				// TODO: do we miss the default case here?
+			default:
+				// best effort non-blocking write
 			}
 		}
 		return true
