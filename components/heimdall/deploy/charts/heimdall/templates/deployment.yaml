@@ -76,6 +76,7 @@ spec:
             - "--istio-mesh-id={{ .Values.istio.meshID | required ".Values.istio.meshID is required." }}"
             - "--istio-network={{ .Values.istio.network | required ".Values.istio.network is required." }}"
             - "--istio-revision={{ .Values.istio.revision | required ".Values.istio.revision is required." }}"
+            - "--cluster-name={{ .Values.istio.clusterId | required ".Values.istio.clusterId is required."}}"
           ports:
             - name: metrics
               containerPort: {{ .Values.metrics.port }}

@@ -17,9 +17,9 @@ COPY ./go.mod /go/src/app/
 COPY ./go.sum /go/src/app/
 # Copy the Heimdall Go Modules manifests
 COPY components/heimdall/heimdall/go.mod components/heimdall/heimdall/go.mod
-COPY components/heimdall/experimental/heimdall/go.sum components/heimdall/heimdall/go.sum
+COPY components/heimdall/heimdall/go.sum components/heimdall/heimdall/go.sum
 # Copy the charts Go Modules manifests
-COPY components/heimdall/heimdall/charts/go.mod components/heimdall/heimdall/charts/go.mod
+COPY components/heimdall/deploy/charts/go.mod components/heimdall/deploy/charts/go.mod
 
 # hadolint ignore=DL3059
 RUN go mod download
@@ -35,15 +35,15 @@ FROM golang:1.18 as build-webhook
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
+COPY components/heimdall/go.mod go.mod
+COPY components/heimdall/go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
 
 # Copy the go source
-COPY pkg pkg
-COPY main.go main.go
+COPY components/heimdall/pkg pkg
+COPY components/heimdall/main.go main.go
 
 # Build
 RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager main.go
@@ -53,7 +53,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=linux GOA
 FROM gcr.io/distroless/static:nonroot
 
 # Heimdall
-COPY --from=build /go/bin/app /
+COPY --from=build-heimdall /go/bin/app /
 #ENV GIN_MODE=release
 CMD ["/app"]
 

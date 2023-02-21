@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"wwwin-github.cisco.com/eti/nasp-webhook/pkg/k8sutil"
+	"github.com/cisco-open/heimdall-webhook/pkg/k8sutil"
 
 	"github.com/go-logr/logr"
 )
