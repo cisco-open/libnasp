@@ -48,10 +48,17 @@ metrics:
 healthz:
   port: 8082
 
+webhook:
+  port: 9443
+
+server:
+  port: 8080
+
 ingress:
   enabled: false
   className: ""
-  annotations: {}
+  annotations:
+    {}
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
   hosts:
@@ -101,11 +108,7 @@ istio:
     enabled: false
     # nodePort: "16443"
 
-
 controller:
   leaderElection:
     enabled: true
     name: "heimdall-webhook-leader-election"
-
-webhook:
-  port: 9443

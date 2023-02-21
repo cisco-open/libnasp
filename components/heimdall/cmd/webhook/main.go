@@ -25,9 +25,6 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/cisco-open/heimdall-webhook/pkg/cert"
-	"github.com/cisco-open/heimdall-webhook/pkg/webhooks"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -37,8 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	clusterregistryv1alpha1 "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
+	"github.com/cisco-open/nasp/components/heimdall/pkg/cert"
+	"github.com/cisco-open/nasp/components/heimdall/pkg/k8sutil"
 
-	"github.com/cisco-open/heimdall-webhook/pkg/k8sutil"
+	"github.com/cisco-open/nasp/components/heimdall/pkg/webhooks"
 	//+kubebuilder:scaffold:imports
 )
 

@@ -3,12 +3,14 @@ name: Docker image [Heimdall]
 on:
   push:
     branches:
-      - 'main'
+      - "main"
+      - "heimdall-*"
+      - "nasp-webhook-*"
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
     branches:
-      - 'main'
+      - "main"
 
 env:
   PLATFORMS: linux/amd64,linux/arm64
@@ -48,7 +50,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: experimental/heimdall/Dockerfile
+          file: components/heimdall/Dockerfile
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: ${{ env.PLATFORMS }}

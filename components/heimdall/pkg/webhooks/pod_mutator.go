@@ -22,14 +22,13 @@ import (
 	"strings"
 
 	"emperror.dev/errors"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/cisco-open/heimdall-webhook/pkg/k8sutil"
-
-	"github.com/go-logr/logr"
+	"github.com/cisco-open/nasp/components/heimdall/pkg/k8sutil"
 )
 
 type PodMutator struct {
