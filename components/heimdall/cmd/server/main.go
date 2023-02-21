@@ -77,7 +77,11 @@ type ConfigMapClientDatabase struct {
 }
 
 func NewConfigMapClientDatabase() (ClientDatabase, error) {
-	kubeconfig := config.GetConfigOrDie()
+	kubeconfig, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	c, err := client.New(kubeconfig, client.Options{})
 	if err != nil {
 		return nil, err

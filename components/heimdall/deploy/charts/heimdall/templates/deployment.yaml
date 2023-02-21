@@ -35,10 +35,10 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - /app
+            - /heimdall-server
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: {{ .Values.server.port }}
               protocol: TCP
           livenessProbe:
             httpGet:
@@ -67,7 +67,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - /manager
+            - /heimdall-webhook
           args:
             - "--webhook-name={{ include "heimdall-webhook-controller.fullname" . }}"
             - "--webhook-port={{ .Values.webhook.port }}"

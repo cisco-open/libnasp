@@ -1,3 +1,3 @@
 module github.com/cisco-open/nasp/components/heimdall/charts
 
-go 1.18
+go 1.19
