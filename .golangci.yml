@@ -23,6 +23,7 @@ linters:
     - containedctx
     - contextcheck
     - testpackage
+    - musttag
 
     - gomoddirectives
 
