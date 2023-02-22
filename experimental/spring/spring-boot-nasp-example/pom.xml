@@ -22,4 +22,17 @@
         </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <imageBuilder>paketobuildpacks/builder-jammy-base</imageBuilder>
+                    <runImage>paketobuildpacks/run-jammy-base</runImage>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>
