@@ -1,10 +1,12 @@
 package com.ciscoopen.app;
 
+import sun.nio.ch.FileChannelImpl;
 import sun.nio.ch.SelectionKeyImpl;
 import sun.nio.ch.SelectorImpl;
 import sun.nio.ch.SelectorProviderImpl;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -45,7 +47,8 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     public Selector wakeup() {
-        throw new UnsupportedOperationException();
+        selector.wakeUp();
+        return this;
     }
 
     @Override
@@ -56,7 +59,7 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     protected void implClose() throws IOException {
-        throw new UnsupportedOperationException();
+        selector.close();
     }
 
     @Override
@@ -89,6 +92,34 @@ class NaspSelector extends SelectorImpl {
 }
 
 public class NaspSelectorProvider extends SelectorProviderImpl {
+
+    static {
+        try {
+            boolean sendfileTurnedOff = false;
+            loop:
+            for (Field field : FileChannelImpl.class.getDeclaredFields()) {
+                switch (field.getName()) {
+                    case "transferToNotSupported":
+                        field.setAccessible(true);
+                        field.setBoolean(null, true);
+                        field.setAccessible(false);
+                        sendfileTurnedOff = true;
+                        break loop;
+                    case "transferSupported":
+                        field.setAccessible(true);
+                        field.setBoolean(null, false);
+                        field.setAccessible(false);
+                        sendfileTurnedOff = true;
+                        break loop;
+                }
+            }
+            if (!sendfileTurnedOff) {
+                throw new IllegalStateException("couldn't turn off sendfile support");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     @Override
     public AbstractSelector openSelector() throws IOException {

@@ -6,6 +6,7 @@ import sun.nio.ch.SelectionKeyImpl;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketOption;
 import java.nio.channels.SelectionKey;
@@ -59,11 +60,15 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
 
     @Override
     protected void implCloseSelectableChannel() throws IOException {
-        throw new UnsupportedOperationException();
+        socket.getTCPListener().close();
     }
 
     public SocketChannel accept() throws IOException {
-        return this.socket.accept().getChannel();
+        Socket client = socket.accept();
+        if (client == null) {
+            return null;
+        }
+        return client.getChannel();
     }
 
     @Override
@@ -130,6 +135,6 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
 
     @Override
     public void kill() throws IOException {
-        throw new UnsupportedOperationException();
+        socket.getTCPListener().close();
     }
 }

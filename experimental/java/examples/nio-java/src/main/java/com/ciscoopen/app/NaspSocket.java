@@ -3,9 +3,7 @@ package com.ciscoopen.app;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.Socket;
-import java.net.SocketAddress;
-import java.net.SocketException;
+import java.net.*;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 
@@ -15,18 +13,56 @@ public class NaspSocket extends Socket {
     private final Connection conn;
     private final SocketChannel channel;
 
+    private InetSocketAddress address;
+
     public NaspSocket(SelectorProvider provider, Connection conn) {
         this.conn = conn;
         this.channel = new NaspSocketChannel(provider, conn, this);
     }
+    public void setAddress(InetSocketAddress address) {
+        this.address = address;
+    }
     @Override
     public int getPort() {
+        try {
+            return conn.getRemoteAddress().getPort();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+    @Override
+    public InetAddress getLocalAddress() {
+        if (conn != null) {
+            try {
+                return InetAddress.getByName(conn.getAddress().getHost());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return address.getAddress();
+    }
+
+    @Override
+    public int getLocalPort() {
         try {
             return conn.getAddress().getPort();
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return 0;
+        return -1;
+    }
+
+    @Override
+    public InetAddress getInetAddress() {
+        if (conn != null) {
+            try {
+                return InetAddress.getByName(conn.getRemoteAddress().getHost());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return address.getAddress();
     }
 
 

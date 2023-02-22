@@ -21,13 +21,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"strconv"
+	"sync/atomic"
+	"syscall"
 
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pborman/uuid"
 
 	"github.com/cisco-open/nasp/pkg/istio"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
@@ -35,11 +40,14 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const MAX_WRITE_BUFFERS = 64
+
 const (
 	OP_READ    = 1 << 0
 	OP_WRITE   = 1 << 2
 	OP_CONNECT = 1 << 3
 	OP_ACCEPT  = 1 << 4
+	OP_WAKEUP  = -1
 )
 
 var logger = klog.NewKlogr()
@@ -51,6 +59,9 @@ type TCPListener struct {
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
+	terminated           atomic.Bool
+
+	acceptInProgress atomic.Bool
 }
 
 type NaspIntegrationHandler struct {
@@ -60,12 +71,18 @@ type NaspIntegrationHandler struct {
 }
 
 type Connection struct {
+	id           string
 	conn         net.Conn
 	readBuffer   *bytes.Buffer
 	readLock     sync.Mutex
 	writeChannel chan []byte
-	ctx          context.Context
-	cancel       context.CancelFunc
+
+	readInProgress  atomic.Bool
+	writeInProgress atomic.Bool
+
+	terminated atomic.Bool
+
+	EOF atomic.Bool
 }
 
 type Address struct {
@@ -79,40 +96,85 @@ type SelectedKey struct {
 }
 
 type Selector struct {
-	queue    chan *SelectedKey
-	selected []*SelectedKey
+	queue        chan SelectedKey
+	selected     map[SelectedKey]struct{}
+	writableKeys sync.Map
 }
 
 func NewSelector() *Selector {
-	return &Selector{queue: make(chan *SelectedKey, 64)}
+	return &Selector{queue: make(chan SelectedKey, 64), selected: map[SelectedKey]struct{}{}}
 }
 
-func (s *Selector) Select(timeout int64) int {
-	timeoutChan := make(<-chan time.Time)
-	if timeout != -1 {
-		timeoutChan = time.After(time.Duration(timeout) * time.Millisecond)
+func (s *Selector) Close() {
+	close(s.queue)
+	s.writableKeys = sync.Map{}
+	s.selected = nil
+}
+
+func (s *Selector) Select(timeoutMs int64) int {
+	ctx, cancel := context.WithCancel(context.Background())
+	if timeoutMs != -1 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	}
+	defer cancel()
+
+	//nolint:forcetypeassert
+	s.writableKeys.Range(func(key, value any) bool {
+		check := value.(func() bool)
+		if check() {
+			selectedKey := SelectedKey{
+				SelectedKeyId: key.(int32),
+				Operation:     OP_WRITE,
+			}
+			select {
+			case s.queue <- selectedKey:
+			default:
+				// best effort non-blocking write
+			}
+		}
+		return true
+	})
+
+	if (timeoutMs == 0) && len(s.queue) == 0 {
+		return 0
+	}
+
 	select {
 	case c := <-s.queue:
-		s.selected = append(s.selected, c)
+		if c.Operation == OP_WAKEUP {
+			return 0
+		}
+
+		s.selected[c] = struct{}{}
 
 		l := len(s.queue)
 
 		for i := 0; i < l; i++ {
-			s.selected = append(s.selected, <-s.queue)
+			s.selected[<-s.queue] = struct{}{}
 		}
 
 		return l + 1
-	case <-timeoutChan:
+	case <-ctx.Done():
 		return 0
 	}
 }
 
+func (s *Selector) registerWriter(selectedKeyId int32, check func() bool) {
+	s.writableKeys.Store(selectedKeyId, check)
+}
+
+func (s *Selector) unregisterWriter(selectedKeyId int32) {
+	s.writableKeys.Delete(selectedKeyId)
+}
+
+func (s *Selector) WakeUp() {
+	s.queue <- SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: -1}
+}
+
 func (s *Selector) NextSelectedKey() *SelectedKey {
-	if len(s.selected) != 0 {
-		selected := s.selected[0]
-		s.selected = s.selected[1:]
-		return selected
+	for k := range s.selected {
+		delete(s.selected, k)
+		return &k
 	}
 	return nil
 }
@@ -156,26 +218,47 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 	}, nil
 }
 
+// isTerminated returns whether this TCPListener is terminated or not. This method is thread-safe.
+func (l *TCPListener) isTerminated() bool {
+	return l.terminated.Load()
+}
+
+func (l *TCPListener) Close() {
+	if !l.terminated.CompareAndSwap(false, true) {
+		return // listener already terminated
+	}
+
+	err := l.listener.Close()
+	if err != nil {
+		logger.Error(err, "couldn't close listener", "address", l.listener.Addr())
+	}
+}
+
 func (l *TCPListener) Accept() (*Connection, error) {
 	c, err := l.listener.Accept()
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
 	return &Connection{
 		conn:         c,
 		readBuffer:   new(bytes.Buffer),
-		writeChannel: make(chan []byte, 64),
-		ctx:          ctx,
-		cancel:       cancel,
+		writeChannel: make(chan []byte, MAX_WRITE_BUFFERS),
+		id:           uuid.New(),
 	}, nil
 }
 
 func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
+	if !l.acceptInProgress.CompareAndSwap(false, true) {
+		return
+	}
 	go func() {
 		for {
 			conn, err := l.Accept()
 			if err != nil {
+				if l.isTerminated() {
+					l.acceptInProgress.Store(false)
+					break
+				}
 				println(err.Error())
 				continue
 			}
@@ -184,7 +267,7 @@ func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) 
 			l.asyncConnections = append(l.asyncConnections, conn)
 			l.asyncConnectionsLock.Unlock()
 
-			selector.queue <- &SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: selectedKeyId}
+			selector.queue <- SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: selectedKeyId}
 		}
 	}()
 }
@@ -214,68 +297,162 @@ func (c *Connection) GetAddress() (*Address, error) {
 		Port: int32(port)}, nil
 }
 
+func (c *Connection) GetRemoteAddress() (*Address, error) {
+	address := c.conn.RemoteAddr().String()
+	port, err := strconv.Atoi(address[strings.LastIndex(address, ":")+1:])
+	if err != nil {
+		return nil, err
+	}
+	return &Address{
+		Host: address[0:strings.LastIndex(address, ":")],
+		//nolint:gosec
+		Port: int32(port)}, nil
+}
+
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
+	logCtx := []interface{}{
+		"selected key id", selectedKeyId,
+		"id", c.id,
+	}
+	if !c.readInProgress.CompareAndSwap(false, true) {
+		return
+	}
+
+	logger := logger.WithName("StartAsyncRead")
+	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 	go func() {
 		tempBuffer := make([]byte, 1024)
 		for {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
-				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
-					c.conn.Close()
+				if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.ECONNRESET) {
+					c.setEofReceived()
+					c.readInProgress.Store(false)
 					break
 				}
-				println("Error received:")
-				println(err.Error())
+				logger.Error(err, "reading data from connection failed", logCtx...)
 				continue
 			}
+			if num == 0 {
+				logger.Info("received 0 bytes on connection", logCtx...)
+			}
 			c.readLock.Lock()
-			c.readBuffer.Write(tempBuffer[:num])
+			n, err := c.readBuffer.Write(tempBuffer[:num])
 			c.readLock.Unlock()
-			selector.queue <- &SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
+			if err != nil {
+				logger.Error(err, "couldn't write data to read buffer", logCtx...)
+			}
+			if n != num {
+				logger.Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
+			}
+			selector.queue <- SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
 		}
+
+		logger.Info("StartAsyncRead finished", "id", c.id, "selected key id", selectedKeyId)
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
+	if c.eofReceived() {
+		return -1, nil
+	}
 	c.readLock.Lock()
 	defer c.readLock.Unlock()
-	n, err := c.readBuffer.Read(b)
+	max := int(math.Min(float64(c.readBuffer.Len()), float64(len(b))))
+	n, err := c.readBuffer.Read(b[:max])
 	return int32(n), err
 }
 
 func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
-	go func() {
-		for {
-			select {
-			case buff := <-c.writeChannel:
-				for {
-					num, err := c.Write(buff)
-					if err != nil {
-						println(err.Error())
-						continue
-					}
-					if len(buff) == num {
-						break
-					} else {
-						buff = buff[num:]
-					}
-				}
-			case <-c.ctx.Done():
-				c.conn.Close()
-			}
-			selector.queue <- &SelectedKey{Operation: OP_WRITE, SelectedKeyId: selectedKeyId}
+	logCtx := []interface{}{
+		"selected key id", selectedKeyId,
+	}
+	logger := logger.WithName("StartAsyncWrite")
+	if !c.writeInProgress.CompareAndSwap(false, true) {
+		return
+	}
+
+	selector.registerWriter(selectedKeyId, func() bool {
+		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
+		if !b {
+			logger.Info("write channel is full !!!")
 		}
+		return b
+	})
+
+	go func() {
+	out:
+		for buff := range c.writeChannel {
+			for {
+				num, err := c.Write(buff)
+				if err != nil {
+					if c.isTerminated() {
+						c.writeInProgress.Store(false)
+						break out
+					}
+					if errors.Is(err, io.EOF) {
+						c.setEofReceived()
+						c.writeInProgress.Store(false)
+						break out
+					}
+					logger.Error(err, "received error while writing data to connection", logCtx...)
+					continue
+				}
+				if len(buff) == num {
+					break
+				} else {
+					buff = buff[num:]
+				}
+			}
+		}
+		selector.unregisterWriter(selectedKeyId)
+		c.writeInProgress.Store(false)
+		logger.Info("StartAsyncWrite finished", "id", c.id, "selected key id", selectedKeyId)
 	}()
 }
 
+// isTerminated returns whether this Connection is terminated or not. This method is thread-safe.
+func (c *Connection) isTerminated() bool {
+	return c.terminated.Load()
+}
+
+// eofReceived returns true if EOF was received while writing/reading data to/from connection
+func (c *Connection) eofReceived() bool {
+	return c.EOF.Load()
+}
+
+func (c *Connection) setEofReceived() {
+	if c.EOF.CompareAndSwap(false, true) {
+		close(c.writeChannel)
+	}
+}
+
 func (c *Connection) Close() {
-	c.cancel()
+	if !c.terminated.CompareAndSwap(false, true) {
+		return // connection already closed
+	}
+
+	c.setEofReceived()
+
+	logger.Info("CLOSING CONNECTION", "id", c.id)
+	err := c.conn.Close()
+	if err != nil {
+		logger.Error(err, "couldn't close connection")
+	}
 }
 
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
+	if c.eofReceived() {
+		return -1, nil
+	}
+
 	bCopy := make([]byte, len(b))
 	copy(bCopy, b)
-	c.writeChannel <- bCopy
-	return int32(len(bCopy)), nil
+	select {
+	case c.writeChannel <- bCopy:
+		return int32(len(bCopy)), nil
+	default:
+		return 0, nil
+	}
 }
 
 func (c *Connection) Read(b []byte) (int, error) {
@@ -332,12 +509,16 @@ func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, addr
 			println(err.Error())
 			return
 		}
+		if err != nil {
+			println(err.Error())
+			return
+		}
 
 		d.asyncConnectionsLock.Lock()
 		d.asyncConnections = append(d.asyncConnections, conn)
 		d.asyncConnectionsLock.Unlock()
 
-		selector.queue <- &SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
+		selector.queue <- SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
 	}()
 }
 
@@ -355,18 +536,15 @@ func (d *TCPDialer) AsyncDial() *Connection {
 }
 
 func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
-	backgroundCtx := context.Background()
-	c, err := d.dialer.DialContext(backgroundCtx, "tcp", fmt.Sprintf("%s:%d", address, port))
+	c, err := d.dialer.DialContext(context.Background(), "tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(backgroundCtx)
 	return &Connection{
 		conn:         c,
 		readBuffer:   new(bytes.Buffer),
-		writeChannel: make(chan []byte, 64),
-		ctx:          ctx,
-		cancel:       cancel,
+		writeChannel: make(chan []byte, MAX_WRITE_BUFFERS),
+		id:           uuid.New(),
 	}, nil
 }
 

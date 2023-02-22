@@ -1,21 +1,20 @@
 package com.ciscoopen.app;
 
 import nasp.Connection;
-import nasp.TCPDialer;
 import nasp.Nasp;
+import nasp.TCPDialer;
 import sun.nio.ch.Net;
 import sun.nio.ch.SelChImpl;
 import sun.nio.ch.SelectionKeyImpl;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.net.SocketOption;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
+import java.util.Objects;
 import java.util.Set;
 
 public class NaspSocketChannel extends SocketChannel implements SelChImpl {
@@ -67,18 +66,20 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public NaspSocket socket() {
+        if (socket == null) {
+            socket = new NaspSocket(provider(), connection);
+        }
         return socket;
     }
 
     @Override
     public boolean isConnected() {
-        //TODO check this if this is right the whole time
-        return true;
+        return connection != null;
     }
 
     @Override
     public boolean isConnectionPending() {
-        return false;
+        return connection == null;
     }
 
     @Override
@@ -90,27 +91,55 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         } catch (Exception e) {
             throw new IOException("could not get nasp tcp dialer");
         }
-        address = (InetSocketAddress)remote;
+        address = (InetSocketAddress) checkRemote(remote);
+        socket.setAddress(address);
         return false;
+    }
+
+    private SocketAddress checkRemote(SocketAddress sa) {
+        InetSocketAddress isa = Net.checkAddress(sa);
+        @SuppressWarnings("removal")
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkConnect(isa.getAddress().getHostAddress(), isa.getPort());
+        }
+        InetAddress address = isa.getAddress();
+        if (address.isAnyLocalAddress()) {
+            int port = isa.getPort();
+            if (address instanceof Inet4Address) {
+                return new InetSocketAddress("127.0.0.1", port);
+            } else {
+                return new InetSocketAddress("::1", port);
+            }
+        } else {
+            return isa;
+        }
     }
 
     @Override
     public boolean finishConnect() throws IOException {
         connection = dialer.asyncDial();
+        if (connection == null) {
+            return false;
+        }
         return true;
     }
 
     @Override
     public SocketAddress getRemoteAddress() throws IOException {
-        throw new UnsupportedOperationException();
+        return address;
     }
 
     @Override
     public int read(ByteBuffer dst) throws IOException {
+        //TODO revise this to be more efficient
         try {
             byte[] buff = new byte[dst.remaining()];
             int num = connection.asyncRead(buff);
-            dst.put(buff, 0, num);
+            if (num == -1) {
+                return -1;
+            }
+            dst.put(buff, dst.position(), num);
             return num;
         } catch (Exception e) {
             throw new IOException(e);
@@ -125,9 +154,14 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public int write(ByteBuffer src) throws IOException {
         try {
-            byte[] tempArray = new byte[src.limit()];
-            src.get(tempArray, 0, src.limit());
-            return connection.asyncWrite(tempArray);
+            int rem = src.remaining();
+            if (rem == 0) {
+                return 0;
+            }
+
+            byte[] temp = new byte[rem];
+            src.get(temp, src.position(), src.limit());
+            return connection.asyncWrite(temp);
         } catch (Exception e) {
             throw new IOException(e);
         }
@@ -135,7 +169,18 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public long write(ByteBuffer[] srcs, int offset, int length) throws IOException {
-        throw new UnsupportedOperationException();
+        Objects.checkFromIndexSize(offset, length, srcs.length);
+
+        int totalLength = 0;
+        for (int i = offset; i < offset + length; i++) {
+            int writtenBytes = write(srcs[i]);
+            if (writtenBytes == -1) {
+                return -1;
+            }
+            totalLength += writtenBytes;
+
+        }
+        return totalLength;
     }
 
     @Override
@@ -145,7 +190,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     protected void implCloseSelectableChannel() throws IOException {
-        connection.close();
+        if (connection != null) {
+            connection.close();
+        }
     }
 
     @Override
@@ -155,7 +202,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public FileDescriptor getFD() {
-
         throw new UnsupportedOperationException();
     }
 
@@ -223,7 +269,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public void kill() throws IOException {
-        throw new UnsupportedOperationException();
+        if (connection != null) {
+            connection.close();
+        }
     }
 
     public Connection getConnection() {
