@@ -16,118 +16,52 @@ package server
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
+	"emperror.dev/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
+	istionetworkingv1beta1 "istio.io/client-go/pkg/apis/networking/v1beta1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	cluster_registry "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
 	"github.com/cisco-open/nasp/pkg/environment"
-	istio_networking_v1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 )
 
-var podNamespace = os.Getenv("POD_NAMESPACE")
-var clusterID = os.Getenv("NASP_CLUSTER_ID")
-var istioVersion = os.Getenv("NASP_ISTIO_VERSION")
-var istioRevision = os.Getenv("NASP_ISTIO_REVISION")
+var (
+	clusterID     = os.Getenv("NASP_CLUSTER_ID")
+	istioVersion  = os.Getenv("NASP_ISTIO_VERSION")
+	istioRevision = os.Getenv("NASP_ISTIO_REVISION")
+)
 
-var ErrClientNotFound = errors.New("client not found in database")
 var ErrClusterIDNotFound = errors.New("clusterID not found")
-var ErrClientOrClientSecretInvalid = errors.New("invalid ClientID or ClientSecret")
-var ClientDatabaseConfigMap = types.NamespacedName{Namespace: podNamespace, Name: "heimdall-client-database"}
-
-type ConfigRequest struct {
-	ClientID     string `binding:"required"`
-	ClientSecret string `binding:"required"`
-	Version      string
-}
-
-type Client struct {
-	ClientID           string
-	ClientSecret       string
-	WorkloadName       string
-	PodNamespace       string
-	Network            string
-	MeshID             string
-	ServiceName        string
-	Version            string
-	ServiceAccountName string
-}
-
-type ClientDatabase interface {
-	Lookup(ClientID string) (*Client, error)
-}
-
-type ConfigMapClientDatabase struct {
-	c client.Client
-}
-
-func NewConfigMapClientDatabase() (ClientDatabase, error) {
-	kubeconfig, err := config.GetConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := client.New(kubeconfig, client.Options{})
-	if err != nil {
-		return nil, err
-	}
-
-	// Sanity check
-	var configMap corev1.ConfigMap
-	err = c.Get(context.Background(), ClientDatabaseConfigMap, &configMap)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ConfigMapClientDatabase{c: c}, nil
-}
-
-func (db *ConfigMapClientDatabase) Lookup(clientID string) (*Client, error) {
-	var configMap corev1.ConfigMap
-	err := db.c.Get(context.Background(), ClientDatabaseConfigMap, &configMap)
-	if err != nil {
-		return nil, err
-	}
-
-	if clientData, ok := configMap.Data[clientID]; ok {
-		var client Client
-		err = json.Unmarshal([]byte(clientData), &client)
-		if err != nil {
-			return nil, err
-		}
-		return &client, nil
-	}
-
-	return nil, ErrClientNotFound
-}
 
 type server struct {
+	mgr    manager.Manager
 	logger logr.Logger
 }
 
-func New(logger logr.Logger) *server {
+func New(mgr manager.Manager, logger logr.Logger) *server {
 	return &server{
+		mgr:    mgr,
 		logger: logger,
 	}
 }
 
 func (s *server) Run(ctx context.Context) error {
-	srv, err := s.run()
-	if err != nil {
-		return err
+	if clusterID == "" {
+		if _, err := s.getClusterIDFromRegistry(); err != nil {
+			return err
+		}
 	}
+
+	srv := s.run()
 
 	<-ctx.Done()
 
@@ -138,17 +72,7 @@ func (s *server) Run(ctx context.Context) error {
 	return nil
 }
 
-func (s *server) run() (*http.Server, error) {
-	kubeconfig, err := config.GetConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := client.New(kubeconfig, client.Options{})
-	if err != nil {
-		return nil, err
-	}
-
+func (s *server) run() *http.Server {
 	r := gin.Default()
 
 	r.GET("/", func(c *gin.Context) {})
@@ -156,41 +80,54 @@ func (s *server) run() (*http.Server, error) {
 	r.POST("/config", func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header is missing"})
+			err := errors.NewPlain("authorization header is missing")
+			s.logger.Error(err, "authorization failed")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
-		user, err := AuthenticateToken(c, client, authHeader)
+		jwtToken := strings.Split(authHeader, " ")
+		if len(jwtToken) != 2 {
+			err := errors.NewPlain("incorrectly formatted authorization header")
+			s.logger.Error(err, "authorization failed")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+
+		user, err := AuthenticateToken(c, s.mgr.GetClient(), jwtToken[1])
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization token is invalid"})
+			s.logger.Error(err, "authorization failed")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
 		log := s.logger.WithValues("user", user.Name)
 		log.Info("client requesting config")
 
-		//TODO should this come from client side?
-		//client.Version = configRequest.Version
-
-		if user.ServiceAccount == "" {
-			user.ServiceAccount = "default"
+		if user.ServiceAccountRef.Name == "" {
+			user.ServiceAccountRef.Name = "default"
 		}
 
-		workloadGroup := &istio_networking_v1alpha3.WorkloadGroup{}
-		// TODO get workloadGroup name from the JWT token
-		err = client.Get(c, types.NamespacedName{Namespace: user.Namespace, Name: "asd"}, workloadGroup)
+		workloadGroup := &istionetworkingv1beta1.WorkloadGroup{}
+		err = s.mgr.GetClient().Get(c, user.WorkloadGroupRef, workloadGroup)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Workload group was not found"})
+			s.logger.Error(err, "could not get workload group")
+			err = errors.WrapIf(err, "could not get workload group")
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
+		}
+
+		type IstioCAClientConfigAndEnvironment struct {
+			CAClientConfig istio_ca.IstioCAClientConfig
+			Environment    environment.IstioEnvironment
 		}
 
 		var e IstioCAClientConfigAndEnvironment
 
-		e.CAClientConfig, err = istio_ca.GetIstioCAClientConfigWithKubeConfig(clusterID, istioRevision, nil, &types.NamespacedName{
-			Name:      user.ServiceAccount,
-			Namespace: user.Namespace,
-		})
+		e.CAClientConfig, err = istio_ca.GetIstioCAClientConfigWithKubeConfig(clusterID, istioRevision, nil, &user.ServiceAccountRef)
 		if err != nil {
+			s.logger.Error(err, "could not get ca client config")
+			err = errors.WrapIf(err, "could not get ca client config")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -202,32 +139,30 @@ func (s *server) run() (*http.Server, error) {
 
 		e.Environment = environment.IstioEnvironment{
 			Type:              "sidecar",
-			PodName:           workloadGroup.GetName() + "-" + user.Name, //TODO what is the pattern for the workloadentry name?
 			PodNamespace:      workloadGroup.GetNamespace(),
-			PodOwner:          fmt.Sprintf("kubernetes://apis/v1/namespaces/%s/workloadgroups/%s", user.Namespace, workloadGroup.GetName()),
-			PodServiceAccount: user.ServiceAccount,
+			PodOwner:          fmt.Sprintf("kubernetes://apis/v1/namespaces/%s/workloadgroups/%s", user.WorkloadGroupRef.Namespace, workloadGroup.GetName()),
+			PodServiceAccount: user.ServiceAccountRef.Name,
 			WorkloadName:      workloadGroup.GetName(),
 			AppContainers:     nil,
 			InstanceIPs:       []string{clientIP},
 			Labels: map[string]string{
 				"security.istio.io/tlsMode":           "istio",
-				"service.istio.io/canonical-revision": "latest",
+				"service.istio.io/canonical-revision": getLabelValueWithDefault(workloadGroup.Labels, []string{"service.istio.io/canonical-revision", "app.kubernetes.io/version", "version"}, "latest"),
 				"istio.io/rev":                        e.CAClientConfig.Revision,
 				"topology.istio.io/network":           workloadGroup.Spec.Template.GetNetwork(),
 				"k8s-app":                             workloadGroup.GetName(),
-				//"service.istio.io/canonical-name":     client.ServiceName, //TODO how do we get the service name?
-				"app": workloadGroup.GetName(),
-				//"version":                             client.Version, //TODO should this come from client side?
+				"service.istio.io/canonical-name":     getLabelValueWithDefault(workloadGroup.Labels, []string{"service.istio.io/canonical-name", "app.kubernetes.io/name", "app"}, workloadGroup.GetName()),
+				"app":                                 workloadGroup.GetName(),
 			},
 			PlatformMetadata: nil,
 			Network:          workloadGroup.Spec.Template.GetNetwork(),
 			SearchDomains:    []string{"svc.cluster.local", "cluster.local"},
 			ClusterID:        e.CAClientConfig.ClusterID,
 			DNSDomain:        "cluster.local",
-			//MeshID:           client.MeshID, //TODO how do we get meshID? it's not in WG
-			IstioCAAddress: e.CAClientConfig.CAEndpoint,
-			IstioVersion:   istioVersion,
-			IstioRevision:  istioRevision,
+			MeshID:           e.CAClientConfig.MeshID,
+			IstioCAAddress:   e.CAClientConfig.CAEndpoint,
+			IstioVersion:     istioVersion,
+			IstioRevision:    istioRevision,
 		}
 
 		c.JSON(http.StatusOK, e)
@@ -244,22 +179,15 @@ func (s *server) run() (*http.Server, error) {
 		}
 	}()
 
-	return srv, nil
+	return srv
 }
 
-func getClusterIDFromRegistry() (string, error) {
-	config, err := clientconfig.GetConfig()
-	if err != nil {
-		return "", err
-	}
-
-	k8sClient, err := client.New(config, client.Options{})
-	if err != nil {
-		return "", err
-	}
-
+func (s *server) getClusterIDFromRegistry() (string, error) {
 	var clusters cluster_registry.ClusterList
-	err = k8sClient.List(context.Background(), &clusters)
+	err := s.mgr.GetClient().List(context.Background(), &clusters)
+	if k8serrors.IsInvalid(err) {
+		return "", nil
+	}
 	if err != nil {
 		return "", err
 	}
@@ -273,7 +201,12 @@ func getClusterIDFromRegistry() (string, error) {
 	return "", ErrClusterIDNotFound
 }
 
-type IstioCAClientConfigAndEnvironment struct {
-	CAClientConfig istio_ca.IstioCAClientConfig
-	Environment    environment.IstioEnvironment
+func getLabelValueWithDefault(labels map[string]string, precedence []string, def string) string {
+	for _, k := range precedence {
+		if v, ok := labels[k]; ok {
+			return v
+		}
+	}
+
+	return def
 }

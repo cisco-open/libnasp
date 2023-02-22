@@ -24,6 +24,8 @@ import (
 	"os"
 
 	"emperror.dev/errors"
+	"github.com/golang/protobuf/jsonpb"
+	meshv1alpha1 "istio.io/api/mesh/v1alpha1"
 	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -131,6 +134,11 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 		return IstioCAClientConfig{}, errors.WrapIf(err, "could not get istio root ca pem")
 	}
 
+	mc, err := GetMeshConfig(cl, istioRevision)
+	if err != nil {
+		return IstioCAClientConfig{}, errors.WrapIf(err, "could not get istio mesh config")
+	}
+
 	return IstioCAClientConfig{
 		CAEndpoint:    address + ":15012",
 		CAEndpointSAN: fmt.Sprintf("%s.%s.svc", svc.GetName(), svc.GetNamespace()),
@@ -138,6 +146,7 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 		CApem:         pem,
 		ClusterID:     clusterID,
 		Revision:      istioRevision,
+		MeshID:        mc.GetDefaultConfig().GetMeshId(),
 	}, nil
 }
 
@@ -269,6 +278,51 @@ func GetIstioRootCAPEM(cl client.Client, istioRevision string) ([]byte, error) {
 	}
 
 	return []byte(configmap.Data["root-cert.pem"]), nil
+}
+
+func GetMeshConfig(cl client.Client, istioRevision string) (*meshv1alpha1.MeshConfig, error) {
+	cms := &corev1.ConfigMapList{}
+	err := cl.List(context.Background(), cms, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
+		"istio.io/rev": istioRevision,
+		"istio":        "meshconfig",
+	}))
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not get configmaps")
+	}
+
+	if len(cms.Items) == 0 {
+		return nil, errors.New("mesh config is not found")
+	}
+
+	configmap := &corev1.ConfigMap{}
+	err = cl.Get(context.Background(), client.ObjectKeyFromObject(&cms.Items[0]), configmap)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not get istio mesh config configmap")
+	}
+
+	yamlMeshConfig, ok := configmap.Data["mesh"]
+	if !ok {
+		return nil, errors.New("could not find mesh config in configmap")
+	}
+
+	var parsedYAMLMeshConfig map[string]interface{}
+	err = yaml.Unmarshal([]byte(yamlMeshConfig), &parsedYAMLMeshConfig)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not unmarshal meshconfig yaml")
+	}
+
+	jsonMeshConfig, err := json.Marshal(parsedYAMLMeshConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	meshConfig := meshv1alpha1.MeshConfig{}
+	err = jsonpb.UnmarshalString(string(jsonMeshConfig), &meshConfig)
+	if err != nil {
+		return &meshConfig, err
+	}
+
+	return &meshConfig, nil
 }
 
 func GetIstioTokenFromPod(config *rest.Config, scheme *runtime.Scheme, name, namespace string) ([]byte, error) {

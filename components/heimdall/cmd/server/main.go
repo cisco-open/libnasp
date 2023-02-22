@@ -72,7 +72,7 @@ func main() {
 		}
 	}()
 
-	if err := server.New(logger).Run(ctx); err != nil {
+	if err := server.New(mgr, logger).Run(ctx); err != nil {
 		panic(err)
 	}
 }

@@ -11,6 +11,7 @@ require (
 	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-logr/logr v1.2.3
+	github.com/golang-jwt/jwt/v4 v4.2.0
 	istio.io/client-go v1.15.0-beta.1.0.20220826132951-9dfd19c7a2a0
 	k8s.io/api v0.24.2
 	k8s.io/apimachinery v0.24.2
@@ -56,7 +57,6 @@ require (
 	github.com/go-playground/validator/v10 v10.11.2 // indirect
 	github.com/goccy/go-json v0.10.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
