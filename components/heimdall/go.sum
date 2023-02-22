@@ -494,8 +494,8 @@ github.com/googleapis/gax-go/v2 v2.2.0/go.mod h1:as02EH8zWkzwUoLbBaFeQ+arQaj/Oth
 github.com/googleapis/gax-go/v2 v2.3.0/go.mod h1:b8LNqSzNabLiUpXKkY7HAR5jr6bIT99EXz9pXxye9YM=
 github.com/googleapis/gax-go/v2 v2.4.0 h1:dS9eYAjhrE2RjmzYw2XAPvcXfmcQLtFEQWn0CR82awk=
 github.com/googleapis/gax-go/v2 v2.4.0/go.mod h1:XOTVJ59hdnfJLIP/dh8n5CGryZR2LxK9wbMD5+iXC6c=
-github.com/googleapis/gnostic v0.4.1 h1:DLJCy1n/vrD4HPjOvYcT8aYQXpPIzoRZONaYwyycI+I=
 github.com/googleapis/gnostic v0.4.1/go.mod h1:LRhVm6pbyptWbWbuZ38d1eyptfvIytN3ir6b65WBswg=
+github.com/googleapis/gnostic v0.5.5 h1:9fHAtK0uDfpveeqqo1hkEZJcFvYXAiCN3UutL8F9xHw=
 github.com/googleapis/go-type-adapters v1.0.0 h1:9XdMn+d/G57qq1s8dNc5IesGCXHf6V2HZ2JwRxfA2tA=
 github.com/googleapis/go-type-adapters v1.0.0/go.mod h1:zHW75FOG2aur7gAO2B+MLby+cLsWGBF62rFAi7WjWO4=
 github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1 h1:EGx4pi6eqNxGaHF6qqu48+N2wcFQ5qg5FXgOdqsJ5d8=
@@ -1556,6 +1556,7 @@ honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9
 istio.io/api v0.0.0-20220826132550-04f2b20dc284 h1:V1i4YF4zqlfrp6hlAweThW1XuDtgUWyDVcndX7FxB3U=
 istio.io/api v0.0.0-20220826132550-04f2b20dc284/go.mod h1:hQkF0Q19MCmfOTre/Sg4KvrwwETq45oaFplnBm2p4j8=
 istio.io/client-go v1.15.0-beta.1.0.20220826132951-9dfd19c7a2a0 h1:GSm2hZ8JoDDBypyWkCdh4UIVHyE3jM3Nw3B+MzS/biM=
+istio.io/client-go v1.15.0-beta.1.0.20220826132951-9dfd19c7a2a0/go.mod h1:EqbbL+90VpmUbedJTv0nG0v/ulk32cVTKKjZsG7UYqM=
 istio.io/istio v0.0.0-20220831174539-e3364ab424b7 h1:+kz4nwCUa4CsgnKHK4dEN47v7cBKov0UhHY8vWCHpyk=
 istio.io/istio v0.0.0-20220831174539-e3364ab424b7/go.mod h1:tsGtNnps8oWEagCnOQ6gBgeQhpZf1J6KVNrKihaPrW0=
 istio.io/pkg v0.0.0-20220815202617-8f42645c6e49 h1:5KHbyoZ4Jzrb/gucGsjSkI/aPNeIHvmaAoCCctB9uJc=
