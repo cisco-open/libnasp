@@ -11,6 +11,7 @@ require (
 	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-logr/logr v1.2.3
+	istio.io/client-go v1.15.0-beta.1.0.20220826132951-9dfd19c7a2a0
 	k8s.io/api v0.24.2
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.24.2
