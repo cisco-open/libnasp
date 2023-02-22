@@ -32,9 +32,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pborman/uuid"
+
 	"github.com/cisco-open/nasp/pkg/istio"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
-	"github.com/pborman/uuid"
 
 	"k8s.io/klog/v2"
 )
@@ -247,7 +248,6 @@ func (l *TCPListener) Accept() (*Connection, error) {
 }
 
 func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) {
-
 	if !l.acceptInProgress.CompareAndSwap(false, true) {
 		return
 	}

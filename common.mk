@@ -1,7 +1,7 @@
 REPO_ROOT=$(shell git rev-parse --show-toplevel)
 
 LICENSEI_VERSION = 0.7.0
-GOLANGCI_VERSION = 1.50.1
+GOLANGCI_VERSION = 1.51.2
 
 .PHONY: fmt
 fmt: ## Run go fmt against code
