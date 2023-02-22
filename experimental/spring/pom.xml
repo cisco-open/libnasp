@@ -23,24 +23,22 @@
     <profiles>
         <profile>
             <id>os-darwin</id>
-            <activation>
-                <property>
-                    <name>os.name</name>
-                    <value>Mac OS X</value>
-                </property>
-            </activation>
+<!--            <activation>-->
+<!--                <os>-->
+<!--                    <name>Mac OS X</name>-->
+<!--                </os>-->
+<!--            </activation>-->
             <properties>
                 <nasp.os>darwin</nasp.os>
             </properties>
         </profile>
         <profile>
             <id>os-linux</id>
-            <activation>
-                <property>
-                    <name>os.name</name>
-                    <value>Linux</value>
-                </property>
-            </activation>
+<!--            <activation>-->
+<!--                <os>-->
+<!--                    <name>Linux</name>-->
+<!--                </os>-->
+<!--            </activation>-->
             <properties>
                 <nasp.os>linux</nasp.os>
             </properties>
@@ -76,6 +74,7 @@
                 <groupId>com.cisco.nasp</groupId>
                 <artifactId>spring-boot-nasp</artifactId>
                 <version>${project.version}</version>
+                <classifier>linux</classifier>
             </dependency>
         </dependencies>
     </dependencyManagement>

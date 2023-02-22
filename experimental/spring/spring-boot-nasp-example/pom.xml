@@ -11,31 +11,14 @@
         <relativePath>../pom.xml</relativePath> <!-- lookup parent from repository -->
     </parent>
 
-    <properties>
-        <maven.compiler.source>19</maven.compiler.source>
-        <maven.compiler.target>19</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-
     <artifactId>spring-boot-nasp-example</artifactId>
     <version>1.0-SNAPSHOT</version>
-
-    <!-- You need a GitHub access token in your m2 settings.xml to access this repo -->
-    <!-- https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry#authenticating-with-a-personal-access-token -->
-    <repositories>
-<!--        <repository>-->
-<!--            <id>github-nasp</id>-->
-<!--            <url>https://maven.pkg.github.com/cisco-open/nasp</url>-->
-<!--            <snapshots>-->
-<!--                <enabled>true</enabled>-->
-<!--            </snapshots>-->
-<!--        </repository>-->
-    </repositories>
 
     <dependencies>
         <dependency>
             <groupId>com.cisco.nasp</groupId>
             <artifactId>spring-boot-nasp</artifactId>
+            <classifier>linux</classifier>
         </dependency>
     </dependencies>
 

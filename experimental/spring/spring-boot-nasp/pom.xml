@@ -18,7 +18,7 @@
             <groupId>nasp</groupId>
             <artifactId>nasp</artifactId>
             <version>0.0.0</version>
-            <classifier>${nasp.os}</classifier>
+            <classifier>linux</classifier>
         </dependency>
 
         <dependency>
@@ -35,5 +35,25 @@
             <!--            </exclusions>-->
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>classifier</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>${nasp.os}</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
