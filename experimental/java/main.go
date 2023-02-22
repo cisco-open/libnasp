@@ -207,10 +207,6 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 		return nil, err
 	}
 
-	return &TCPListener{
-		listener: listener,
-	}, nil
-
 	listener, err = h.iih.GetTCPListener(listener)
 	if err != nil {
 		return nil, err
@@ -490,12 +486,10 @@ func NewTCPDialer(heimdallURL, clientID, clientSecret string) (*TCPDialer, error
 		return nil, err
 	}
 
-	dialer := &net.Dialer{}
-
-	// dialer, err := iih.GetTCPDialer()
-	// if err != nil {
-	// 	return nil, err
-	// }
+	dialer, err := iih.GetTCPDialer()
+	if err != nil {
+		return nil, err
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go iih.Run(ctx)
