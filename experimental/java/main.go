@@ -25,6 +25,7 @@ import (
 	"net"
 	"strconv"
 	"sync/atomic"
+	"syscall"
 
 	"net/http"
 	"strings"
@@ -328,7 +329,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		for {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
-				if errors.Is(err, io.EOF) || strings.Contains(err.Error(), net.ErrClosed.Error()) {
+				if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.ECONNRESET) {
 					c.setEofReceived()
 					c.readInProgress.Store(false)
 					break
