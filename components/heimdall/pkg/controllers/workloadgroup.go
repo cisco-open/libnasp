@@ -34,6 +34,7 @@ import (
 	"github.com/go-logr/logr"
 
 	"github.com/cisco-open/nasp/components/heimdall/pkg/predicates"
+	"github.com/cisco-open/nasp/components/heimdall/pkg/server"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
 )
 
@@ -52,7 +53,6 @@ var (
 	naspLabels = labels.Set(map[string]string{
 		"nasp": "true",
 	})
-	tokenAudience          = "nasp-heimdall" //nolint:gosec
 	tokenExpirationSeconds = 60 * 60 * 24
 )
 
@@ -137,7 +137,9 @@ func (r *IstioWorkloadGroupReconciler) createToken(ctx context.Context, wg *isti
 		return err
 	}
 
-	token, err := istio_ca.CreateK8SToken(ctx, r.Config, wg.Spec.Template.ServiceAccount, wg.GetNamespace(), []string{tokenAudience}, tokenExpirationSeconds)
+	aud := server.NASPTokenAudience("").Generate(client.ObjectKeyFromObject(wg))
+
+	token, err := istio_ca.CreateK8SToken(ctx, r.Config, wg.Spec.Template.ServiceAccount, wg.GetNamespace(), []string{aud}, tokenExpirationSeconds)
 	if err != nil {
 		return err
 	}
