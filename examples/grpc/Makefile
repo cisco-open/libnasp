@@ -1,3 +1,5 @@
+NASP_AUTH_TOKEN ?= $(shell kubectl -n external get secret -l nasp.k8s.cisco.com/workloadgroup=test-grpc -o jsonpath='{@.items[0].data.token}' | base64 -D)
+
 .PHONY: help
 .DEFAULT_GOAL := help
 help:
@@ -11,8 +13,8 @@ proto: ## Generate hello protobuf
 
 .PHONY: run-server
 run-server: ## Run gRPC server
-	go run .
+	NASP_AUTH_TOKEN=$(NASP_AUTH_TOKEN) go run .
 
 .PHONY: run-client
 run-client: ## Run gRPC client
-	go run ./client
+	NASP_AUTH_TOKEN=$(NASP_AUTH_TOKEN) go run ./client

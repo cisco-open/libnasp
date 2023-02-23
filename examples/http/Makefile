@@ -1,3 +1,5 @@
+NASP_AUTH_TOKEN ?= $(shell kubectl -n external get secret -l nasp.k8s.cisco.com/workloadgroup=test-grpc -o jsonpath='{@.items[0].data.token}' | base64 -D)
+
 .PHONY: help
 .DEFAULT_GOAL := help
 help:
@@ -5,8 +7,8 @@ help:
 
 .PHONY: run-server
 run-server: ## Run HTTP server
-	go run . -mode=server
+	NASP_AUTH_TOKEN=$(NASP_AUTH_TOKEN) go run . -mode=server
 
 .PHONY: run-client
 run-client: ## Run HTTP client
-	 go run . -mode=client -dump-client-response=1 -request-url http://localhost:8080
+	NASP_AUTH_TOKEN=$(NASP_AUTH_TOKEN) go run . -mode=client -dump-client-response=1 -request-url http://localhost:8080

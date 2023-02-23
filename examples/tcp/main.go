@@ -17,10 +17,12 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net"
+	"os"
 
 	"k8s.io/klog/v2"
 
@@ -37,11 +39,16 @@ func init() {
 	flag.Parse()
 }
 
-func getIIH() (*istio.IstioIntegrationHandler, error) {
+func getIIH(ctx context.Context) (*istio.IstioIntegrationHandler, error) {
+	authToken := os.Getenv("NASP_AUTH_TOKEN")
+	if authToken == "" {
+		panic(errors.New("NASP_AUTH_TOKEN env var must be specified."))
+	}
+
 	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
 		MetricsAddress:      ":15090",
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(context.Background(), heimdallURL, "eyJhbGciOiJSUzI1NiIsImtpZCI6ImpITnNtdUliY2RHdE43XzJjR0NTV0pPLU9DX2ZyM3REcjI3eXR3bnFNU3MifQ.eyJhdWQiOlsibmFzcC1oZWltZGFsbDp3b3JrbG9hZGdyb3VwOmhlaW1kYWxsOnJldmlld3MiXSwiZXhwIjoxNjc3MTk1Mzg1LCJpYXQiOjE2NzcxMDg5ODUsImlzcyI6Imh0dHBzOi8va3ViZXJuZXRlcy5kZWZhdWx0LnN2Yy5jbHVzdGVyLmxvY2FsIiwia3ViZXJuZXRlcy5pbyI6eyJuYW1lc3BhY2UiOiJoZWltZGFsbCIsInNlcnZpY2VhY2NvdW50Ijp7Im5hbWUiOiJkZWZhdWx0IiwidWlkIjoiMTAwOTkzNTUtZmFlMi00YWUwLTg1OTgtMWNjNWU3ZWYyYTVkIn19LCJuYmYiOjE2NzcxMDg5ODUsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpoZWltZGFsbDpkZWZhdWx0In0.aEmmMcvBBick3HVniu5lkgobxD9-yW_amOit2wSXKfcQTwQbzIxxj3bnplTN_6nEJAe4itEEmzh5PH2K_Xq_6J36MtiG3K6Ghd-SEJB0hCx9QWfV8cVWkf-azu1zhddfjQLYxj4y9vAt1Lvjf4LFKbCHsrdbA072z6WD_gm6Ox43zvij27ZGa4Mx8icL1aGbnqiDEPEImL1A2m_TGC1wrNrFOR_MPqriRAiO08lBDH1I_2b56e6l93cIWP_WrwODjHhGvs0zApbfYvzQAOG1lEYQFk7FnSQfYx1_9i4STDdvJyjPJrw5cb493IyqNSLiSbO1IDYFV0EFRk_AvW31mA", "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authToken, "v1"),
 	}
 
 	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, klog.TODO())
@@ -62,7 +69,10 @@ func main() {
 }
 
 func server() {
-	iih, err := getIIH()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	iih, err := getIIH(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -107,12 +117,14 @@ func server() {
 }
 
 func client() {
-	iih, err := getIIH()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	iih, err := getIIH(ctx)
 	if err != nil {
 		panic(err)
 	}
 
-	ctx := context.Background()
 	d, err := iih.GetTCPDialer()
 	if err != nil {
 		panic(err)
