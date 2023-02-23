@@ -13,7 +13,7 @@ install-gomobile:
 install-linux-dependencies:
 	sudo apt update
 	sudo apt install golang default-jdk git
-	sudo apt install gcc-aarch64-linux-gnu
+	sudo apt install gcc-aarch64-linux-gnu gcc-x86-64-linux-gnu
 
 setup-vm: install-linux-dependencies install-gomobile
 	grep -qxF 'export PATH=$$PATH:$$HOME/go/bin' ~/.bashrc || echo 'export PATH=$$PATH:$$HOME/go/bin' >> ~/.bashrc
