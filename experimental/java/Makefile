@@ -6,13 +6,14 @@ ARCH := $(shell uname -m)
 java:
 	gomobile bind -target java/arm64,java/amd64 -v -o repo/nasp/nasp/0.0.0/nasp-0.0.0-$(OS).jar
 
-setup-vm:
+install-gomobile:
+	git clone -b plainjava https://github.com/bonifaido/mobile.git gomobile
+	cd gomobile && go install ./cmd/gomobile && go install ./cmd/gobind
+
+install-linux-dependencies:
 	sudo apt update
-	sudo apt golang default-jdk git
-	ifeq ($(ARCH), x86_64)
-		sudo apt install gcc-aarch64-linux-gnu
-	endif
-	ifeq ($(ARCH), aarch64)
-		sudo apt install gcc-x86-64-linux-gnu
-	endif
+	sudo apt install golang default-jdk git
+	sudo apt install gcc-aarch64-linux-gnu
+
+setup-vm: install-linux-dependencies install-gomobile
 	grep -qxF 'export PATH=$$PATH:$$HOME/go/bin' ~/.bashrc || echo 'export PATH=$$PATH:$$HOME/go/bin' >> ~/.bashrc
