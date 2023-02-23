@@ -113,16 +113,14 @@ var logger = klog.NewKlogr()
 var httpTransportPool = httpTransportPoolManager{}
 
 //export NewHTTPTransport
-func NewHTTPTransport(heimdallURLPtr, clientIDPtr, clientSecretPtr *C.char,
+func NewHTTPTransport(heimdallURLPtr, authorizationTokenPtr *C.char,
 	usePushGateWay C._Bool, pushGatewayAddressPtr *C.char) (C.ulonglong, *C.struct_GoError) {
 	heimdallURL := C.GoString(heimdallURLPtr)
-	clientID := C.GoString(clientIDPtr)
-	clientSecret := C.GoString(clientSecretPtr)
+	authorizationToken := C.GoString(authorizationTokenPtr)
 
 	hash := fnv.New64()
 	hash.Write([]byte(heimdallURL))
-	hash.Write([]byte(clientID))
-	hash.Write([]byte(clientSecret))
+	hash.Write([]byte(authorizationToken))
 	httpTransportIDHex := fmt.Sprintf("%x", hash.Sum(nil))
 	httpTransportID, _ := strconv.ParseUint(httpTransportIDHex, 16, 64)
 
@@ -139,9 +137,13 @@ func NewHTTPTransport(heimdallURLPtr, clientIDPtr, clientSecretPtr *C.char,
 			UseUniqueIDLabel: true,
 		}
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret, "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
 		PushgatewayConfig:   pgwConfig,
 	}
 
@@ -156,7 +158,6 @@ func NewHTTPTransport(heimdallURLPtr, clientIDPtr, clientSecretPtr *C.char,
 		return C.ulonglong(0), cGoError(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go iih.Run(ctx)
 
 	client := &http.Client{

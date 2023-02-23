@@ -63,9 +63,9 @@ var (
 	IstioCAConfigGetterLocal = func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
 		return istio_ca.GetIstioCAClientConfigFromLocal(e.ClusterID, e.IstioCAAddress)
 	}
-	IstioCAConfigGetterHeimdall = func(heimdallURL, clientID, clientSecret, version string) IstioCAConfigGetterFunc {
+	IstioCAConfigGetterHeimdall = func(ctx context.Context, heimdallURL, authorizationToken string, version string) IstioCAConfigGetterFunc {
 		return func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
-			c, err := istio_ca.GetIstioCAClientConfigFromHeimdall(heimdallURL, clientID, clientSecret, version)
+			c, err := istio_ca.GetIstioCAClientConfigFromHeimdall(ctx, heimdallURL, authorizationToken, version)
 			if err != nil {
 				return istio_ca.IstioCAClientConfig{}, err
 			}

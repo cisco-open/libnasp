@@ -55,10 +55,13 @@ type HTTPResponse struct {
 	Body       []byte
 }
 
-func NewHTTPTransport(heimdallURL, clientID, clientSecret string) (*HTTPTransport, error) {
+func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret, "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
 		PushgatewayConfig: &istio.PushgatewayConfig{
 			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
 			UseUniqueIDLabel: true,
@@ -73,7 +76,6 @@ func NewHTTPTransport(heimdallURL, clientID, clientSecret string) (*HTTPTranspor
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go iih.Run(ctx)
 
 	client := &http.Client{

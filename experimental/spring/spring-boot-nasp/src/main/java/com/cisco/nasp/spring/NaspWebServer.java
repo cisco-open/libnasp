@@ -21,7 +21,7 @@ public class NaspWebServer implements WebServer {
     @Override
     public void start() throws WebServerException {
         try {
-            transport = Nasp.newHTTPTransport(configuration.getHeimdallURL(), configuration.getHeimdallClientID(), configuration.getHeimdallClientSecret());
+            transport = Nasp.newHTTPTransport(configuration.getHeimdallURL(), configuration.getHeimdallAuthorizationToken());
         } catch (Exception e) {
             throw new WebServerException("failed to create nasp transport", e);
         }

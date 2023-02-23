@@ -46,17 +46,17 @@ func (gs *greeterServer) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb
 }
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		MetricsAddress:      ":15090",
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, "test-grpc-16362813-F46B-41AC-B191-A390DB1F6BDF", "16362813-F46B-41AC-B191-A390DB1F6BDF", "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, "ZXlKaGJHY2lPaUpTVXpJMU5pSXNJbXRwWkNJNkltcElUbk50ZFVsaVkyUkhkRTQzWHpKalIwTlRWMHBQTFU5RFgyWnlNM1JFY2pJM2VYUjNibkZOVTNNaWZRLmV5SmhkV1FpT2xzaWFYTjBhVzh0WTJFaVhTd2laWGh3SWpveE5qYzNNalEzT0RReUxDSnBZWFFpT2pFMk56Y3hOakUwTkRJc0ltbHpjeUk2SW1oMGRIQnpPaTh2YTNWaVpYSnVaWFJsY3k1a1pXWmhkV3gwTG5OMll5NWpiSFZ6ZEdWeUxteHZZMkZzSWl3aWEzVmlaWEp1WlhSbGN5NXBieUk2ZXlKdVlXMWxjM0JoWTJVaU9pSm9aV2x0WkdGc2JDSXNJbk5sY25acFkyVmhZMk52ZFc1MElqcDdJbTVoYldVaU9pSmtaV1poZFd4MElpd2lkV2xrSWpvaU1UQXdPVGt6TlRVdFptRmxNaTAwWVdVd0xUZzFPVGd0TVdOak5XVTNaV1l5WVRWa0luMTlMQ0p1WW1ZaU9qRTJOemN4TmpFME5ESXNJbk4xWWlJNkluTjVjM1JsYlRwelpYSjJhV05sWVdOamIzVnVkRHBvWldsdFpHRnNiRHBrWldaaGRXeDBJbjAuV2NLbjVMY051YmNhMEYxRXBYVU1RV0RsRmNqOUQxeVBfSmFpUTUyRTJNSmhCQUd0MU1GYV96QlM3dVVDSExmQmctc0E0SUstYUYzWW5rYnFJdzlzNEpIa252b0hIaWlYY1l6SEZJUnBMZzg3NEhTSmpfOWt6SERHYkNoSVhfSy1GSnlMYUNHSzlnSWFZOFpvUEFRZWJnVDZ5QVRQbVhsN2ZrRUsxblBWdFpFS3B0LU1sSXVNZDBHWDVIcUVZQWNGeGZpTTZQU1hBaWstVU9OUXhMWnBSRDl3c1pfM0k4YXRjZi1UcEdkaW5QTXlPb01DWW10cFZNb3U3VFZFd3RodmF3eWZPVXFWTzN5NXRGQXFQSlZjaHllTHVRU20zcHc5a1FFRE40NFdHNU1KRDFITmgxeldBaDN6RW9ma2pOSXFNUnNlZGRNY2J3VjBYY1Y4aWtlOVRB", "v1"),
 	}, klog.TODO())
 	if err != nil {
 		panic(err)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	iih.Run(ctx)
 
