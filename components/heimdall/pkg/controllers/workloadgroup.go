@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	istionetworkingv1beta1 "istio.io/client-go/pkg/apis/networking/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,8 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/go-logr/logr"
-
+	"github.com/banzaicloud/operator-tools/pkg/utils"
 	"github.com/cisco-open/nasp/components/heimdall/pkg/predicates"
 	"github.com/cisco-open/nasp/components/heimdall/pkg/server"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
@@ -48,6 +48,11 @@ type IstioWorkloadGroupReconciler struct {
 	builder *ctrlBuilder.Builder
 	ctrl    controller.Controller
 }
+
+const (
+	naspSecretType                   corev1.SecretType = "nasp.k8s.cisco.com/access-token"
+	naspSecretWorkloadgroupLabelName string            = "nasp.k8s.cisco.com/workloadgroup"
+)
 
 var (
 	naspLabels = labels.Set(map[string]string{
@@ -117,9 +122,14 @@ func (r *IstioWorkloadGroupReconciler) createToken(ctx context.Context, wg *isti
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				naspSecretWorkloadgroupLabelName: wg.GetName(),
+			},
 			Name:      name,
 			Namespace: wg.GetNamespace(),
 		},
+		Type:      naspSecretType,
+		Immutable: utils.BoolPointer(true),
 		Data: map[string][]byte{
 			"namespace": []byte(wg.GetNamespace()),
 		},
