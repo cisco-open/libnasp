@@ -168,7 +168,7 @@ func (s *Selector) unregisterWriter(selectedKeyId int32) {
 }
 
 func (s *Selector) WakeUp() {
-	s.queue <- SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: -1}
+	s.queue <- SelectedKey{Operation: OP_WAKEUP, SelectedKeyId: -1}
 }
 
 func (s *Selector) NextSelectedKey() *SelectedKey {
