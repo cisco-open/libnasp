@@ -22,32 +22,76 @@
 
     <profiles>
         <profile>
-            <id>os-darwin</id>
-<!--            <activation>-->
-<!--                <os>-->
-<!--                    <name>Mac OS X</name>-->
-<!--                </os>-->
-<!--            </activation>-->
+            <id>darwin</id>
+            <!--            <activation>-->
+            <!--                <os>-->
+            <!--                    <name>Mac OS X</name>-->
+            <!--                </os>-->
+            <!--            </activation>-->
             <properties>
                 <nasp.os>darwin</nasp.os>
             </properties>
         </profile>
         <profile>
-            <id>os-linux</id>
-<!--            <activation>-->
-<!--                <os>-->
-<!--                    <name>Linux</name>-->
-<!--                </os>-->
-<!--            </activation>-->
+            <id>linux</id>
+            <!--            <activation>-->
+            <!--                <os>-->
+            <!--                    <name>Linux</name>-->
+            <!--                </os>-->
+            <!--            </activation>-->
             <properties>
                 <nasp.os>linux</nasp.os>
+            </properties>
+        </profile>
+        <profile>
+            <id>aarch64-arm64</id>
+            <activation>
+                <os>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <nasp.arch>arm64</nasp.arch>
+            </properties>
+        </profile>
+        <profile>
+            <id>arm64-arm64</id>
+            <activation>
+                <os>
+                    <arch>arm64</arch>
+                </os>
+            </activation>
+            <properties>
+                <nasp.arch>arm64</nasp.arch>
+            </properties>
+        </profile>
+        <profile>
+            <id>x86_64-amd64</id>
+            <activation>
+                <os>
+                    <arch>x86_64</arch>
+                </os>
+            </activation>
+            <properties>
+                <nasp.arch>amd64</nasp.arch>
+            </properties>
+        </profile>
+        <profile>
+            <id>amd64-amd64</id>
+            <activation>
+                <os>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <properties>
+                <nasp.arch>amd64</nasp.arch>
             </properties>
         </profile>
     </profiles>
 
     <properties>
-        <maven.compiler.source>19</maven.compiler.source>
-        <maven.compiler.target>19</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 

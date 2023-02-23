@@ -24,12 +24,30 @@
 
     <build>
         <plugins>
+            <!--            <plugin>-->
+            <!--                <groupId>org.springframework.boot</groupId>-->
+            <!--                <artifactId>spring-boot-maven-plugin</artifactId>-->
+            <!--                <configuration>-->
+            <!--                    <imageBuilder>paketobuildpacks/builder-jammy-base</imageBuilder>-->
+            <!--                    <runImage>paketobuildpacks/run-jammy-base</runImage>-->
+            <!--                </configuration>-->
+            <!--            </plugin>-->
             <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>3.3.1</version>
                 <configuration>
-                    <imageBuilder>paketobuildpacks/builder-jammy-base</imageBuilder>
-                    <runImage>paketobuildpacks/run-jammy-base</runImage>
+                    <from>
+                        <platforms>
+                            <platform>
+                                <architecture>${nasp.arch}</architecture>
+                                <os>linux</os>
+                            </platform>
+                        </platforms>
+                    </from>
+                    <to>
+                        <image>${artifactId}:${version}</image>
+                    </to>
                 </configuration>
             </plugin>
         </plugins>
