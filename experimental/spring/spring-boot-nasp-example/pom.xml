@@ -46,7 +46,7 @@
                         </platforms>
                     </from>
                     <to>
-                        <image>${artifactId}:${version}</image>
+                        <image>${project.artifactId}:${project.version}</image>
                     </to>
                 </configuration>
             </plugin>

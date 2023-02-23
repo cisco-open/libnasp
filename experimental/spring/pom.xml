@@ -34,11 +34,11 @@
         </profile>
         <profile>
             <id>linux</id>
-            <!--            <activation>-->
-            <!--                <os>-->
-            <!--                    <name>Linux</name>-->
-            <!--                </os>-->
-            <!--            </activation>-->
+            <activation>
+                <os>
+                    <name>Linux</name>
+                </os>
+            </activation>
             <properties>
                 <nasp.os>linux</nasp.os>
             </properties>
@@ -114,6 +114,12 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>nasp</groupId>
+                <artifactId>nasp</artifactId>
+                <version>0.0.0</version>
+                <classifier>${nasp.os}</classifier>
+            </dependency>
             <dependency>
                 <groupId>com.cisco.nasp</groupId>
                 <artifactId>spring-boot-nasp</artifactId>
