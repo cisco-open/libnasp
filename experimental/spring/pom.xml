@@ -14,44 +14,114 @@
     <groupId>com.cisco.nasp</groupId>
     <artifactId>spring-nasp</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <modules>
+        <module>spring-boot-nasp</module>
+        <module>spring-boot-nasp-example</module>
+    </modules>
+
+    <profiles>
+        <profile>
+            <id>darwin</id>
+            <!--            <activation>-->
+            <!--                <os>-->
+            <!--                    <name>Mac OS X</name>-->
+            <!--                </os>-->
+            <!--            </activation>-->
+            <properties>
+                <nasp.os>darwin</nasp.os>
+            </properties>
+        </profile>
+        <profile>
+            <id>linux</id>
+            <!--            <activation>-->
+            <!--                <os>-->
+            <!--                    <name>Linux</name>-->
+            <!--                </os>-->
+            <!--            </activation>-->
+            <properties>
+                <nasp.os>linux</nasp.os>
+            </properties>
+        </profile>
+        <profile>
+            <id>aarch64-arm64</id>
+            <activation>
+                <os>
+                    <arch>aarch64</arch>
+                </os>
+            </activation>
+            <properties>
+                <nasp.arch>arm64</nasp.arch>
+            </properties>
+        </profile>
+        <profile>
+            <id>arm64-arm64</id>
+            <activation>
+                <os>
+                    <arch>arm64</arch>
+                </os>
+            </activation>
+            <properties>
+                <nasp.arch>arm64</nasp.arch>
+            </properties>
+        </profile>
+        <profile>
+            <id>x86_64-amd64</id>
+            <activation>
+                <os>
+                    <arch>x86_64</arch>
+                </os>
+            </activation>
+            <properties>
+                <nasp.arch>amd64</nasp.arch>
+            </properties>
+        </profile>
+        <profile>
+            <id>amd64-amd64</id>
+            <activation>
+                <os>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <properties>
+                <nasp.arch>amd64</nasp.arch>
+            </properties>
+        </profile>
+    </profiles>
 
     <properties>
-        <maven.compiler.source>19</maven.compiler.source>
-        <maven.compiler.target>19</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <repositories>
+        <!--        <repository>-->
+        <!--            <id>github-nasp</id>-->
+        <!--            <url>https://maven.pkg.github.com/cisco-open/nasp</url>-->
+        <!--            <snapshots>-->
+        <!--                <enabled>true</enabled>-->
+        <!--            </snapshots>-->
+        <!--        </repository>-->
         <repository>
-            <id>github-nasp</id>
-            <url>https://maven.pkg.github.com/cisco-open/nasp</url>
+            <id>local-nasp</id>
+            <url>file://${project.basedir}/../../java/repo</url>
             <snapshots>
                 <enabled>true</enabled>
             </snapshots>
         </repository>
     </repositories>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.cisco.nasp</groupId>
-            <artifactId>nasp</artifactId>
-            <version>2.0-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-webflux</artifactId>
-            <scope>compile</scope>
-            <!-- for some reason with parent 3.0.0 it misses jakarta.websocket.Endpoint,
-                 but netty is certainly not required -->
-<!--            <exclusions>-->
-<!--                <exclusion>-->
-<!--                    <groupId>org.springframework.boot</groupId>-->
-<!--                    <artifactId>spring-boot-starter-reactor-netty</artifactId>-->
-<!--                </exclusion>-->
-<!--            </exclusions>-->
-        </dependency>
-    </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.cisco.nasp</groupId>
+                <artifactId>spring-boot-nasp</artifactId>
+                <version>${project.version}</version>
+                <classifier>${nasp.os}</classifier>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <distributionManagement>
         <repository>
