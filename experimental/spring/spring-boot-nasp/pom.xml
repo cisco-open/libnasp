@@ -21,18 +21,29 @@
             <classifier>${nasp.os}</classifier>
         </dependency>
 
+        <!-- for some reason with parent 3.0.* it misses jakarta.websocket.Endpoint,
+             but netty is certainly not required, so we exclude netty and add the
+             missing websocket stuff explicitly -->
+        <dependency>
+            <groupId>jakarta.websocket</groupId>
+            <artifactId>jakarta.websocket-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>jakarta.websocket</groupId>
+            <artifactId>jakarta.websocket-client-api</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
             <scope>compile</scope>
-            <!-- for some reason with parent 3.0.0 it misses jakarta.websocket.Endpoint,
-                 but netty is certainly not required -->
-            <!--            <exclusions>-->
-            <!--                <exclusion>-->
-            <!--                    <groupId>org.springframework.boot</groupId>-->
-            <!--                    <artifactId>spring-boot-starter-reactor-netty</artifactId>-->
-            <!--                </exclusion>-->
-            <!--            </exclusions>-->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-reactor-netty</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
