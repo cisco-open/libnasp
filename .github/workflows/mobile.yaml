@@ -45,7 +45,7 @@ jobs:
         working-directory: experimental/spring
         run: |
           export JAVA_HOME="$(brew --prefix)/opt/openjdk/"
-          ./mvnw install -Pos-darwin
+          ./mvnw install -Pdarwin
 
       - name: Setup original gomobile
         run: |
