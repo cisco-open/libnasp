@@ -18,7 +18,7 @@
             <groupId>nasp</groupId>
             <artifactId>nasp</artifactId>
             <version>0.0.0</version>
-            <classifier>linux</classifier>
+            <classifier>${nasp.os}</classifier>
         </dependency>
 
         <dependency>

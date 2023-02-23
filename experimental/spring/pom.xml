@@ -74,7 +74,7 @@
                 <groupId>com.cisco.nasp</groupId>
                 <artifactId>spring-boot-nasp</artifactId>
                 <version>${project.version}</version>
-                <classifier>linux</classifier>
+                <classifier>${nasp.os}</classifier>
             </dependency>
         </dependencies>
     </dependencyManagement>

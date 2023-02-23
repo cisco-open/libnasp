@@ -18,7 +18,7 @@
         <dependency>
             <groupId>com.cisco.nasp</groupId>
             <artifactId>spring-boot-nasp</artifactId>
-            <classifier>linux</classifier>
+            <classifier>${nasp.os}</classifier>
         </dependency>
     </dependencies>
 
