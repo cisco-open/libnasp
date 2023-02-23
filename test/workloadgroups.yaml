@@ -1,0 +1,80 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: WorkloadGroup
+metadata:
+  labels:
+    nasp: "true"
+  name: test-http
+spec:
+  metadata:
+    labels:
+      app.kubernetes.io/name: test-http
+      app.kubernetes.io/version: "v1"
+  template:
+    ports:
+      http: 8080
+    network: network2
+    serviceAccount: test-http
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: WorkloadGroup
+metadata:
+  labels:
+    nasp: "true"
+  name: test-tcp
+spec:
+  metadata:
+    labels:
+      app.kubernetes.io/name: test-tcp
+      app.kubernetes.io/version: "v1"
+  template:
+    ports:
+      tcp: 10000
+    network: network2
+    serviceAccount: test-tcp
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: WorkloadGroup
+metadata:
+  labels:
+    nasp: "true"
+  name: test-grpc
+spec:
+  metadata:
+    labels:
+      app.kubernetes.io/name: test-grpc
+      app.kubernetes.io/version: "v1"
+  template:
+    ports:
+      grpc: 8082
+    network: network2
+    serviceAccount: test-grpc
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: WorkloadGroup
+metadata:
+  labels:
+    nasp: "true"
+  name: ios-mobile-app
+spec:
+  metadata:
+    labels:
+      app.kubernetes.io/name: ios-mobile-app
+      app.kubernetes.io/version: "v1"
+  template:
+    network: network2
+    serviceAccount: ios-mobile
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: WorkloadGroup
+metadata:
+  labels:
+    nasp: "true"
+  name: android-mobile-app
+spec:
+  metadata:
+    labels:
+      app.kubernetes.io/name: android-mobile-app
+      app.kubernetes.io/version: "v1"
+  template:
+    network: network2
+    serviceAccount: android-mobile

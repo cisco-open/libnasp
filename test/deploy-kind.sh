@@ -83,6 +83,9 @@ kubectl wait -n testing deployment/echo --for condition=Available=True --timeout
 log "create external namespace"
 create_and_label_namespace external
 
+log "apply workloadgroups"
+kubectl apply --namespace external -f ${DIRECTORY}/workloadgroups.yaml
+
 log "create service accounts in namespace external"
 for saName in ios-mobile android-mobile test-http test-tcp test-grpc; do
     create_sa external ${saName}
