@@ -179,10 +179,13 @@ func (s *Selector) NextSelectedKey() *SelectedKey {
 	return nil
 }
 
-func NewNaspIntegrationHandler(heimdallURL, clientID, clientSecret string) (*NaspIntegrationHandler, error) {
+func NewNaspIntegrationHandler(heimdallURL, authorizationToken string) (*NaspIntegrationHandler, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret, "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
 		PushgatewayConfig: &istio.PushgatewayConfig{
 			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
 			UseUniqueIDLabel: true,
@@ -192,7 +195,6 @@ func NewNaspIntegrationHandler(heimdallURL, clientID, clientSecret string) (*Nas
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go iih.Run(ctx)
 
 	return &NaspIntegrationHandler{
@@ -239,6 +241,9 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	return &Connection{
 		conn:         c,
 		readBuffer:   new(bytes.Buffer),
@@ -473,10 +478,13 @@ type TCPDialer struct {
 	asyncConnections     []*Connection
 }
 
-func NewTCPDialer(heimdallURL, clientID, clientSecret string) (*TCPDialer, error) {
+func NewTCPDialer(heimdallURL, authorizationToken string) (*TCPDialer, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret, "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
 		PushgatewayConfig: &istio.PushgatewayConfig{
 			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
 			UseUniqueIDLabel: true,
@@ -491,7 +499,6 @@ func NewTCPDialer(heimdallURL, clientID, clientSecret string) (*TCPDialer, error
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go iih.Run(ctx)
 
 	return &TCPDialer{
@@ -540,6 +547,9 @@ func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
+	ctx, cancel := context.WithCancel(backgroundCtx)
+	defer cancel()
+
 	return &Connection{
 		conn:         c,
 		readBuffer:   new(bytes.Buffer),
@@ -576,10 +586,13 @@ type HTTPResponse struct {
 	Body       []byte
 }
 
-func NewHTTPTransport(heimdallURL, clientID, clientSecret string) (*HTTPTransport, error) {
+func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(heimdallURL, clientID, clientSecret, "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
 		PushgatewayConfig: &istio.PushgatewayConfig{
 			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
 			UseUniqueIDLabel: true,
@@ -594,7 +607,6 @@ func NewHTTPTransport(heimdallURL, clientID, clientSecret string) (*HTTPTranspor
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go iih.Run(ctx)
 
 	client := &http.Client{

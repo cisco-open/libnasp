@@ -8,9 +8,7 @@ import org.springframework.context.annotation.Configuration;
 public class NaspConfiguration {
 
     private String heimdallURL;
-    private String heimdallClientID;
-
-    private String heimdallClientSecret;
+    private String heimdallAuthorizationToken;
 
     public String getHeimdallURL() {
         return heimdallURL;
@@ -20,19 +18,11 @@ public class NaspConfiguration {
         this.heimdallURL = heimdallURL;
     }
 
-    public String getHeimdallClientID() {
-        return heimdallClientID;
+    public String getHeimdallAuthorizationToken() {
+        return heimdallAuthorizationToken;
     }
 
-    public void setHeimdallClientID(String heimdallClientID) {
-        this.heimdallClientID = heimdallClientID;
-    }
-
-    public String getHeimdallClientSecret() {
-        return heimdallClientSecret;
-    }
-
-    public void setHeimdallClientSecret(String heimdallClientSecret) {
-        this.heimdallClientSecret = heimdallClientSecret;
+    public void setHeimdallAuthorizationToken(String heimdallAuthorizationToken) {
+        this.heimdallAuthorizationToken = heimdallAuthorizationToken;
     }
 }

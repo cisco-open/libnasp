@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
-	golang.org/x/mobile v0.0.0-20221020085226-b36e6246172e
+	golang.org/x/mobile v0.0.0-20221110043201-43a038452099
 	k8s.io/klog/v2 v2.90.0
 )
 

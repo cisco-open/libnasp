@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"emperror.dev/errors"
 	"github.com/golang/protobuf/jsonpb"
@@ -56,7 +58,7 @@ const (
 	// K8sSAJWTFileName is the token volume mount file name for k8s jwt token.
 	K8sSAJWTFileName = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
-	// The data name in the ConfigMap of each namespace storing the root cert of non-Kube CA.
+	// CACertPEMFileName The data name in the ConfigMap of each namespace storing the root cert of non-Kube CA.
 	CACertPEMFileName = "/var/run/secrets/istio/root-cert.pem"
 )
 
@@ -365,27 +367,45 @@ func GetIstioTokenFromPod(config *rest.Config, scheme *runtime.Scheme, name, nam
 	return stdout.Bytes(), nil
 }
 
-func GetIstioCAClientConfigFromHeimdall(heimdallURL, clientID, clientSecret, version string) (config IstioCAClientConfigAndEnvironment, err error) {
+func GetIstioCAClientConfigFromHeimdall(ctx context.Context, heimdallURL, authorizationToken, version string) (config IstioCAClientConfigAndEnvironment, err error) {
+	hostName, err := os.Hostname()
+	if err != nil {
+		return
+	}
+
+	podName := hostName + "-" + strconv.Itoa(os.Getppid())
+
+	if !strings.HasPrefix(authorizationToken, "Bearer ") {
+		authorizationToken = "Bearer " + authorizationToken
+	}
+
+	// Prepare request
 	body, err := json.Marshal(map[string]string{
-		"ClientID":     clientID,
-		"ClientSecret": clientSecret,
-		"Version":      version,
+		"PodName": podName,
+		"Version": version,
 	})
 	if err != nil {
 		return config, err
 	}
 
-	client := &http.Client{Transport: &http.Transport{
+	httpContext := &http.Client{Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
 
-	// TODO(@nandork): use ctx
-	response, err := client.Post(heimdallURL, "application/json", bytes.NewReader(body)) //nolint:noctx
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, heimdallURL, bytes.NewReader(body))
 	if err != nil {
-		return config, errors.WrapIf(err, "failed to communicate with Heimdall")
+		return config, errors.WrapIf(err, "failed to create Heimdall request")
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authorizationToken)
+
+	response, err := httpContext.Do(req)
+	if err != nil {
+		return config, errors.WrapIf(err, "failed to get Heimdall response")
 	}
 	defer response.Body.Close()
 
+	// Read the response body
 	if response.StatusCode == http.StatusOK {
 		err = json.NewDecoder(response.Body).Decode(&config)
 		if err != nil {
