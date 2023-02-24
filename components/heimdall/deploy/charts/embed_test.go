@@ -15,7 +15,7 @@
 package charts_test
 
 import (
-	"github.com/cisco-open/nasp/components/heimdall/charts"
+	"github.com/cisco-open/nasp/components/heimdall/deploy/charts"
 	"io"
 	"os"
 	"testing"
