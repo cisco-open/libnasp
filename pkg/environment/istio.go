@@ -36,9 +36,12 @@ type IstioEnvironment struct {
 	Network           string            `env:"NETWORK"`
 	SearchDomains     []string          `env:"SEARCH_DOMAINS"`
 
-	ClusterID string `env:"CLUSTER_ID"`
-	DNSDomain string `env:"DNS_DOMAIN"`
-	MeshID    string `env:"MESH_ID"`
+	AdditionalMetadata map[string]string `env:"ADDITIONAL_METADATA"`
+
+	ClusterID   string `env:"CLUSTER_ID"`
+	DNSDomain   string `env:"DNS_DOMAIN"`
+	TrustDomain string `env:"TRUST_DOMAIN"`
+	MeshID      string `env:"MESH_ID"`
 
 	IstioCAAddress string `env:"ISTIO_CA_ADDR"`
 	IstioVersion   string `env:"ISTIO_VERSION"`
@@ -101,6 +104,8 @@ func (e *IstioEnvironment) Override(otherEnv IstioEnvironment) {
 	e.Network = otherEnv.Network
 	e.SearchDomains = otherEnv.SearchDomains
 
+	e.AdditionalMetadata = otherEnv.AdditionalMetadata
+
 	e.ClusterID = otherEnv.ClusterID
 	e.DNSDomain = otherEnv.DNSDomain
 	e.MeshID = otherEnv.MeshID
@@ -121,22 +126,28 @@ func (e *IstioEnvironment) GetNodePropertiesFromEnvironment() map[string]interfa
 		platformMetadata[k] = v
 	}
 
+	md := map[string]interface{}{
+		"NAME":              e.PodName,
+		"NAMESPACE":         e.PodNamespace,
+		"OWNER":             e.PodOwner,
+		"WORKLOAD_NAME":     e.WorkloadName,
+		"ISTIO_VERSION":     e.IstioVersion,
+		"MESH_ID":           e.MeshID,
+		"CLUSTER_ID":        e.ClusterID,
+		"NETWORK":           e.Network,
+		"LABELS":            labels,
+		"PLATFORM_METADATA": platformMetadata,
+		"APP_CONTAINERS":    strings.Join(e.AppContainers, ","),
+		"INSTANCE_IPS":      strings.Join(e.InstanceIPs, ","),
+	}
+
+	for k, v := range e.AdditionalMetadata {
+		md[k] = v
+	}
+
 	return map[string]interface{}{
-		"id":      e.GetNodeID(),
-		"cluster": e.GetClusterName(),
-		"metadata": map[string]interface{}{
-			"NAME":              e.PodName,
-			"NAMESPACE":         e.PodNamespace,
-			"OWNER":             e.PodOwner,
-			"WORKLOAD_NAME":     e.WorkloadName,
-			"ISTIO_VERSION":     e.IstioVersion,
-			"MESH_ID":           e.MeshID,
-			"CLUSTER_ID":        e.ClusterID,
-			"NETWORK":           e.Network,
-			"LABELS":            labels,
-			"PLATFORM_METADATA": platformMetadata,
-			"APP_CONTAINERS":    strings.Join(e.AppContainers, ","),
-			"INSTANCE_IPS":      strings.Join(e.InstanceIPs, ","),
-		},
+		"id":       e.GetNodeID(),
+		"cluster":  e.GetClusterName(),
+		"metadata": md,
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -32,9 +33,12 @@ import (
 	cluster_registry "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
 	"github.com/cisco-open/nasp/pkg/environment"
+	"github.com/cisco-open/nasp/pkg/k8s/labels"
+	k8slabels "github.com/cisco-open/nasp/pkg/k8s/labels"
 )
 
 var (
+	dnsDomain     = os.Getenv("NASP_DNS_DOMAIN")
 	clusterID     = os.Getenv("NASP_CLUSTER_ID")
 	istioVersion  = os.Getenv("NASP_ISTIO_VERSION")
 	istioRevision = os.Getenv("NASP_ISTIO_REVISION")
@@ -43,14 +47,16 @@ var (
 var ErrClusterIDNotFound = errors.New("clusterID not found")
 
 type server struct {
-	mgr    manager.Manager
-	logger logr.Logger
+	listener net.Listener
+	mgr      manager.Manager
+	logger   logr.Logger
 }
 
-func New(mgr manager.Manager, logger logr.Logger) *server {
+func New(listener net.Listener, mgr manager.Manager, logger logr.Logger) *server {
 	return &server{
-		mgr:    mgr,
-		logger: logger,
+		listener: listener,
+		mgr:      mgr,
+		logger:   logger,
 	}
 }
 
@@ -59,6 +65,10 @@ func (s *server) Run(ctx context.Context) error {
 		if _, err := s.getClusterIDFromRegistry(); err != nil {
 			return err
 		}
+	}
+
+	if dnsDomain == "" {
+		dnsDomain = k8slabels.DefaultClusterDNSDomain
 	}
 
 	srv := s.run()
@@ -117,14 +127,14 @@ func (s *server) run() *http.Server {
 			return
 		}
 
-		type IstioCAClientConfigAndEnvironment struct {
+		type Response struct {
 			CAClientConfig istio_ca.IstioCAClientConfig
 			Environment    environment.IstioEnvironment
 		}
 
-		var e IstioCAClientConfigAndEnvironment
+		var r Response
 
-		e.CAClientConfig, err = istio_ca.GetIstioCAClientConfigWithKubeConfig(clusterID, istioRevision, nil, &user.ServiceAccountRef)
+		r.CAClientConfig, err = istio_ca.GetIstioCAClientConfigWithKubeConfig(clusterID, istioRevision, nil, &user.ServiceAccountRef)
 		if err != nil {
 			s.logger.Error(err, "could not get ca client config")
 			err = errors.WrapIf(err, "could not get ca client config")
@@ -137,8 +147,8 @@ func (s *server) run() *http.Server {
 			clientIP = "127.0.0.1"
 		}
 
-		e.Environment = environment.IstioEnvironment{
-			Type:              "sidecar",
+		r.Environment = environment.IstioEnvironment{
+			Type:              string(k8slabels.IstioProxyTypeSidecar),
 			PodNamespace:      workloadGroup.GetNamespace(),
 			PodOwner:          fmt.Sprintf("kubernetes://apis/v1/namespaces/%s/workloadgroups/%s", user.WorkloadGroupRef.Namespace, workloadGroup.GetName()),
 			PodServiceAccount: user.ServiceAccountRef.Name,
@@ -146,35 +156,35 @@ func (s *server) run() *http.Server {
 			AppContainers:     nil,
 			InstanceIPs:       []string{clientIP},
 			Labels: map[string]string{
-				"security.istio.io/tlsMode":           "istio",
-				"service.istio.io/canonical-revision": getLabelValueWithDefault(workloadGroup.Labels, []string{"service.istio.io/canonical-revision", "app.kubernetes.io/version", "version"}, "latest"),
-				"istio.io/rev":                        e.CAClientConfig.Revision,
-				"topology.istio.io/network":           workloadGroup.Spec.Template.GetNetwork(),
-				"k8s-app":                             workloadGroup.GetName(),
-				"service.istio.io/canonical-name":     getLabelValueWithDefault(workloadGroup.Labels, []string{"service.istio.io/canonical-name", "app.kubernetes.io/name", "app"}, workloadGroup.GetName()),
-				"app":                                 workloadGroup.GetName(),
+				k8slabels.IstioSecurityTlsModeLabel:          string(labels.IstioTLSModeIstio),
+				k8slabels.IstioServiceCanonicalRevisionLabel: labels.IstioCanonicalServiceRevision(workloadGroup.Labels),
+				k8slabels.IstioRevisionLabel:                 r.CAClientConfig.Revision,
+				k8slabels.IstioTopologyNetworkLabel:          workloadGroup.Spec.Template.GetNetwork(),
+				k8slabels.IstioServiceCanonicalNameLabel:     labels.IstioCanonicalServiceName(workloadGroup.Labels, workloadGroup.GetName()),
+				k8slabels.KubernetesAppNameLabel:             workloadGroup.GetName(),
+				k8slabels.AppNameLabel:                       workloadGroup.GetName(),
 			},
 			PlatformMetadata: nil,
 			Network:          workloadGroup.Spec.Template.GetNetwork(),
-			SearchDomains:    []string{"svc.cluster.local", "cluster.local"},
-			ClusterID:        e.CAClientConfig.ClusterID,
-			DNSDomain:        "cluster.local",
-			MeshID:           e.CAClientConfig.MeshID,
-			IstioCAAddress:   e.CAClientConfig.CAEndpoint,
+			ClusterID:        r.CAClientConfig.ClusterID,
+			DNSDomain:        dnsDomain,
+			SearchDomains:    []string{"svc." + dnsDomain, dnsDomain},
+			TrustDomain:      r.CAClientConfig.TrustDomain,
+			MeshID:           r.CAClientConfig.MeshID,
+			IstioCAAddress:   r.CAClientConfig.CAEndpoint,
 			IstioVersion:     istioVersion,
 			IstioRevision:    istioRevision,
 		}
 
-		c.JSON(http.StatusOK, e)
+		c.JSON(http.StatusOK, r)
 	})
 
 	srv := &http.Server{
-		Addr:    ":8080",
 		Handler: r,
 	}
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.Serve(s.listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Printf("server: %s\n", err)
 		}
 	}()
@@ -199,14 +209,4 @@ func (s *server) getClusterIDFromRegistry() (string, error) {
 	}
 
 	return "", ErrClusterIDNotFound
-}
-
-func getLabelValueWithDefault(labels map[string]string, precedence []string, def string) string {
-	for _, k := range precedence {
-		if v, ok := labels[k]; ok {
-			return v
-		}
-	}
-
-	return def
 }

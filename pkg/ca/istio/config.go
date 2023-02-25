@@ -149,6 +149,7 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 		ClusterID:     clusterID,
 		Revision:      istioRevision,
 		MeshID:        mc.GetDefaultConfig().GetMeshId(),
+		TrustDomain:   mc.GetTrustDomain(),
 	}, nil
 }
 
@@ -367,7 +368,7 @@ func GetIstioTokenFromPod(config *rest.Config, scheme *runtime.Scheme, name, nam
 	return stdout.Bytes(), nil
 }
 
-func GetIstioCAClientConfigFromHeimdall(ctx context.Context, heimdallURL, authorizationToken, version string) (config IstioCAClientConfigAndEnvironment, err error) {
+func GetIstioCAClientConfigFromHeimdall(ctx context.Context, heimdallURL, authorizationToken, version string) (config HeimdallResponse, err error) {
 	hostName, err := os.Hostname()
 	if err != nil {
 		return
@@ -412,13 +413,24 @@ func GetIstioCAClientConfigFromHeimdall(ctx context.Context, heimdallURL, author
 			return config, errors.WrapIf(err, "failed to decode Heimdall response")
 		}
 
+		if config.Environment.AdditionalMetadata == nil {
+			config.Environment.AdditionalMetadata = make(map[string]string)
+		}
+		config.Environment.AdditionalMetadata["AUTO_REGISTER_GROUP"] = config.Environment.WorkloadName
+
+		if config.Environment.Labels == nil {
+			config.Environment.Labels = make(map[string]string)
+		}
+
+		config.Environment.PodName = podName
+
 		return
 	}
 
 	return config, ConfigRetrievalError{Status: response.Status}
 }
 
-type IstioCAClientConfigAndEnvironment struct {
+type HeimdallResponse struct {
 	CAClientConfig IstioCAClientConfig
 	Environment    environment.IstioEnvironment
 }

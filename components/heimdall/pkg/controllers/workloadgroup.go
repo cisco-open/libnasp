@@ -36,6 +36,7 @@ import (
 	"github.com/cisco-open/nasp/components/heimdall/pkg/predicates"
 	"github.com/cisco-open/nasp/components/heimdall/pkg/server"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
+	k8slabels "github.com/cisco-open/nasp/pkg/k8s/labels"
 )
 
 type IstioWorkloadGroupReconciler struct {
@@ -50,13 +51,13 @@ type IstioWorkloadGroupReconciler struct {
 }
 
 const (
-	naspSecretType                   corev1.SecretType = "nasp.k8s.cisco.com/access-token"
-	naspSecretWorkloadgroupLabelName string            = "nasp.k8s.cisco.com/workloadgroup"
+	//#nosec G101
+	naspSecretType corev1.SecretType = "nasp.k8s.cisco.com/access-token"
 )
 
 var (
 	naspLabels = labels.Set(map[string]string{
-		"nasp": "true",
+		k8slabels.NASPMonitoringLabel: "true",
 	})
 	tokenExpirationSeconds = 60 * 60 * 24
 )
@@ -118,21 +119,19 @@ func (r *IstioWorkloadGroupReconciler) deleteToken(ctx context.Context, wg *isti
 }
 
 func (r *IstioWorkloadGroupReconciler) createToken(ctx context.Context, wg *istionetworkingv1beta1.WorkloadGroup) error {
-	name := fmt.Sprintf("wg-%s-nasp-token", wg.GetName())
+	name := fmt.Sprintf("%s-nasp-token", wg.GetName())
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				naspSecretWorkloadgroupLabelName: wg.GetName(),
+				k8slabels.NASPWorkloadgroupLabel: wg.GetName(),
 			},
 			Name:      name,
 			Namespace: wg.GetNamespace(),
 		},
 		Type:      naspSecretType,
 		Immutable: utils.BoolPointer(true),
-		Data: map[string][]byte{
-			"namespace": []byte(wg.GetNamespace()),
-		},
+		Data:      map[string][]byte{},
 	}
 
 	if err := controllerutil.SetControllerReference(wg, secret, r.Scheme); err != nil {
