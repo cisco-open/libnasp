@@ -15,6 +15,8 @@
 package main
 
 import (
+	"net"
+
 	istionetworkingv1beta1 "istio.io/client-go/pkg/apis/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -72,7 +74,13 @@ func main() {
 		}
 	}()
 
-	if err := server.New(mgr, logger).Run(ctx); err != nil {
+	//#nosec G102
+	listener, err := net.Listen("tcp", ":8080")
+	if err != nil {
+		panic(err)
+	}
+
+	if err := server.New(listener, mgr, logger).Run(ctx); err != nil {
 		panic(err)
 	}
 }

@@ -7,6 +7,7 @@ replace github.com/cisco-open/nasp => ../..
 require (
 	emperror.dev/errors v0.8.1
 	github.com/banzaicloud/k8s-objectmatcher v1.8.0
+	github.com/banzaicloud/operator-tools v0.21.0
 	github.com/cisco-open/cluster-registry-controller/api v0.2.3
 	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
 	github.com/gin-gonic/gin v1.9.0
@@ -32,7 +33,6 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
-	github.com/banzaicloud/operator-tools v0.21.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/briandowns/spinner v1.12.0 // indirect
 	github.com/bytedance/sonic v1.8.0 // indirect

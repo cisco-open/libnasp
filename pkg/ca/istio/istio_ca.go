@@ -45,6 +45,7 @@ type IstioCAClientConfig struct {
 	CApem         []byte
 	Revision      string
 	MeshID        string
+	TrustDomain   string
 }
 
 func NewIstioCAClient(config IstioCAClientConfig, logger logr.Logger) ca.Client {
