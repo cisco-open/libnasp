@@ -18,7 +18,7 @@ const (
 	DefaultClusterDNSDomain = "cluster.local"
 )
 
-var (
+const (
 	IstioRevisionLabel                 = "istio.io/rev"
 	IstioNetworkingGatewayPortLabel    = "networking.istio.io/gatewayPort"
 	IstioSecurityTlsModeLabel          = "security.istio.io/tlsMode"
@@ -30,12 +30,15 @@ var (
 	IstioTopologySubzoneLabel          = "topology.istio.io/subzone"
 )
 
-var (
-	NASPMonitoringLabel    string = "nasp.k8s.cisco.com/monitoring"
-	NASPWorkloadgroupLabel string = "nasp.k8s.cisco.com/workloadgroup"
+const (
+	NASPMonitoringLabel     = "nasp.k8s.cisco.com/monitoring"
+	NASPMonitoringPortLabel = "nasp.k8s.cisco.com/monitoring-port"
+	NASPMonitoringPathLabel = "nasp.k8s.cisco.com/monitoring-path"
+	NASPWorkloadgroupLabel  = "nasp.k8s.cisco.com/workloadgroup"
+	NASPWorkloadUID         = "nasp.k8s.cisco.com/uid"
 )
 
-var (
+const (
 	KubernetesAppNameLabel    = "app.kubernetes.io/name"
 	KubernetesAppVersionLabel = "app.kubernetes.io/version"
 	AppNameLabel              = "app"
