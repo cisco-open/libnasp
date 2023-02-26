@@ -112,7 +112,6 @@ func main() {
 	}
 
 	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
-		MetricsAddress:      ":15090",
 		UseTLS:              true,
 		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authToken, "v1"),
 	}

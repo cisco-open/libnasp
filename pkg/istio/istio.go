@@ -18,9 +18,11 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"net"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"emperror.dev/errors"
@@ -38,6 +40,7 @@ import (
 	"github.com/cisco-open/nasp/pkg/istio/discovery"
 	"github.com/cisco-open/nasp/pkg/istio/filters"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
+	k8slabels "github.com/cisco-open/nasp/pkg/k8s/labels"
 	"github.com/cisco-open/nasp/pkg/network"
 	"github.com/cisco-open/nasp/pkg/proxywasm"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
@@ -174,6 +177,21 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 		} else {
 			s.caClient = istio_ca.NewIstioCAClient(istioCAConfig, logger)
 		}
+	}
+
+	if config.PushgatewayConfig == nil {
+		if e.Labels == nil {
+			e.Labels = make(map[string]string)
+		}
+		e.Labels[k8slabels.NASPMonitoringLabel] = "true"
+		e.Labels[k8slabels.NASPWorkloadUID] = uuid.New()
+		if strings.Contains(config.MetricsAddress, ":") {
+			if p := strings.Split(config.MetricsAddress, ":"); len(p) > 1 {
+				e.Labels[k8slabels.NASPMonitoringPortLabel] = p[len(p)-1]
+			}
+		}
+
+		e.Labels[k8slabels.NASPMonitoringPathLabel] = base64.RawURLEncoding.EncodeToString([]byte(config.MetricsPath))
 	}
 
 	baseContext.Set("node", e.GetNodePropertiesFromEnvironment())
