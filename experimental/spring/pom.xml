@@ -23,11 +23,11 @@
     <profiles>
         <profile>
             <id>darwin</id>
-            <!--            <activation>-->
-            <!--                <os>-->
-            <!--                    <name>Mac OS X</name>-->
-            <!--                </os>-->
-            <!--            </activation>-->
+            <activation>
+                <os>
+                    <name>Mac OS X</name>
+                </os>
+            </activation>
             <properties>
                 <nasp.os>darwin</nasp.os>
             </properties>
