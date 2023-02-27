@@ -54,7 +54,7 @@ import (
 
 var DefaultIstioIntegrationHandlerConfig = IstioIntegrationHandlerConfig{
 	MetricsPath:    "/stats/prometheus",
-	MetricsAddress: ":15090",
+	MetricsAddress: ":16090",
 	UseTLS:         true,
 
 	IstioCAConfigGetter: IstioCAConfigGetterAuto,
@@ -99,8 +99,8 @@ var (
 			return IstioCAConfigGetterLocal(e)
 		}
 
-		if heimdallURL := os.Getenv("NASP_HEIMDALL_URL"); heimdallURL != "" {
-			c := IstioCAConfigGetterHeimdall(heimdallURL, os.Getenv("NASP_HEIMDALL_CLIENT_ID"), os.Getenv("NASP_HEIMDALL_CLIENT_SECRET"), os.Getenv("NASP_HEIMDALL_APP_VERSION"))
+		if heimdallURL := os.Getenv("HEIMDALL_URL"); heimdallURL != "" {
+			c := IstioCAConfigGetterHeimdall(context.Background(), heimdallURL, os.Getenv("HEIMDALL_AUTH_TOKEN"), os.Getenv("NASP_APP_VERSION"))
 
 			return c(e)
 		}
@@ -149,9 +149,7 @@ func (c *IstioIntegrationHandlerConfig) SetDefaults() {
 		c.MetricsAddress = DefaultIstioIntegrationHandlerConfig.MetricsAddress
 	}
 	if c.IstioCAConfigGetter == nil {
-		c.IstioCAConfigGetter = func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
-			return istio_ca.GetIstioCAClientConfigFromLocal(e.ClusterID, e.IstioCAAddress)
-		}
+		c.IstioCAConfigGetter = IstioCAConfigGetterAuto
 	}
 	if c.PushgatewayConfig != nil {
 		c.PushgatewayConfig.SetDefaults()
@@ -372,7 +370,7 @@ func (h *IstioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 			}
 		})
 		if err != nil {
-			h.logger.Info("could not find listener properties", "address", listenAddress, "error", err)
+			h.logger.Error(err, "could not find listener properties", "address", listenAddress)
 		}
 	}()
 

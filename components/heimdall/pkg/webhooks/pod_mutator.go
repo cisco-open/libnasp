@@ -200,7 +200,7 @@ func (m *PodMutator) setAnnotations(pod *corev1.Pod) {
 	}
 	pod.Annotations["sidecar.istio.io/inject"] = "false"
 	pod.Annotations["prometheus.io/path"] = "/stats/prometheus"
-	pod.Annotations["prometheus.io/port"] = "15090"
+	pod.Annotations["prometheus.io/port"] = "16090"
 	pod.Annotations["prometheus.io/scrape"] = "true"
 }
 
@@ -246,17 +246,12 @@ func (m *PodMutator) setEnvs(pod *corev1.Pod, request admission.Request) {
 		podLabels = append(podLabels, fmt.Sprintf("%s:%s", k, v))
 	}
 
-	podIPs := []string{}
-	for _, ip := range pod.Status.PodIPs {
-		podIPs = append(podIPs, ip.IP)
-	}
-
 	for i, container := range pod.Spec.Containers {
 		if container.Ports == nil {
 			container.Ports = []corev1.ContainerPort{}
 		}
 		container.Ports = append(container.Ports, corev1.ContainerPort{
-			ContainerPort: 15090,
+			ContainerPort: 16090,
 			Name:          "http-envoy-prom",
 			Protocol:      corev1.ProtocolTCP,
 		})
@@ -305,8 +300,12 @@ func (m *PodMutator) setEnvs(pod *corev1.Pod, request admission.Request) {
 				Value: strings.Join(containerNames, ","),
 			},
 			{
-				Name:  "NASP_INSTANCE_IP",
-				Value: strings.Join(podIPs, ","),
+				Name: "NASP_INSTANCE_IP",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "status.podIPs",
+					},
+				},
 			},
 			{
 				Name:  "NASP_LABELS",
