@@ -246,8 +246,6 @@ func (l *TCPListener) Accept() (*Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	return &Connection{
 		conn:         c,
@@ -548,12 +546,13 @@ func (d *TCPDialer) AsyncDial() *Connection {
 }
 
 func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
-	c, err := d.dialer.DialContext(context.Background(), "tcp", fmt.Sprintf("%s:%d", address, port))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	c, err := d.dialer.DialContext(ctx, "tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(backgroundCtx)
-	defer cancel()
 
 	return &Connection{
 		conn:         c,
