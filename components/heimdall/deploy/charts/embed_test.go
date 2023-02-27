@@ -15,13 +15,16 @@
 package charts_test
 
 import (
-	"github.com/cisco-open/nasp/components/heimdall/deploy/charts"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/cisco-open/nasp/components/heimdall/deploy/charts"
 )
 
 func TestEmbed(t *testing.T) {
+	t.Parallel()
+
 	file, err := charts.Heimdall.Open("Chart.yaml")
 	if err != nil {
 		t.Fatalf("%+v", err)
