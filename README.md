@@ -35,7 +35,7 @@ Then, create and start an `IstioIntegrationHandler`:
 
 ```go
 istioHandlerConfig := &istio.IstioIntegrationHandlerConfig {
-    MetricsAddress: ":15090",
+    MetricsAddress: ":16090",
     UseTLS:         true,
         IstioCAConfigGetter: func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
         return istio_ca.GetIstioCAClientConfig(clusterID, istioRevision)

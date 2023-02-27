@@ -34,8 +34,10 @@ const (
 	NASPMonitoringLabel     = "nasp.k8s.cisco.com/monitoring"
 	NASPMonitoringPortLabel = "nasp.k8s.cisco.com/monitoring-port"
 	NASPMonitoringPathLabel = "nasp.k8s.cisco.com/monitoring-path"
-	NASPWorkloadgroupLabel  = "nasp.k8s.cisco.com/workloadgroup"
-	NASPWorkloadUID         = "nasp.k8s.cisco.com/uid"
+	//#nosec G101
+	NASPWorkloadgroupLabel = "nasp.k8s.cisco.com/workloadgroup"
+	//#nosec G101
+	NASPWorkloadUID = "nasp.k8s.cisco.com/uid"
 )
 
 const (
