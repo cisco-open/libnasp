@@ -1,4 +1,4 @@
-NASP_AUTH_TOKEN ?= $(shell kubectl -n external get secret -l nasp.k8s.cisco.com/workloadgroup=test-grpc -o jsonpath='{@.items[0].data.token}' | base64 -D)
+NASP_AUTH_TOKEN ?= $(shell kubectl -n external get secret -l nasp.k8s.cisco.com/workloadgroup=test-tcp -o jsonpath='{@.items[0].data.token}' | base64 -D)
 
 .PHONY: help
 .DEFAULT_GOAL := help
