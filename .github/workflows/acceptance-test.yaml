@@ -49,5 +49,6 @@ jobs:
           DOCKER_BUILDKIT: "1"
 
       - name: Run simple go http client
+        working-directory: examples/http
         run: |
-          go run examples/http/main.go -mode=client -dump-client-response=1
+          make run-client
