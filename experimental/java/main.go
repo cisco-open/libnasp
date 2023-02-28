@@ -141,19 +141,24 @@ func (s *Selector) Select(timeoutMs int64) int {
 
 	select {
 	case c := <-s.queue:
-		if c.Operation == OP_WAKEUP {
-			return 0
-		}
 
-		s.selected[c] = struct{}{}
+		eventNumber := 0
+		if c.Operation != OP_WAKEUP {
+			s.selected[c] = struct{}{}
+			eventNumber++
+		}
 
 		l := len(s.queue)
 
 		for i := 0; i < l; i++ {
-			s.selected[<-s.queue] = struct{}{}
+			event := <-s.queue
+			if event.Operation != OP_WAKEUP {
+				s.selected[event] = struct{}{}
+				eventNumber++
+			}
 		}
 
-		return l + 1
+		return eventNumber
 	case <-ctx.Done():
 		return 0
 	}
