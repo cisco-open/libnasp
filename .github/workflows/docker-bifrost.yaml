@@ -1,10 +1,10 @@
-name: Docker image [Heimdall]
+name: Docker image [Bifrost]
 
 on:
   push:
     branches:
       - "main"
-      - "heimdall-*"
+      - "bifrost-*"
       - "nasp-webhook-*"
     tags:
       - "v*"
@@ -15,7 +15,7 @@ on:
 env:
   PLATFORMS: linux/amd64,linux/arm64
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}-heimdall
+  IMAGE_NAME: ${{ github.repository }}-bifrost
 
 jobs:
   build-and-push-image:
@@ -46,11 +46,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image [Bifrost]
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: components/heimdall/Dockerfile
+          file: components/bifrost/Dockerfile
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: ${{ env.PLATFORMS }}

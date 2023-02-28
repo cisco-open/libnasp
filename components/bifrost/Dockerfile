@@ -1,4 +1,5 @@
-ARG GO_VERSION=1.19.5
+# Copyright (c) 2023 Cisco and/or its affiliates. All rights reserved.
+ARG GO_VERSION=1.19.6
 
 FROM golang:${GO_VERSION}-alpine3.17 AS builder
 
