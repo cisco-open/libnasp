@@ -78,7 +78,7 @@ func CreateMessage(messageType MessageType, message interface{}) (Message, []byt
 
 func CreateMessageWithID(id string, messageType MessageType, message interface{}) (Message, []byte, error) {
 	msg := Message{
-		ID:   uuid.New().String(),
+		ID:   id,
 		Type: messageType,
 	}
 
