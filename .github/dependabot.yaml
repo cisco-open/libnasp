@@ -1,7 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: "docker"
-    directory: "/experimental/heimdall/"
+    directory: "/components/heimdall/"
     schedule:
       interval: "weekly"
 

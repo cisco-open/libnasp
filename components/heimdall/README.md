@@ -15,7 +15,7 @@ Heimdall is meant to run on Kubernetes.
 Install the Helm chart of Heimdall configure it beforehand:
 
 ```bash
-helm install -n heimdall --create-namespace heimdall ./experimental/heimdall/charts/heimdall
+helm install -n heimdall --create-namespace heimdall ./components/heimdall/deploy/charts/heimdall
 ```
 
 Take note of the exposed Heimdall service, this can be used in mobile applications for example to get an Istio entry configuration:

@@ -3,8 +3,8 @@ go 1.19
 use (
 	.
 	./components/bifrost
-	./experimental/heimdall
-	./experimental/heimdall/charts
+	./components/heimdall
+	./components/heimdall/deploy/charts
 	./experimental/java
 	./experimental/mobile
 	./pkg/proxywasm/testdata/filters
