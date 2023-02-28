@@ -75,6 +75,7 @@ func AuthenticateToken(ctx context.Context, c client.Client, token string) (*Aut
 	for _, aud := range claims.Audience {
 		if naspAud := NASPTokenAudience(aud); naspAud.Valid() {
 			naspAudience = naspAud
+			break
 		}
 	}
 
