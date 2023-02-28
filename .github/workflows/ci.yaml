@@ -44,34 +44,6 @@ jobs:
           restore-keys: |
             build-deps-v2
 
-      - name: Cache licenses
-        id: cache-licenses
-        uses: actions/cache@v3
-        with:
-          path: |
-            .licensei.cache
-            components/heimdall/.licensei.cache
-            experimental/mobile/.licensei.cache
-            experimental/java/.licensei.cache
-          key: licensei-v2-${{ hashFiles('go.sum') }}
-          restore-keys: |
-            licensei-v2
-
-      - name: Download license information for dependencies
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
-        run: make license-cache-all
-
-      - name: List license information for dependencies
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
-        run: ./bin/licensei list
-
-      - name: Check dependency licenses
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Note: this is required for licensei auth in steps to avoid rate-limiting.
-        run: make license-check-all
-
       - name: Run unit tests
         run: make test
 

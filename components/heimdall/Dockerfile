@@ -1,6 +1,9 @@
 # Copyright (c) 2023 Cisco and/or its affiliates. All rights reserved.
+ARG GO_VERSION=1.19.6
 
-FROM golang:1.19.6 as builder
+FROM golang:${GO_VERSION}-alpine3.17 AS builder
+
+RUN apk add --update --no-cache bash=~5.2 ca-certificates~=20220614 make~=4.3 git~=2.38 curl~=7.87
 
 ARG GITHUB_ACCESS_TOKEN
 
