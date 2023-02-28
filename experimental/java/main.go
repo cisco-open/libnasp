@@ -185,20 +185,14 @@ func (s *Selector) NextSelectedKey() *SelectedKey {
 }
 
 func NewNaspIntegrationHandler(heimdallURL, authorizationToken string) (*NaspIntegrationHandler, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-		PushgatewayConfig: &istio.PushgatewayConfig{
-			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
-			UseUniqueIDLabel: true,
-		},
+		UseTLS: true,
 	}, logger)
 	if err != nil {
 		return nil, err
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	go iih.Run(ctx)
 
@@ -482,16 +476,8 @@ type TCPDialer struct {
 }
 
 func NewTCPDialer(heimdallURL, authorizationToken string) (*TCPDialer, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-		PushgatewayConfig: &istio.PushgatewayConfig{
-			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
-			UseUniqueIDLabel: true,
-		},
+		UseTLS: true,
 	}, logger)
 	if err != nil {
 		return nil, err
@@ -501,6 +487,8 @@ func NewTCPDialer(heimdallURL, authorizationToken string) (*TCPDialer, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	go iih.Run(ctx)
 
@@ -591,16 +579,8 @@ type HTTPResponse struct {
 }
 
 func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-		PushgatewayConfig: &istio.PushgatewayConfig{
-			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
-			UseUniqueIDLabel: true,
-		},
+		UseTLS: true,
 	}, logger)
 	if err != nil {
 		return nil, err
@@ -610,6 +590,8 @@ func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, e
 	if err != nil {
 		return nil, err
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	go iih.Run(ctx)
 
