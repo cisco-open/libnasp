@@ -98,11 +98,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     private SocketAddress checkRemote(SocketAddress sa) {
         InetSocketAddress isa = Net.checkAddress(sa);
-        @SuppressWarnings("removal")
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            sm.checkConnect(isa.getAddress().getHostAddress(), isa.getPort());
-        }
         InetAddress address = isa.getAddress();
         if (address.isAnyLocalAddress()) {
             int port = isa.getPort();
