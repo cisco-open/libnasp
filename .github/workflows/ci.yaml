@@ -50,7 +50,7 @@ jobs:
         with:
           path: |
             .licensei.cache
-            experimental/heimdall/.licensei.cache
+            components/heimdall/.licensei.cache
             experimental/mobile/.licensei.cache
             experimental/java/.licensei.cache
           key: licensei-v2-${{ hashFiles('go.sum') }}
