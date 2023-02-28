@@ -47,7 +47,7 @@ const (
 	OP_WRITE   = 1 << 2
 	OP_CONNECT = 1 << 3
 	OP_ACCEPT  = 1 << 4
-	OP_WAKEUP  = -1
+	OP_WAKEUP  = 1 << 5
 )
 
 var logger = klog.NewKlogr()
@@ -90,9 +90,18 @@ type Address struct {
 	Port int32
 }
 
-type SelectedKey struct {
-	SelectedKeyId int32
-	Operation     int32
+type SelectedKey uint64
+
+func NewSelectedKey(operation, id uint32) SelectedKey {
+	return SelectedKey((uint64(operation) << 32) | uint64(id))
+}
+
+func (k SelectedKey) Operation() uint32 {
+	return uint32(k >> 32)
+}
+
+func (k SelectedKey) SelectedKeyId() uint32 {
+	return uint32(k)
 }
 
 type Selector struct {
@@ -122,12 +131,8 @@ func (s *Selector) Select(timeoutMs int64) int {
 	s.writableKeys.Range(func(key, value any) bool {
 		check := value.(func() bool)
 		if check() {
-			selectedKey := SelectedKey{
-				SelectedKeyId: key.(int32),
-				Operation:     OP_WRITE,
-			}
 			select {
-			case s.queue <- selectedKey:
+			case s.queue <- NewSelectedKey(OP_WRITE, uint32(key.(int32))):
 			default:
 				// best effort non-blocking write
 			}
@@ -143,7 +148,7 @@ func (s *Selector) Select(timeoutMs int64) int {
 	case c := <-s.queue:
 
 		eventNumber := 0
-		if c.Operation != OP_WAKEUP {
+		if c.Operation() != OP_WAKEUP {
 			s.selected[c] = struct{}{}
 			eventNumber++
 		}
@@ -152,7 +157,7 @@ func (s *Selector) Select(timeoutMs int64) int {
 
 		for i := 0; i < l; i++ {
 			event := <-s.queue
-			if event.Operation != OP_WAKEUP {
+			if event.Operation() != OP_WAKEUP {
 				s.selected[event] = struct{}{}
 				eventNumber++
 			}
@@ -173,15 +178,15 @@ func (s *Selector) unregisterWriter(selectedKeyId int32) {
 }
 
 func (s *Selector) WakeUp() {
-	s.queue <- SelectedKey{Operation: OP_WAKEUP, SelectedKeyId: -1}
+	s.queue <- NewSelectedKey(OP_WAKEUP, 0)
 }
 
-func (s *Selector) NextSelectedKey() *SelectedKey {
+func (s *Selector) NextSelectedKey() int64 {
 	for k := range s.selected {
 		delete(s.selected, k)
-		return &k
+		return int64(k)
 	}
-	return nil
+	return 0
 }
 
 func NewNaspIntegrationHandler(heimdallURL, clientID, clientSecret string) (*NaspIntegrationHandler, error) {
@@ -213,10 +218,10 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 		return nil, err
 	}
 
-	listener, err = h.iih.GetTCPListener(listener)
-	if err != nil {
-		return nil, err
-	}
+	// listener, err = h.iih.GetTCPListener(listener)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return &TCPListener{
 		listener: listener,
@@ -272,7 +277,7 @@ func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) 
 			l.asyncConnections = append(l.asyncConnections, conn)
 			l.asyncConnectionsLock.Unlock()
 
-			selector.queue <- SelectedKey{Operation: OP_ACCEPT, SelectedKeyId: selectedKeyId}
+			selector.queue <- NewSelectedKey(OP_ACCEPT, uint32(selectedKeyId))
 		}
 	}()
 }
@@ -350,7 +355,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if n != num {
 				logger.Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
 			}
-			selector.queue <- SelectedKey{Operation: OP_READ, SelectedKeyId: selectedKeyId}
+			selector.queue <- NewSelectedKey(OP_READ, uint32(selectedKeyId))
 		}
 
 		logger.Info("StartAsyncRead finished", "id", c.id, "selected key id", selectedKeyId)
@@ -523,7 +528,7 @@ func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, addr
 		d.asyncConnections = append(d.asyncConnections, conn)
 		d.asyncConnectionsLock.Unlock()
 
-		selector.queue <- SelectedKey{Operation: OP_CONNECT, SelectedKeyId: selectedKeyId}
+		selector.queue <- NewSelectedKey(OP_CONNECT, uint32(selectedKeyId))
 	}()
 }
 
