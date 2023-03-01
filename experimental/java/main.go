@@ -108,12 +108,12 @@ func (k SelectedKey) SelectedKeyId() uint32 {
 
 type Selector struct {
 	queue        chan SelectedKey
-	selected     map[SelectedKey]struct{}
+	selected     map[uint32]SelectedKey
 	writableKeys sync.Map
 }
 
 func NewSelector() *Selector {
-	return &Selector{queue: make(chan SelectedKey, 64), selected: map[SelectedKey]struct{}{}}
+	return &Selector{queue: make(chan SelectedKey, 64), selected: map[uint32]SelectedKey{}}
 }
 
 func (s *Selector) Close() {
@@ -147,25 +147,22 @@ func (s *Selector) Select(timeoutMs int64) int {
 	}
 
 	select {
-	case c := <-s.queue:
+	case e := <-s.queue:
 
-		eventNumber := 0
-		if c.Operation() != OP_WAKEUP {
-			s.selected[c] = struct{}{}
-			eventNumber++
+		if e.Operation() != OP_WAKEUP {
+			s.selected[e.SelectedKeyId()] |= e
 		}
 
 		l := len(s.queue)
 
 		for i := 0; i < l; i++ {
-			event := <-s.queue
-			if event.Operation() != OP_WAKEUP {
-				s.selected[event] = struct{}{}
-				eventNumber++
+			e := <-s.queue
+			if e.Operation() != OP_WAKEUP {
+				s.selected[e.SelectedKeyId()] |= e
 			}
 		}
 
-		return eventNumber
+		return len(s.selected)
 	case <-ctx.Done():
 		return 0
 	}
@@ -184,9 +181,9 @@ func (s *Selector) WakeUp() {
 }
 
 func (s *Selector) NextSelectedKey() int64 {
-	for k := range s.selected {
+	for k, v := range s.selected {
 		delete(s.selected, k)
-		return int64(k)
+		return int64(v)
 	}
 	return 0
 }
