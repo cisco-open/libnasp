@@ -23,7 +23,7 @@ import (
 func TestSelectedKey(t *testing.T) {
 	t.Parallel()
 
-	const operation uint32 = OP_ACCEPT
+	const operation ReadyOps = OP_ACCEPT
 	const selectedKeyId uint32 = 12345
 
 	sk := NewSelectedKey(operation, selectedKeyId)
