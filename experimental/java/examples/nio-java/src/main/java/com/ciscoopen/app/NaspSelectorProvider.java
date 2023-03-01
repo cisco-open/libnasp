@@ -66,7 +66,7 @@ class NaspSelector extends SelectorImpl {
         selectionKeyTable.put(ski.hashCode(), ski);
 
         int interestOps = ski.interestOps();
-        startAsyncOps(ski, interestOps);
+        handleAsyncOps(ski, interestOps);
     }
 
     @Override
@@ -81,18 +81,23 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     protected void setEventOps(SelectionKeyImpl ski) {
-        int interestOps = newInterestOps(ski);
+        int opsDiff = getAsyncOpsDiff(ski);
 
-        startAsyncOps(ski, interestOps);
+        handleAsyncOps(ski, opsDiff);
     }
 
-    protected int newInterestOps(SelectionKeyImpl ski) {
+    /**
+     * Returns the diff between running async ops and the list the interest ops registered in the provided ski
+     * @param ski specifies the list of ops we are interested in
+     * @return the diff between running async ops and the list the interest ops
+     */
+    protected int getAsyncOpsDiff(SelectionKeyImpl ski) {
         if (ski == null)
             return 0;
 
         int interestOps = ski.interestOps();
         Integer runningOps = runningAsyncOps.get(ski.hashCode());
-        if (runningOps == null) {
+        if (runningOps == null || runningOps == 0) {
             return interestOps;
         }
 
@@ -101,7 +106,7 @@ class NaspSelector extends SelectorImpl {
         return interestOps & mask;
     }
 
-    protected void startAsyncOps(SelectionKeyImpl ski, int interestOps) {
+    protected void handleAsyncOps(SelectionKeyImpl ski, int opsDiff) {
         int selectedKeyId = ski.hashCode();
         int runningOps = 0;
         if (runningAsyncOps.containsKey(selectedKeyId)) {
@@ -109,25 +114,29 @@ class NaspSelector extends SelectorImpl {
         }
 
         if (ski.channel() instanceof NaspServerSocketChannel naspServerSockChan) {
-            startAsyncOps(naspServerSockChan, ski.hashCode(), runningOps, interestOps);
+            handleAsyncOps(naspServerSockChan, ski.hashCode(), runningOps, opsDiff);
             return;
         }
 
         if (ski.channel() instanceof NaspSocketChannel naspSockChan) {
-            startAsyncOps(naspSockChan, ski.hashCode(), runningOps, interestOps);
+            handleAsyncOps(naspSockChan, ski.hashCode(), runningOps, opsDiff);
         }
     }
 
-    protected void startAsyncOps(NaspSocketChannel naspSocketChannel, int selectedKeyId, int runningOps, int interestOps) {
-        if ((interestOps & SelectionKey.OP_READ) != 0) {
+    protected void handleAsyncOps(NaspSocketChannel naspSocketChannel, int selectedKeyId, int runningOps, int opsDiff) {
+        if ((opsDiff & SelectionKey.OP_READ) != 0) {
             naspSocketChannel.getConnection().startAsyncRead(selectedKeyId, selector);
             runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
+        } else {
+            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_READ);
         }
-        if ((interestOps & SelectionKey.OP_WRITE) != 0) {
+        if ((opsDiff & SelectionKey.OP_WRITE) != 0) {
             naspSocketChannel.getConnection().startAsyncWrite(selectedKeyId, selector);
             runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_WRITE);
+        } else {
+            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_WRITE);
         }
-        if ((interestOps & SelectionKey.OP_CONNECT) != 0) {
+        if ((opsDiff & SelectionKey.OP_CONNECT) != 0) {
             //This could happen if we are servers not clients
             if (naspSocketChannel.getNaspTcpDialer() != null) {
                 InetSocketAddress address = naspSocketChannel.getAddress();
@@ -135,13 +144,17 @@ class NaspSelector extends SelectorImpl {
                         address.getHostString(), address.getPort());
                 runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
             }
+        } else {
+            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_CONNECT);
         }
     }
 
-    protected void startAsyncOps(NaspServerSocketChannel naspServerSocketChannel, int selectedKeyId, int runningOps, int interestOps) {
-        if ((interestOps & SelectionKey.OP_ACCEPT) != 0) {
-            naspServerSocketChannel.socket().getNaspTcpListener().startAsyncAccept(ski.hashCode(), selector);
+    protected void handleAsyncOps(NaspServerSocketChannel naspServerSocketChannel, int selectedKeyId, int runningOps, int opsDiff) {
+        if ((opsDiff & SelectionKey.OP_ACCEPT) != 0) {
+            naspServerSocketChannel.socket().getNaspTcpListener().startAsyncAccept(selectedKeyId, selector);
             runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_ACCEPT);
+        } else {
+            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_ACCEPT);
         }
     }
 }
