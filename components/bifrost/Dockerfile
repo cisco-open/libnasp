@@ -3,7 +3,7 @@ ARG GO_VERSION=1.19.6
 
 FROM golang:${GO_VERSION}-alpine3.17 AS builder
 
-RUN apk add --update --no-cache ca-certificates~=20220614 make~=4.3 git~=2.38 curl~=7.87
+RUN apk add --update --no-cache ca-certificates~=20220614 make~=4.3 git~=2.38 curl~=7.88
 
 ARG BUILD_DIR /go/src/app
 RUN mkdir -p /${BUILD_DIR}
