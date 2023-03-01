@@ -1,7 +1,11 @@
 package com.ciscoopen.app;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketAddress;
+import java.net.SocketException;
 import java.nio.channels.spi.SelectorProvider;
 
 import nasp.Nasp;
@@ -11,8 +15,8 @@ import nasp.Connection;
 
 public class NaspServerSocket extends ServerSocket {
 
-    private final NaspIntegrationHandler NaspIntegrationHandler;
-    private TCPListener TCPListener;
+    private final NaspIntegrationHandler nasp;
+    private TCPListener naspTcpListener;
     private final SelectorProvider selectorProvider;
 
     private int localPort;
@@ -20,12 +24,9 @@ public class NaspServerSocket extends ServerSocket {
 
     public NaspServerSocket(SelectorProvider selectorProvider) throws IOException {
         try {
-            NaspIntegrationHandler = Nasp.newNaspIntegrationHandler("https://localhost:16443/config",
-                    "test-tcp-16362813-F46B-41AC-B191-A390DB1F6BDF",
-                    "16362813-F46B-41AC-B191-A390DB1F6BDF");
-
+            nasp = Nasp.newNaspIntegrationHandler("https://localhost:16443/config", System.getenv("NASP_AUTH_TOKEN"));
         } catch (Exception e) {
-            throw new IOException("could not get nasp tcp listener");
+            throw new IOException("could not get nasp tcp listener", e);
         }
 
         this.selectorProvider = selectorProvider;
@@ -35,9 +36,9 @@ public class NaspServerSocket extends ServerSocket {
     public void bind(SocketAddress endpoint) throws IOException {
         if (endpoint instanceof InetSocketAddress) {
             try {
-                address = (InetSocketAddress)endpoint;
+                address = (InetSocketAddress) endpoint;
                 localPort = ((InetSocketAddress) endpoint).getPort();
-                TCPListener = NaspIntegrationHandler.bind(((InetSocketAddress) endpoint).getHostString(), localPort);
+                naspTcpListener = nasp.bind(((InetSocketAddress) endpoint).getHostString(), localPort);
             } catch (Exception e) {
                 throw new IOException(e);
             }
@@ -50,9 +51,10 @@ public class NaspServerSocket extends ServerSocket {
     public void bind(SocketAddress endpoint, int backlog) throws IOException {
         bind(endpoint);
     }
+
     @Override
     public int getLocalPort() {
-        if (TCPListener != null) {
+        if (naspTcpListener != null) {
             return localPort;
         }
         return -1;
@@ -66,7 +68,7 @@ public class NaspServerSocket extends ServerSocket {
     @Override
     public Socket accept() throws IOException {
         try {
-            Connection conn = TCPListener.asyncAccept();
+            Connection conn = naspTcpListener.asyncAccept();
             if (conn == null) {
                 return null;
             }
@@ -76,7 +78,7 @@ public class NaspServerSocket extends ServerSocket {
         }
     }
 
-    public nasp.TCPListener getTCPListener() {
-        return TCPListener;
+    public TCPListener getNaspTcpListener() {
+        return naspTcpListener;
     }
 }
