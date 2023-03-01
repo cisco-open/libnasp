@@ -83,7 +83,6 @@ class NaspSelector extends SelectorImpl {
             int interestOps = ski.interestOps();
             if ((interestOps & SelectionKey.OP_READ) != 0) {
                 naspSockChan.getConnection().startAsyncRead(ski.hashCode(), selector);
-                naspSockChan.getConnection().startAsyncWrite(ski.hashCode(), selector);
             }
             if ((interestOps & SelectionKey.OP_WRITE) != 0) {
                 naspSockChan.getConnection().startAsyncWrite(ski.hashCode(), selector);
