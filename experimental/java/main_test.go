@@ -16,16 +16,18 @@ package nasp
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSelectedKey(t *testing.T) {
-	sk := NewSelectedKey(OP_ACCEPT, 12345)
+	t.Parallel()
 
-	if sk.Operation() != OP_ACCEPT {
-		t.Fatalf("sk.Operation() -> %d != operation -> %d", sk.Operation(), OP_ACCEPT)
-	}
+	const operation uint32 = OP_ACCEPT
+	const selectedKeyId uint32 = 12345
 
-	if sk.SelectedKeyId() != 12345 {
-		t.Fatalf("sk.SelectedKeyId() -> %d != selectedKeyId -> %d", sk.SelectedKeyId(), 12345)
-	}
+	sk := NewSelectedKey(operation, selectedKeyId)
+
+	assert.Equal(t, sk.Operation(), operation, "sk.Operation() != operation")
+	assert.Equal(t, sk.SelectedKeyId(), selectedKeyId, "sk.SelectedKeyId() != selectedKeyId")
 }
