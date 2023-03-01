@@ -199,6 +199,7 @@ func NewNaspIntegrationHandler(heimdallURL, authorizationToken string) (*NaspInt
 		UseTLS:              true,
 	}, logger)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -491,11 +492,13 @@ func NewTCPDialer(heimdallURL, authorizationToken string) (*TCPDialer, error) {
 		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
 	}, logger)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	dialer, err := iih.GetTCPDialer()
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -595,11 +598,13 @@ func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, e
 		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
 	}, logger)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	transport, err := iih.GetHTTPTransport(http.DefaultTransport)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
@@ -609,7 +614,12 @@ func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, e
 		Transport: transport,
 	}
 
-	return &HTTPTransport{iih: iih, client: client, ctx: ctx, cancel: cancel}, nil
+	return &HTTPTransport{
+		iih:    iih,
+		client: client,
+		ctx:    ctx,
+		cancel: cancel,
+	}, nil
 }
 
 func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error) {
