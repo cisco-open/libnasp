@@ -42,12 +42,14 @@ import (
 
 const MAX_WRITE_BUFFERS = 64
 
+type ReadyOps uint32
+
 const (
-	OP_READ    = 1 << 0
-	OP_WRITE   = 1 << 2
-	OP_CONNECT = 1 << 3
-	OP_ACCEPT  = 1 << 4
-	OP_WAKEUP  = 1 << 5
+	OP_READ    ReadyOps = 1 << 0
+	OP_WRITE   ReadyOps = 1 << 2
+	OP_CONNECT ReadyOps = 1 << 3
+	OP_ACCEPT  ReadyOps = 1 << 4
+	OP_WAKEUP  ReadyOps = 1 << 5
 )
 
 var logger = klog.NewKlogr()
@@ -92,12 +94,12 @@ type Address struct {
 
 type SelectedKey uint64
 
-func NewSelectedKey(operation, id uint32) SelectedKey {
+func NewSelectedKey(operation ReadyOps, id uint32) SelectedKey {
 	return SelectedKey((uint64(operation) << 32) | uint64(id))
 }
 
-func (k SelectedKey) Operation() uint32 {
-	return uint32(k >> 32)
+func (k SelectedKey) Operation() ReadyOps {
+	return ReadyOps(k >> 32)
 }
 
 func (k SelectedKey) SelectedKeyId() uint32 {
@@ -218,10 +220,10 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 		return nil, err
 	}
 
-	listener, err = h.iih.GetTCPListener(listener)
-	if err != nil {
-		return nil, err
-	}
+	// listener, err = h.iih.GetTCPListener(listener)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return &TCPListener{
 		listener: listener,
