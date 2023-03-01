@@ -78,7 +78,7 @@ class NaspSelector extends SelectorImpl {
     @Override
     protected void setEventOps(SelectionKeyImpl ski) {
         if (ski.channel() instanceof NaspServerSocketChannel naspServerSockChan) {
-            naspServerSockChan.socket().getTCPListener().startAsyncAccept(ski.hashCode(), selector);
+            naspServerSockChan.socket().getNaspTcpListener().startAsyncAccept(ski.hashCode(), selector);
         } else if (ski.channel() instanceof NaspSocketChannel naspSockChan) {
             int interestOps = ski.interestOps();
             if ((interestOps & SelectionKey.OP_READ) != 0) {
@@ -89,9 +89,9 @@ class NaspSelector extends SelectorImpl {
             }
             if ((interestOps & SelectionKey.OP_CONNECT) != 0) {
                 //This could happen if we are servers not clients
-                if (naspSockChan.getTCPDialer() != null) {
+                if (naspSockChan.getNaspTcpDialer() != null) {
                     InetSocketAddress address = naspSockChan.getAddress();
-                    naspSockChan.getTCPDialer().startAsyncDial(ski.hashCode(), selector,
+                    naspSockChan.getNaspTcpDialer().startAsyncDial(ski.hashCode(), selector,
                             address.getHostString(), address.getPort());
                 }
             }

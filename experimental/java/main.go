@@ -192,14 +192,16 @@ func (s *Selector) NextSelectedKey() int64 {
 }
 
 func NewNaspIntegrationHandler(heimdallURL, authorizationToken string) (*NaspIntegrationHandler, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS: true,
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
+		UseTLS:              true,
 	}, logger)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	go iih.Run(ctx)
 
@@ -483,19 +485,22 @@ type TCPDialer struct {
 }
 
 func NewTCPDialer(heimdallURL, authorizationToken string) (*TCPDialer, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS: true,
+		UseTLS:              true,
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
 	}, logger)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	dialer, err := iih.GetTCPDialer()
 	if err != nil {
+		cancel()
 		return nil, err
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	go iih.Run(ctx)
 
@@ -586,19 +591,22 @@ type HTTPResponse struct {
 }
 
 func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS: true,
+		UseTLS:              true,
+		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
 	}, logger)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	transport, err := iih.GetHTTPTransport(http.DefaultTransport)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	go iih.Run(ctx)
 
@@ -606,7 +614,12 @@ func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, e
 		Transport: transport,
 	}
 
-	return &HTTPTransport{iih: iih, client: client, ctx: ctx, cancel: cancel}, nil
+	return &HTTPTransport{
+		iih:    iih,
+		client: client,
+		ctx:    ctx,
+		cancel: cancel,
+	}, nil
 }
 
 func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error) {

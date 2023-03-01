@@ -9,7 +9,11 @@ import sun.nio.ch.SelectionKeyImpl;
 
 import java.io.FileDescriptor;
 import java.io.IOException;
-import java.net.*;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.SocketOption;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
@@ -19,7 +23,7 @@ import java.util.Set;
 
 public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
-    private TCPDialer dialer;
+    private TCPDialer naspTcpDialer;
     private Connection connection;
     private NaspSocket socket;
     private InetSocketAddress address;
@@ -41,7 +45,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public <T> SocketChannel setOption(SocketOption<T> name, T value) throws IOException {
-        throw new UnsupportedOperationException();
+        return this;
     }
 
     @Override
@@ -85,11 +89,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public boolean connect(SocketAddress remote) throws IOException {
         try {
-            dialer = Nasp.newTCPDialer("https://localhost:16443/config",
-                    "test-tcp-16362813-F46B-41AC-B191-A390DB1F6BDF",
-                    "16362813-F46B-41AC-B191-A390DB1F6BDF");
+            naspTcpDialer = Nasp.newTCPDialer("https://localhost:16443/config", System.getenv("NASP_AUTH_TOKEN"));
         } catch (Exception e) {
-            throw new IOException("could not get nasp tcp dialer");
+            throw new IOException("could not get nasp tcp dialer", e);
         }
         address = (InetSocketAddress) checkRemote(remote);
         socket.setAddress(address);
@@ -113,7 +115,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public boolean finishConnect() throws IOException {
-        connection = dialer.asyncDial();
+        connection = naspTcpDialer.asyncDial();
         if (connection == null) {
             return false;
         }
@@ -224,16 +226,13 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         }
 
         boolean connected = isConnected();
-        if (((ops & Net.POLLIN) != 0) &&
-                ((intOps & SelectionKey.OP_READ) != 0) && connected)
+        if (((ops & Net.POLLIN) != 0) && ((intOps & SelectionKey.OP_READ) != 0) && connected)
             newOps |= SelectionKey.OP_READ;
 
-        if (((ops & Net.POLLCONN) != 0) &&
-                ((intOps & SelectionKey.OP_CONNECT) != 0) && isConnectionPending())
+        if (((ops & Net.POLLCONN) != 0) && ((intOps & SelectionKey.OP_CONNECT) != 0) && isConnectionPending())
             newOps |= SelectionKey.OP_CONNECT;
 
-        if (((ops & Net.POLLOUT) != 0) &&
-                ((intOps & SelectionKey.OP_WRITE) != 0) && connected)
+        if (((ops & Net.POLLOUT) != 0) && ((intOps & SelectionKey.OP_WRITE) != 0) && connected)
             newOps |= SelectionKey.OP_WRITE;
 
         ski.nioReadyOps(newOps);
@@ -253,12 +252,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public int translateInterestOps(int ops) {
         int newOps = 0;
-        if ((ops & SelectionKey.OP_READ) != 0)
-            newOps |= Net.POLLIN;
-        if ((ops & SelectionKey.OP_WRITE) != 0)
-            newOps |= Net.POLLOUT;
-        if ((ops & SelectionKey.OP_CONNECT) != 0)
-            newOps |= Net.POLLCONN;
+        if ((ops & SelectionKey.OP_READ) != 0) newOps |= Net.POLLIN;
+        if ((ops & SelectionKey.OP_WRITE) != 0) newOps |= Net.POLLOUT;
+        if ((ops & SelectionKey.OP_CONNECT) != 0) newOps |= Net.POLLCONN;
         return newOps;
     }
 
@@ -273,8 +269,8 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         return connection;
     }
 
-    public TCPDialer getTCPDialer() {
-        return dialer;
+    public TCPDialer getNaspTcpDialer() {
+        return naspTcpDialer;
     }
 
     public InetSocketAddress getAddress() {
