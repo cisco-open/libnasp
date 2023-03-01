@@ -20,6 +20,14 @@ import java.util.function.Consumer;
 
 class NaspSelector extends SelectorImpl {
 
+    static int getOperation(long selectedKey) {
+        return (int) (selectedKey >> 32);
+    }
+
+    static int getSelectedKeyId(long selectedKey) {
+        return (int) selectedKey;
+    }
+
     private final nasp.Selector selector = new nasp.Selector();
     private final Map<Integer, SelectionKeyImpl> selectionKeyTable = new HashMap<>();
 
@@ -32,12 +40,12 @@ class NaspSelector extends SelectorImpl {
         selector.select(timeout);
 
         int numKeysUpdated = 0;
-        nasp.SelectedKey selectedKey;
-        while ((selectedKey = selector.nextSelectedKey()) != null) {
-            SelectionKeyImpl selectionKey = selectionKeyTable.get(selectedKey.getSelectedKeyId());
+        long selectedKey;
+        while ((selectedKey = selector.nextSelectedKey()) != 0) {
+            SelectionKeyImpl selectionKey = selectionKeyTable.get(getSelectedKeyId(selectedKey));
             if (selectionKey != null) {
                 if (selectionKey.isValid()) {
-                    numKeysUpdated += processReadyEvents(selectedKey.getOperation(), selectionKey, action);
+                    numKeysUpdated += processReadyEvents(getOperation(selectedKey), selectionKey, action);
                 }
             }
         }
