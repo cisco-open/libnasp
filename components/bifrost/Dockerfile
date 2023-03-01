@@ -19,7 +19,7 @@ COPY components/bifrost/go.sum /${BUILD_DIR}/components/bifrost/go.sum
 WORKDIR /${BUILD_DIR}/components/bifrost
 
 # hadolint ignore=DL3059
-RUN go mod download
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . /${BUILD_DIR}
 

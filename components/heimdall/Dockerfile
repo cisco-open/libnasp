@@ -24,11 +24,11 @@ COPY ./components/heimdall/go.mod /go/src/app/components/heimdall
 COPY ./components/heimdall/go.sum /go/src/app/components/heimdall
 
 # hadolint ignore=DL3059
-RUN go mod download
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . /go/src/app/
 
-RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 make webhook-binary server-binary
+RUN CGO_ENABLED=0 make webhook-binary server-binary
 
 
 # Use distroless as minimal base image to package the manager binary
