@@ -44,14 +44,15 @@ const (
 	IstioTopologySubzoneLabel          = "topology.istio.io/subzone"
 )
 
+// #nosec G101
 const (
 	NASPMonitoringLabel     = "nasp.k8s.cisco.com/monitoring"
 	NASPMonitoringPortLabel = "nasp.k8s.cisco.com/monitoring-port"
 	NASPMonitoringPathLabel = "nasp.k8s.cisco.com/monitoring-path"
-	//#nosec G101
-	NASPWorkloadgroupLabel = "nasp.k8s.cisco.com/workloadgroup"
-	//#nosec G101
-	NASPWorkloadUID = "nasp.k8s.cisco.com/uid"
+	NASPWorkloadgroupLabel  = "nasp.k8s.cisco.com/workloadgroup"
+	NASPWorkloadUID         = "nasp.k8s.cisco.com/uid"
+
+	NASPHeimdallTokenExpirationDuration = "heimdall.nasp.k8s.cisco.com/token-expiration-duration"
 )
 
 const (

@@ -17,8 +17,11 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"emperror.dev/errors"
 	"github.com/go-logr/logr"
+	"github.com/golang-jwt/jwt/v4"
 	istionetworkingv1beta1 "istio.io/client-go/pkg/apis/networking/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,8 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/banzaicloud/operator-tools/pkg/utils"
+	"github.com/banzaicloud/operator-tools/pkg/reconciler"
 	"github.com/cisco-open/nasp/components/heimdall/pkg/predicates"
 	"github.com/cisco-open/nasp/components/heimdall/pkg/server"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
@@ -50,16 +54,18 @@ type IstioWorkloadGroupReconciler struct {
 	ctrl    controller.Controller
 }
 
+// #nosec G101
 const (
-	//#nosec G101
-	naspSecretType corev1.SecretType = "nasp.k8s.cisco.com/access-token"
+	naspSecretType  corev1.SecretType = "nasp.k8s.cisco.com/access-token"
+	tokenSecretKey  string            = "token"
+	tokenNameFormat string            = "%s-nasp-token"
 )
 
 var (
 	naspLabels = labels.Set(map[string]string{
 		k8slabels.NASPMonitoringLabel: "true",
 	})
-	tokenExpirationSeconds = 60 * 60 * 24
+	defaultTokenExpirationDurationString = "24h"
 )
 
 func (r *IstioWorkloadGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -73,27 +79,34 @@ func (r *IstioWorkloadGroupReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, err
 	}
 
+	r.Logger.V(1).Info("reconcile", "req", req)
+
 	hasNaspLabels := labels.SelectorFromSet(naspLabels).Matches(labels.Set(wg.Labels))
 
+	var res *reconcile.Result
 	if hasNaspLabels {
-		err := r.createToken(ctx, wg)
+		res, err = r.createToken(ctx, wg)
 		if err != nil {
 			r.Logger.Error(err, "could not create token")
 		}
-
-		return ctrl.Result{}, err
+	} else {
+		res, err = r.deleteToken(wg)
+		if err != nil {
+			r.Logger.Error(err, "could not delete token")
+		}
 	}
 
-	err = r.deleteToken(ctx, wg)
-	if err != nil {
-		r.Logger.Error(err, "could not delete token")
+	if res != nil {
+		return *res, err
 	}
 
-	return ctrl.Result{}, err
+	return ctrl.Result{
+		RequeueAfter: time.Minute * 5,
+	}, err
 }
 
-func (r *IstioWorkloadGroupReconciler) deleteToken(ctx context.Context, wg *istionetworkingv1beta1.WorkloadGroup) error {
-	name := fmt.Sprintf("wg-%s-nasp-token", wg.GetName())
+func (r *IstioWorkloadGroupReconciler) deleteToken(wg *istionetworkingv1beta1.WorkloadGroup) (*ctrl.Result, error) {
+	name := fmt.Sprintf(tokenNameFormat, wg.GetName())
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -102,24 +115,15 @@ func (r *IstioWorkloadGroupReconciler) deleteToken(ctx context.Context, wg *isti
 		},
 	}
 
-	err := r.Get(ctx, client.ObjectKey{
-		Name:      secret.GetName(),
-		Namespace: secret.GetNamespace(),
-	}, secret)
-	if k8serrors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
+	rec := reconciler.NewGenericReconciler(r.Client, r.Logger, reconciler.ReconcilerOpts{})
 
 	r.Logger.Info("delete token secret", "wgName", wg.GetName(), "wgNamespace", wg.GetNamespace())
 
-	return r.Delete(ctx, secret)
+	return rec.ReconcileResource(secret, reconciler.StateAbsent)
 }
 
-func (r *IstioWorkloadGroupReconciler) createToken(ctx context.Context, wg *istionetworkingv1beta1.WorkloadGroup) error {
-	name := fmt.Sprintf("%s-nasp-token", wg.GetName())
+func (r *IstioWorkloadGroupReconciler) createToken(ctx context.Context, wg *istionetworkingv1beta1.WorkloadGroup) (*ctrl.Result, error) {
+	name := fmt.Sprintf(tokenNameFormat, wg.GetName())
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -129,35 +133,68 @@ func (r *IstioWorkloadGroupReconciler) createToken(ctx context.Context, wg *isti
 			Name:      name,
 			Namespace: wg.GetNamespace(),
 		},
-		Type:      naspSecretType,
-		Immutable: utils.BoolPointer(true),
-		Data:      map[string][]byte{},
+		Type: naspSecretType,
+		Data: map[string][]byte{},
 	}
 
 	if err := controllerutil.SetControllerReference(wg, secret, r.Scheme); err != nil {
-		return err
+		return nil, err
 	}
 
 	err := r.Get(ctx, client.ObjectKey{
 		Name:      secret.GetName(),
 		Namespace: secret.GetNamespace(),
 	}, secret)
-	if !k8serrors.IsNotFound(err) {
-		return err
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return nil, err
 	}
 
-	aud := server.NASPTokenAudience("").Generate(client.ObjectKeyFromObject(wg))
-
-	token, err := istio_ca.CreateK8SToken(ctx, r.Config, wg.Spec.Template.ServiceAccount, wg.GetNamespace(), []string{aud}, tokenExpirationSeconds)
-	if err != nil {
-		return err
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
 	}
 
-	secret.Data["token"] = token
+	var createToken bool
 
-	r.Logger.Info("create token secret", "wgName", wg.GetName(), "wgNamespace", wg.GetNamespace())
+	if k8serrors.IsNotFound(err) || secret.Data["token"] == nil {
+		createToken = true
+	}
 
-	return r.Create(ctx, secret)
+	if !createToken && secret.Data[tokenSecretKey] != nil {
+		// parse JWT token to extract expiration
+		claims := jwt.RegisteredClaims{}
+		_, _, err := jwt.NewParser().ParseUnverified(string(secret.Data["token"]), &claims)
+		if err != nil {
+			return nil, errors.WrapIf(err, "could not parse JWT token")
+		}
+		if time.Now().Add(time.Minute * 10).After(claims.ExpiresAt.Time) {
+			r.Logger.Info("token expires within 10 minutes", "expireAt", claims.ExpiresAt)
+			createToken = true
+		}
+	}
+
+	if createToken {
+		tokenExpirationDurationString := defaultTokenExpirationDurationString
+		if duration, ok := wg.Annotations[k8slabels.NASPHeimdallTokenExpirationDuration]; ok {
+			tokenExpirationDurationString = duration
+		}
+
+		tokenExpirationDuration, err := time.ParseDuration(tokenExpirationDurationString)
+		if err != nil {
+			return nil, errors.WrapIfWithDetails(err, "could not parse token expiration duration", "duration", tokenExpirationDurationString)
+		}
+
+		r.Logger.Info("create token secret", "wgName", wg.GetName(), "wgNamespace", wg.GetNamespace(), "expireAt", time.Now().Add(tokenExpirationDuration))
+
+		aud := server.NASPTokenAudience("").Generate(client.ObjectKeyFromObject(wg))
+		secret.Data[tokenSecretKey], err = istio_ca.CreateK8SToken(ctx, r.Config, wg.Spec.Template.ServiceAccount, wg.GetNamespace(), []string{aud}, int(tokenExpirationDuration.Seconds()))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	rec := reconciler.NewGenericReconciler(r.Client, r.Logger, reconciler.ReconcilerOpts{})
+
+	return rec.ReconcileResource(secret, reconciler.StatePresent)
 }
 
 func (r *IstioWorkloadGroupReconciler) SetupWithManager(mgr ctrl.Manager) (err error) {
