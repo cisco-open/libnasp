@@ -224,10 +224,10 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 		return nil, err
 	}
 
-	// listener, err = h.iih.GetTCPListener(listener)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	listener, err = h.iih.GetTCPListener(listener)
+	if err != nil {
+		return nil, err
+	}
 
 	return &TCPListener{
 		listener: listener,
