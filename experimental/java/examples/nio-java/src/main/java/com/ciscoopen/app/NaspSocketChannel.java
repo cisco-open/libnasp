@@ -157,7 +157,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
             }
 
             byte[] temp = new byte[rem];
-            src.get(temp, src.position(), src.limit());
+            src.get(temp, 0, rem);
             return connection.asyncWrite(temp);
         } catch (Exception e) {
             throw new IOException(e);
