@@ -8,6 +8,7 @@ import sun.nio.ch.SelectorProviderImpl;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -37,11 +38,24 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     protected int doSelect(Consumer<SelectionKey> action, long timeout) throws IOException {
-        selector.select(timeout);
+        int to = (int) Math.min(timeout, Integer.MAX_VALUE); // max poll timeout
+        boolean blocking = (to != 0);
+
+        byte[] selectedKeysRaw;
+        try {
+            begin(blocking);
+            selectedKeysRaw = selector.select(timeout);
+        } finally {
+            end(blocking);
+        }
+
+        processDeregisterQueue();
+
+        ByteBuffer selectedKeys = ByteBuffer.wrap(selectedKeysRaw);
 
         int numKeysUpdated = 0;
-        long selectedKey;
-        while ((selectedKey = selector.nextSelectedKey()) != 0) {
+        while (selectedKeys.remaining() > 0) {
+            long selectedKey = selectedKeys.getLong();
             SelectionKeyImpl selectionKey = selectionKeyTable.get(getSelectedKeyId(selectedKey));
             if (selectionKey != null) {
                 if (selectionKey.isValid()) {
@@ -72,7 +86,7 @@ class NaspSelector extends SelectorImpl {
 
     @Override
     protected void implDereg(SelectionKeyImpl ski) throws IOException {
-        throw new UnsupportedOperationException();
+        selectionKeyTable.remove(ski.hashCode());
     }
 
     @Override

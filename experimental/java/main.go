@@ -17,6 +17,7 @@ package nasp
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -108,12 +109,12 @@ func (k SelectedKey) SelectedKeyId() uint32 {
 
 type Selector struct {
 	queue        chan SelectedKey
-	selected     map[SelectedKey]struct{}
+	selected     map[uint32]SelectedKey
 	writableKeys sync.Map
 }
 
 func NewSelector() *Selector {
-	return &Selector{queue: make(chan SelectedKey, 64), selected: map[SelectedKey]struct{}{}}
+	return &Selector{queue: make(chan SelectedKey, 64), selected: map[uint32]SelectedKey{}}
 }
 
 func (s *Selector) Close() {
@@ -122,7 +123,7 @@ func (s *Selector) Close() {
 	s.selected = nil
 }
 
-func (s *Selector) Select(timeoutMs int64) int {
+func (s *Selector) Select(timeoutMs int64) []byte {
 	ctx, cancel := context.WithCancel(context.Background())
 	if timeoutMs != -1 {
 		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
@@ -143,31 +144,36 @@ func (s *Selector) Select(timeoutMs int64) int {
 	})
 
 	if (timeoutMs == 0) && len(s.queue) == 0 {
-		return 0
+		return nil
 	}
 
 	select {
-	case c := <-s.queue:
+	case e := <-s.queue:
 
-		eventNumber := 0
-		if c.Operation() != OP_WAKEUP {
-			s.selected[c] = struct{}{}
-			eventNumber++
+		if e.Operation() != OP_WAKEUP {
+			s.selected[e.SelectedKeyId()] |= e
 		}
 
 		l := len(s.queue)
 
 		for i := 0; i < l; i++ {
-			event := <-s.queue
-			if event.Operation() != OP_WAKEUP {
-				s.selected[event] = struct{}{}
-				eventNumber++
+			e := <-s.queue
+			if e.Operation() != OP_WAKEUP {
+				s.selected[e.SelectedKeyId()] |= e
 			}
 		}
 
-		return eventNumber
+		b := make([]byte, len(s.selected)*8)
+		i := 0
+		for k, v := range s.selected {
+			delete(s.selected, k)
+			binary.BigEndian.PutUint64(b[i*8:], uint64(v))
+			i++
+		}
+
+		return b
 	case <-ctx.Done():
-		return 0
+		return nil
 	}
 }
 
@@ -181,14 +187,6 @@ func (s *Selector) unregisterWriter(selectedKeyId int32) {
 
 func (s *Selector) WakeUp() {
 	s.queue <- NewSelectedKey(OP_WAKEUP, 0)
-}
-
-func (s *Selector) NextSelectedKey() int64 {
-	for k := range s.selected {
-		delete(s.selected, k)
-		return int64(k)
-	}
-	return 0
 }
 
 func NewNaspIntegrationHandler(heimdallURL, authorizationToken string) (*NaspIntegrationHandler, error) {
