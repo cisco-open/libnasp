@@ -323,12 +323,14 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 		"id", c.id,
 	}
+
+	logger := logger.WithName("StartAsyncRead")
+	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
+
 	if !c.readInProgress.CompareAndSwap(false, true) {
 		return
 	}
 
-	logger := logger.WithName("StartAsyncRead")
-	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 	go func() {
 		tempBuffer := make([]byte, 1024)
 		for {
