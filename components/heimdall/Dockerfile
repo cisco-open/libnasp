@@ -3,7 +3,8 @@ ARG GO_VERSION=1.19.6
 
 FROM golang:${GO_VERSION}-alpine3.17 AS builder
 
-RUN apk add --update --no-cache bash=~5.2 ca-certificates~=20220614 make~=4.3 git~=2.38 curl~=7.88
+# hadolint ignore=DL3018
+RUN apk add --update --no-cache bash ca-certificates make git curl
 
 ARG GITHUB_ACCESS_TOKEN
 
@@ -23,23 +24,22 @@ COPY ./go.sum /go/src/app
 COPY ./components/heimdall/go.mod /go/src/app/components/heimdall
 COPY ./components/heimdall/go.sum /go/src/app/components/heimdall
 
-# hadolint ignore=DL3059
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . /go/src/app/
 
-RUN CGO_ENABLED=0 make webhook-binary server-binary
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod CGO_ENABLED=0 make webhook-binary \
+    && CGO_ENABLED=0 make server-binary
 
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
+# Use distroless as minimal base image
 FROM gcr.io/distroless/static:nonroot
 
 # Heimdall server
-COPY --from=builder /go/src/app/components/heimdall/bin/server  /heimdall-server
+COPY --from=builder /go/src/app/components/heimdall/build/heimdall-server  /heimdall-server
 
 # Heimdall Webhook
-COPY --from=builder /go/src/app/components/heimdall/bin/webhook  /heimdall-webhook
+COPY --from=builder /go/src/app/components/heimdall/build/heimdall-webhook  /heimdall-webhook
 
 WORKDIR /
 USER 65532:65532

@@ -2,8 +2,13 @@ include ../../common.mk
 
 .DEFAULT_GOAL := help
 
-# Image URL to use all building/pushing image targets
-IMG ?= cisco-open/heimdall:latest
+BUILD_DIR ?= build
+BINARY_NAME ?= heimdall-server
+BUILD_PACKAGE ?= ./cmd/server
+VERSION ?= $(shell (git symbolic-ref -q --short HEAD || git describe --tags --exact-match) | tr "/" "-")
+
+DOCKER_IMAGE ?= cisco-open/heimdall
+DOCKER_TAG ?= ${VERSION}
 
 CONTROLLER_TOOLS_VERSION ?= v0.9.2
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -43,6 +48,16 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 
 ##@ Build
 
+.PHONY: build
+build:
+ifeq (${VERBOSE}, 1)
+	go env
+endif
+	@$(eval GENERATED_BINARY_NAME = ${BINARY_NAME})
+	@$(if $(strip ${BINARY_NAME_SUFFIX}),$(eval GENERATED_BINARY_NAME = ${BINARY_NAME}-$(subst $(eval) ,-,$(strip ${BINARY_NAME_SUFFIX}))),)
+	go build ${GOARGS} -tags "${GOTAGS}" -ldflags "${LDFLAGS}" -o ${BUILD_DIR}/${GENERATED_BINARY_NAME} ${BUILD_PACKAGE}
+
+
 .PHONY: build-webhook
 build-webhook: generate fmt vet webhook-binary ## Build webhook binary with generate.
 
@@ -50,20 +65,24 @@ build-webhook: generate fmt vet webhook-binary ## Build webhook binary with gene
 build-server: fmt vet server-binary ## Build server binary with generate.
 
 .PHONY: webhook-binary
-webhook-binary: ## Build webhook binary.
-	go build -o bin/webhook ./cmd/webhook/main.go
+webhook-binary: LDFLAGS += -w
+webhook-binary: BINARY_NAME = heimdall-webhook
+webhook-binary: BUILD_PACKAGE = ./cmd/webhook
+webhook-binary: build ## Build webhook binary.
 
 .PHONY: server-binary
-server-binary: ## Build server binary.
-	go build -o bin/server ./cmd/server/main.go
+server-binary: LDFLAGS += -w
+server-binary: BINARY_NAME = heimdall-server
+server-binary: BUILD_PACKAGE = ./cmd/server
+server-binary: build ## Build server binary.
 
-.PHONY: docker-build
-docker-build: ## Build docker image with the manager.
-	docker build -t ${IMG} -f Dockerfile --progress=plain ../..
+docker: export GOOS = linux
+docker-build: ## Build docker image.
+	docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} -f Dockerfile --progress=plain ../..
 
 .PHONY: docker-push
-docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+docker-push: ## Push docker image.
+	docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
 
 ##@ Build Dependencies
 
