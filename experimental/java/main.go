@@ -77,7 +77,7 @@ type Connection struct {
 	id           string
 	conn         net.Conn
 	readBuffer   *bytes.Buffer
-	readLock     sync.Mutex
+	readLock     sync.RWMutex
 	writeChannel chan []byte
 
 	readInProgress  atomic.Bool
@@ -111,6 +111,7 @@ type Selector struct {
 	queue        chan SelectedKey
 	selected     map[uint32]SelectedKey
 	writableKeys sync.Map
+	readableKeys sync.Map
 }
 
 func NewSelector() *Selector {
@@ -120,6 +121,7 @@ func NewSelector() *Selector {
 func (s *Selector) Close() {
 	close(s.queue)
 	s.writableKeys = sync.Map{}
+	s.readableKeys = sync.Map{}
 	s.selected = nil
 }
 
@@ -138,6 +140,19 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 			case s.queue <- NewSelectedKey(OP_WRITE, uint32(key.(int32))):
 			default:
 				// best effort non-blocking write
+			}
+		}
+		return true
+	})
+
+	//nolint:forcetypeassert
+	s.readableKeys.Range(func(key, value any) bool {
+		check := value.(func() bool)
+		if check() {
+			select {
+			case s.queue <- NewSelectedKey(OP_READ, uint32(key.(int32))):
+			default:
+				// best effort non-blocking read
 			}
 		}
 		return true
@@ -183,6 +198,10 @@ func (s *Selector) registerWriter(selectedKeyId int32, check func() bool) {
 
 func (s *Selector) unregisterWriter(selectedKeyId int32) {
 	s.writableKeys.Delete(selectedKeyId)
+}
+
+func (s *Selector) registerReader(selectedKeyId int32, check func() bool) {
+	s.readableKeys.Store(selectedKeyId, check)
 }
 
 func (s *Selector) WakeUp() {
@@ -325,7 +344,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	}
 
 	logger := logger.WithName("StartAsyncRead")
-	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
+	// logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 
 	if !c.readInProgress.CompareAndSwap(false, true) {
 		return
@@ -356,7 +375,11 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if n != num {
 				logger.Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
 			}
-			selector.queue <- NewSelectedKey(OP_READ, uint32(selectedKeyId))
+			selector.registerReader(selectedKeyId, func() bool {
+				c.readLock.RLock()
+				defer c.readLock.RUnlock()
+				return c.readBuffer.Len() > 0
+			})
 		}
 
 		logger.Info("StartAsyncRead finished", "id", c.id, "selected key id", selectedKeyId)
