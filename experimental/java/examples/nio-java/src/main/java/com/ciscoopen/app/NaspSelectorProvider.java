@@ -49,6 +49,10 @@ class NaspSelector extends SelectorImpl {
             end(blocking);
         }
 
+        if (selectedKeysRaw == null) {
+            return 0;
+        }
+
         processDeregisterQueue();
 
         ByteBuffer selectedKeys = ByteBuffer.wrap(selectedKeysRaw);
