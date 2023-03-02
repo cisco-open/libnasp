@@ -150,15 +150,13 @@ class NaspSelector extends SelectorImpl {
         if ((opsDiff & SelectionKey.OP_READ) != 0) {
             naspSocketChannel.getConnection().startAsyncRead(selectedKeyId, selector);
             runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
-        } else {
-            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_READ);
         }
+
         if ((opsDiff & SelectionKey.OP_WRITE) != 0) {
             naspSocketChannel.getConnection().startAsyncWrite(selectedKeyId, selector);
             runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_WRITE);
-        } else {
-            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_WRITE);
         }
+        
         if ((opsDiff & SelectionKey.OP_CONNECT) != 0) {
             //This could happen if we are servers not clients
             if (naspSocketChannel.getNaspTcpDialer() != null) {
@@ -167,8 +165,6 @@ class NaspSelector extends SelectorImpl {
                         address.getHostString(), address.getPort());
                 runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
             }
-        } else {
-            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_CONNECT);
         }
     }
 
@@ -176,8 +172,6 @@ class NaspSelector extends SelectorImpl {
         if ((opsDiff & SelectionKey.OP_ACCEPT) != 0) {
             naspServerSocketChannel.socket().getNaspTcpListener().startAsyncAccept(selectedKeyId, selector);
             runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_ACCEPT);
-        } else {
-            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_ACCEPT);
         }
     }
 }
