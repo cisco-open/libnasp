@@ -189,14 +189,6 @@ func (s *Selector) WakeUp() {
 	s.queue <- NewSelectedKey(OP_WAKEUP, 0)
 }
 
-func (s *Selector) NextSelectedKey() int64 {
-	for k, v := range s.selected {
-		delete(s.selected, k)
-		return int64(v)
-	}
-	return 0
-}
-
 func NewNaspIntegrationHandler(heimdallURL, authorizationToken string) (*NaspIntegrationHandler, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
