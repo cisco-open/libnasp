@@ -136,7 +136,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
             if (num == -1) {
                 return -1;
             }
-            dst.put(buff, dst.position(), num);
+            dst.put(buff, 0, num);
             return num;
         } catch (Exception e) {
             throw new IOException(e);
