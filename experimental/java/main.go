@@ -17,6 +17,7 @@ package nasp
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -122,7 +123,7 @@ func (s *Selector) Close() {
 	s.selected = nil
 }
 
-func (s *Selector) Select(timeoutMs int64) int {
+func (s *Selector) Select(timeoutMs int64) []byte {
 	ctx, cancel := context.WithCancel(context.Background())
 	if timeoutMs != -1 {
 		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
@@ -143,7 +144,7 @@ func (s *Selector) Select(timeoutMs int64) int {
 	})
 
 	if (timeoutMs == 0) && len(s.queue) == 0 {
-		return 0
+		return nil
 	}
 
 	select {
@@ -162,9 +163,17 @@ func (s *Selector) Select(timeoutMs int64) int {
 			}
 		}
 
-		return len(s.selected)
+		b := make([]byte, len(s.selected)*8)
+		i := 0
+		for k, v := range s.selected {
+			delete(s.selected, k)
+			binary.BigEndian.PutUint64(b[i*8:], uint64(v))
+			i++
+		}
+
+		return b
 	case <-ctx.Done():
-		return 0
+		return nil
 	}
 }
 
@@ -215,10 +224,10 @@ func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, e
 		return nil, err
 	}
 
-	listener, err = h.iih.GetTCPListener(listener)
-	if err != nil {
-		return nil, err
-	}
+	// listener, err = h.iih.GetTCPListener(listener)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return &TCPListener{
 		listener: listener,
