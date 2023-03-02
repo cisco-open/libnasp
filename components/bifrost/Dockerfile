@@ -3,30 +3,39 @@ ARG GO_VERSION=1.19.6
 
 FROM golang:${GO_VERSION}-alpine3.17 AS builder
 
-RUN apk add --update --no-cache ca-certificates~=20220614 make~=4.3 git~=2.38 curl~=7.88
+# hadolint ignore=DL3018
+RUN apk add --update --no-cache ca-certificates make git curl
 
-ARG BUILD_DIR /go/src/app
-RUN mkdir -p /${BUILD_DIR}
+ARG GITHUB_ACCESS_TOKEN
+
+ARG GOPROXY="https://proxy.golang.org,direct"
+ENV GOPROXY="${GOPROXY}"
+ENV GOPRIVATE='github.com/cisco-open,github.com/banzaicloud'
+ENV GONOPROXY='gopkg.in,go.uber.org'
+ENV GOFLAGS="-mod=readonly"
+
+WORKDIR /go/src/app/components/bifrost
 
 # Copy the go module manifests
-COPY ./go.mod /${BUILD_DIR}/
-COPY ./go.sum /${BUILD_DIR}/
+COPY ./go.mod /go/src/app/
+COPY ./go.sum /go/src/app/
 
 # Copy the Bifrost go module manifests
-COPY components/bifrost/go.mod /${BUILD_DIR}/components/bifrost/go.mod
-COPY components/bifrost/go.sum /${BUILD_DIR}/components/bifrost/go.sum
+COPY components/bifrost/go.mod /go/src/app/components/bifrost
+COPY components/bifrost/go.sum /go/src/app/components/bifrost
 
-WORKDIR /${BUILD_DIR}/components/bifrost
-
-# hadolint ignore=DL3059
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod go mod download
 
-COPY . /${BUILD_DIR}
+COPY . /go/src/app
 
-RUN CGO_ENABLED=0 BUILD_DIR='' BINARY_NAME=app make build-release
+RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod CGO_ENABLED=0 BUILD_DIR='' BINARY_NAME=app make build-release
 
-# hadolint ignore=DL3007
-FROM gcr.io/distroless/static:latest
-COPY --from=builder /app /app
-USER nobody:nobody
-ENTRYPOINT ["/app"]
+
+# Use distroless as minimal base image
+FROM gcr.io/distroless/static:nonroot
+
+COPY --from=builder /app /bifrost
+
+USER 65532:65532
+
+ENTRYPOINT ["/bifrost"]
