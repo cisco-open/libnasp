@@ -42,21 +42,21 @@ class NaspSelector extends SelectorImpl {
         int to = (int) Math.min(timeout, Integer.MAX_VALUE); // max poll timeout
         boolean blocking = (to != 0);
 
-        byte[] selectedKeysRaw;
+        byte[] selectedKeysNative;
         try {
             begin(blocking);
-            selectedKeysRaw = selector.select(timeout);
+            selectedKeysNative = nativeSelect(timeout);
         } finally {
             end(blocking);
         }
 
-        if (selectedKeysRaw == null) {
+        if (selectedKeysNative == null) {
             return 0;
         }
 
         processDeregisterQueue();
 
-        ByteBuffer selectedKeys = ByteBuffer.wrap(selectedKeysRaw);
+        ByteBuffer selectedKeys = ByteBuffer.wrap(selectedKeysNative);
 
         int numKeysUpdated = 0;
         while (selectedKeys.remaining() > 0) {
@@ -70,6 +70,10 @@ class NaspSelector extends SelectorImpl {
         }
 
         return numKeysUpdated;
+    }
+
+    private byte[] nativeSelect(long timeout) {
+        return selector.select(timeout);
     }
 
     @Override
@@ -106,6 +110,7 @@ class NaspSelector extends SelectorImpl {
 
     /**
      * Returns the diff between running async ops and the list the interest ops registered in the provided ski
+     *
      * @param ski specifies the list of ops we are interested in
      * @return the diff between running async ops and the list the interest ops
      */
