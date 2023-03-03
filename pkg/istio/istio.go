@@ -237,9 +237,6 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 	s.pluginManager = proxywasm.NewWasmPluginManager(vms, baseContext, logger)
 
 	s.discoveryClient = discovery.NewXDSDiscoveryClient(e, s.caClient, s.logger.WithName("xds-discovery"))
-	if err := s.discoveryClient.Connect(context.Background()); err != nil {
-		return nil, err
-	}
 
 	if config.PushgatewayConfig != nil {
 		if config.PushgatewayConfig.Address == "" {
@@ -377,7 +374,11 @@ func (h *IstioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 	return server.ServeWithTLSConfig(ln, tlsConfig)
 }
 
-func (h *IstioIntegrationHandler) Run(ctx context.Context) {
+func (h *IstioIntegrationHandler) Run(ctx context.Context) error {
+	if err := h.discoveryClient.Connect(ctx); err != nil {
+		return err
+	}
+
 	if h.config.PushgatewayConfig == nil {
 		go h.RunMetricsServer(ctx)
 	} else {
@@ -386,6 +387,8 @@ func (h *IstioIntegrationHandler) Run(ctx context.Context) {
 			_ = h.RunMetricsPusher(ctx)
 		}()
 	}
+
+	return nil
 }
 
 func (h *IstioIntegrationHandler) RunMetricsServer(ctx context.Context) {
