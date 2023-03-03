@@ -204,6 +204,10 @@ func (s *Selector) registerReader(selectedKeyId int32, check func() bool) {
 	s.readableKeys.Store(selectedKeyId, check)
 }
 
+func (s *Selector) unregisterReader(selectedKeyId int32) {
+	s.readableKeys.Delete(selectedKeyId)
+}
+
 func (s *Selector) WakeUp() {
 	s.queue <- NewSelectedKey(OP_WAKEUP, 0)
 }
@@ -383,6 +387,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		}
 
 		logger.Info("StartAsyncRead finished", "id", c.id, "selected key id", selectedKeyId)
+		selector.unregisterReader(selectedKeyId)
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
