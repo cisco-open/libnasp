@@ -22,9 +22,9 @@ public class NaspServerSocket extends ServerSocket {
     private int localPort;
     private InetSocketAddress address;
 
-    public NaspServerSocket(SelectorProvider selectorProvider) throws IOException {
+    public NaspServerSocket(SelectorProvider selectorProvider, NaspIntegrationHandler nasp) throws IOException {
         try {
-            nasp = Nasp.newNaspIntegrationHandler("https://localhost:16443/config", System.getenv("NASP_AUTH_TOKEN"));
+            this.nasp = nasp;
         } catch (Exception e) {
             throw new IOException("could not get nasp tcp listener", e);
         }
@@ -72,7 +72,7 @@ public class NaspServerSocket extends ServerSocket {
             if (conn == null) {
                 return null;
             }
-            return new NaspSocket(selectorProvider, conn);
+            return new NaspSocket(selectorProvider, conn, nasp);
         } catch (Exception e) {
             throw new IOException("could not bound to nasp tcp listener");
         }

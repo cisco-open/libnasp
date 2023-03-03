@@ -498,40 +498,21 @@ func (c *Connection) Write(b []byte) (int, error) {
 }
 
 type TCPDialer struct {
-	iih    *istio.IstioIntegrationHandler
 	dialer itcp.Dialer
-	ctx    context.Context
-	cancel context.CancelFunc
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
 }
 
-func NewTCPDialer(heimdallURL, authorizationToken string) (*TCPDialer, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-	}, logger)
+func (h *NaspIntegrationHandler) NewTCPDialer() (*TCPDialer, error) {
+	dialer, err := h.iih.GetTCPDialer()
 	if err != nil {
-		cancel()
+		h.cancel()
 		return nil, err
 	}
-
-	dialer, err := iih.GetTCPDialer()
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	go iih.Run(ctx)
 
 	return &TCPDialer{
-		iih:    iih,
 		dialer: dialer,
-		ctx:    ctx,
-		cancel: cancel,
 	}, nil
 }
 

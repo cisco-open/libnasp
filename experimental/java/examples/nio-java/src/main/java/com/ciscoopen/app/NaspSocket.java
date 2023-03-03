@@ -8,6 +8,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 
 import nasp.Connection;
+import nasp.NaspIntegrationHandler;
 
 public class NaspSocket extends Socket {
     private final Connection conn;
@@ -15,9 +16,9 @@ public class NaspSocket extends Socket {
 
     private InetSocketAddress address;
 
-    public NaspSocket(SelectorProvider provider, Connection conn) {
+    public NaspSocket(SelectorProvider provider, Connection conn, NaspIntegrationHandler nasp) {
         this.conn = conn;
-        this.channel = new NaspSocketChannel(provider, conn, this);
+        this.channel = new NaspSocketChannel(provider, conn, this, nasp);
     }
     public void setAddress(InetSocketAddress address) {
         this.address = address;
