@@ -74,6 +74,8 @@ func NewXDSDiscoveryClient(environment *environment.IstioEnvironment, caClient c
 }
 
 func (d *xdsDiscoveryClient) Connect(ctx context.Context) error {
+	ctx = logr.NewContext(ctx, d.logger)
+
 	d.logger.Info("get certificate")
 	cert, err := d.caClient.GetCertificate(d.environment.GetSpiffeID(), time.Hour*24)
 	if err != nil {
