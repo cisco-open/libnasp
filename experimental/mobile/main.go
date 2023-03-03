@@ -76,7 +76,10 @@ func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, e
 		return nil, err
 	}
 
-	go iih.Run(ctx)
+	if err := iih.Run(ctx); err != nil {
+		cancel()
+		return nil, err
+	}
 
 	client := &http.Client{
 		Transport: transport,

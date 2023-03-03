@@ -201,7 +201,10 @@ func NewNaspIntegrationHandler(heimdallURL, authorizationToken string) (*NaspInt
 		return nil, err
 	}
 
-	go iih.Run(ctx)
+	if err := iih.Run(ctx); err != nil {
+		cancel()
+		return nil, err
+	}
 
 	return &NaspIntegrationHandler{
 		iih:    iih,
@@ -500,7 +503,10 @@ func NewTCPDialer(heimdallURL, authorizationToken string) (*TCPDialer, error) {
 		return nil, err
 	}
 
-	go iih.Run(ctx)
+	if err := iih.Run(ctx); err != nil {
+		cancel()
+		return nil, err
+	}
 
 	return &TCPDialer{
 		iih:    iih,
@@ -606,7 +612,10 @@ func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, e
 		return nil, err
 	}
 
-	go iih.Run(ctx)
+	if err := iih.Run(ctx); err != nil {
+		cancel()
+		return nil, err
+	}
 
 	client := &http.Client{
 		Transport: transport,

@@ -158,7 +158,9 @@ func NewHTTPTransport(heimdallURLPtr, authorizationTokenPtr *C.char,
 		return C.ulonglong(0), cGoError(err)
 	}
 
-	go iih.Run(ctx)
+	if err := iih.Run(ctx); err != nil {
+		return C.ulonglong(0), cGoError(err)
+	}
 
 	client := &http.Client{
 		Transport: transport,
