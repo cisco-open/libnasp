@@ -129,7 +129,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public int read(ByteBuffer dst) throws IOException {
-        //TODO revise this to be more efficient
         try {
             byte[] buff = new byte[dst.remaining()];
             int num = connection.asyncRead(buff);
@@ -156,9 +155,22 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
                 return 0;
             }
 
+            int writtenBytes = 0;
             byte[] temp = new byte[rem];
             src.get(temp, 0, rem);
-            return connection.asyncWrite(temp);
+
+            while (writtenBytes < rem) {
+                int n = connection.asyncWrite(temp);
+                writtenBytes += n;
+                if (writtenBytes < rem) {
+                    int remLength = rem - writtenBytes;
+                    byte[] remBytes = new byte[remLength];
+                    System.arraycopy(temp, n, remBytes, 0, remLength);
+                    temp = remBytes;
+                }
+            }
+
+            return writtenBytes;
         } catch (Exception e) {
             throw new IOException(e);
         }
