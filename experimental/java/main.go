@@ -476,7 +476,7 @@ func (c *Connection) Close() {
 
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
 	if c.eofReceived() {
-		return -1, nil
+		return 0, nil
 	}
 
 	bCopy := make([]byte, len(b))
