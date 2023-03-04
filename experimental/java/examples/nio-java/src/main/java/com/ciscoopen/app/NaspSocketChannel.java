@@ -167,7 +167,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
             if (writtenBytes < rem) {
                 src.position(srcBufPos + writtenBytes);
             }
-
             return writtenBytes;
         } catch (Exception e) {
             throw new IOException(e);
@@ -184,12 +183,18 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
         int totalLength = 0;
         for (int i = offset; i < offset + length; i++) {
-            int writtenBytes = write(srcs[i]);
-            if (writtenBytes == -1) {
-                return -1;
+            int expectedWriteCount =  srcs[i].remaining();
+            if (expectedWriteCount == 0) {
+                continue;
             }
+            int writtenBytes = write(srcs[i]);
             totalLength += writtenBytes;
 
+            if (writtenBytes < expectedWriteCount) {
+                // in case the data of one of the byte buffers from the array can not be written to the connection
+                // entirely we need to stop the write operation to ensure the byte buffers are written out in order
+                break;
+            }
         }
         return totalLength;
     }
