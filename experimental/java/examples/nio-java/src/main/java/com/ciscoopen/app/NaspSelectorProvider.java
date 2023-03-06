@@ -205,7 +205,7 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
             if (!sendfileTurnedOff) {
                 throw new IllegalStateException("couldn't turn off sendfile support");
             }
-            nasp = Nasp.newNaspIntegrationHandler("https://localhost:16443/config", System.getenv("NASP_AUTH_TOKEN"));
+            nasp = Nasp.newNaspIntegrationHandler();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
