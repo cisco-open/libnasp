@@ -17,6 +17,7 @@ package nasp
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -360,21 +361,33 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 					c.readInProgress.Store(false)
 					break
 				}
+
 				logger.Error(err, "reading data from connection failed", logCtx...)
+				var tlsErr tls.RecordHeaderError
+				if errors.As(err, &tlsErr) { // e.g. tls handshake error
+					// TODO: is it correct to invoke setEofReceived here or rather have a separate flag for tls related errors
+					// TODO: as these are not EOF ??
+					c.setEofReceived()
+					c.readInProgress.Store(false)
+					break
+				}
+
 				continue
 			}
-			if num == 0 {
+			if num > 0 {
+				c.readLock.Lock()
+				n, err := c.readBuffer.Write(tempBuffer[:num])
+				c.readLock.Unlock()
+				if err != nil {
+					logger.Error(err, "couldn't write data to read buffer", logCtx...)
+				}
+				if n != num {
+					logger.Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
+				}
+			} else {
 				logger.Info("received 0 bytes on connection", logCtx...)
 			}
-			c.readLock.Lock()
-			n, err := c.readBuffer.Write(tempBuffer[:num])
-			c.readLock.Unlock()
-			if err != nil {
-				logger.Error(err, "couldn't write data to read buffer", logCtx...)
-			}
-			if n != num {
-				logger.Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
-			}
+
 			selector.registerReader(selectedKeyId, func() bool {
 				c.readLock.RLock()
 				defer c.readLock.RUnlock()
