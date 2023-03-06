@@ -180,7 +180,7 @@ class NaspSelector extends SelectorImpl {
 
 public class NaspSelectorProvider extends SelectorProviderImpl {
 
-    private static NaspIntegrationHandler nasp;
+    private static final NaspIntegrationHandler nasp;
 
     static {
         try {
