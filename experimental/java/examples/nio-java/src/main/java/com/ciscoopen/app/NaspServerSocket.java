@@ -9,26 +9,18 @@ import java.net.SocketException;
 import java.nio.channels.spi.SelectorProvider;
 
 import nasp.Nasp;
-import nasp.NaspIntegrationHandler;
 import nasp.TCPListener;
 import nasp.Connection;
 
 public class NaspServerSocket extends ServerSocket {
 
-    private final NaspIntegrationHandler nasp;
     private TCPListener naspTcpListener;
     private final SelectorProvider selectorProvider;
 
     private int localPort;
     private InetSocketAddress address;
 
-    public NaspServerSocket(SelectorProvider selectorProvider, NaspIntegrationHandler nasp) throws IOException {
-        try {
-            this.nasp = nasp;
-        } catch (Exception e) {
-            throw new IOException("could not get nasp tcp listener", e);
-        }
-
+    public NaspServerSocket(SelectorProvider selectorProvider) throws IOException {
         this.selectorProvider = selectorProvider;
     }
 
@@ -38,7 +30,7 @@ public class NaspServerSocket extends ServerSocket {
             try {
                 address = (InetSocketAddress) endpoint;
                 localPort = ((InetSocketAddress) endpoint).getPort();
-                naspTcpListener = nasp.bind(((InetSocketAddress) endpoint).getHostString(), localPort);
+                naspTcpListener = Nasp.bind(((InetSocketAddress) endpoint).getHostString(), localPort);
             } catch (Exception e) {
                 throw new IOException(e);
             }
@@ -72,7 +64,7 @@ public class NaspServerSocket extends ServerSocket {
             if (conn == null) {
                 return null;
             }
-            return new NaspSocket(selectorProvider, conn, nasp);
+            return new NaspSocket(selectorProvider, conn);
         } catch (Exception e) {
             throw new IOException("could not bound to nasp tcp listener");
         }

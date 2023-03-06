@@ -2,7 +2,6 @@ package com.ciscoopen.app;
 
 import nasp.Connection;
 import nasp.Nasp;
-import nasp.NaspIntegrationHandler;
 import nasp.TCPDialer;
 import sun.nio.ch.Net;
 import sun.nio.ch.SelChImpl;
@@ -27,20 +26,16 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     private TCPDialer naspTcpDialer;
     private Connection connection;
     private NaspSocket socket;
-    private final NaspIntegrationHandler nasp;
     private InetSocketAddress address;
 
-    public NaspSocketChannel(SelectorProvider provider, NaspIntegrationHandler nasp) {
+    public NaspSocketChannel(SelectorProvider provider) {
         super(provider);
-        this.nasp = nasp;
     }
 
-    protected NaspSocketChannel(SelectorProvider provider, Connection connection, NaspSocket socket,
-                                NaspIntegrationHandler nasp) {
+    protected NaspSocketChannel(SelectorProvider provider, Connection connection, NaspSocket socket) {
         super(provider);
         this.connection = connection;
         this.socket = socket;
-        this.nasp = nasp;
     }
 
     @Override
@@ -76,7 +71,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public NaspSocket socket() {
         if (socket == null) {
-            socket = new NaspSocket(provider(), connection, nasp);
+            socket = new NaspSocket(provider(), connection);
         }
         return socket;
     }
@@ -94,7 +89,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public boolean connect(SocketAddress remote) throws IOException {
         try {
-            naspTcpDialer = nasp.newTCPDialer();
+            naspTcpDialer = Nasp.newTCPDialer();
         } catch (Exception e) {
             throw new IOException("could not get nasp tcp dialer", e);
         }

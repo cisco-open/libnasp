@@ -1,6 +1,5 @@
 package com.ciscoopen.app;
 
-import nasp.NaspIntegrationHandler;
 import sun.nio.ch.Net;
 import sun.nio.ch.SelChImpl;
 import sun.nio.ch.SelectionKeyImpl;
@@ -18,11 +17,9 @@ import java.util.Set;
 
 public class NaspServerSocketChannel extends ServerSocketChannel implements SelChImpl {
     private NaspServerSocket socket;
-    private final NaspIntegrationHandler nasp;
 
-    public NaspServerSocketChannel(SelectorProvider sp, NaspIntegrationHandler nasp) {
+    public NaspServerSocketChannel(SelectorProvider sp) {
         super(sp);
-        this.nasp = nasp;
     }
 
     @Override
@@ -48,7 +45,7 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
     public NaspServerSocket socket() {
         try {
             if (this.socket == null) {
-                this.socket = new NaspServerSocket(provider(), nasp);
+                this.socket = new NaspServerSocket(provider());
             }
             return socket;
         } catch (IOException e) {

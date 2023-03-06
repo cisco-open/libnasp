@@ -1,7 +1,6 @@
 package com.ciscoopen.app;
 
 import nasp.Nasp;
-import nasp.NaspIntegrationHandler;
 import sun.nio.ch.FileChannelImpl;
 import sun.nio.ch.SelectionKeyImpl;
 import sun.nio.ch.SelectorImpl;
@@ -180,8 +179,6 @@ class NaspSelector extends SelectorImpl {
 
 public class NaspSelectorProvider extends SelectorProviderImpl {
 
-    private static final NaspIntegrationHandler nasp;
-
     static {
         try {
             boolean sendfileTurnedOff = false;
@@ -205,7 +202,6 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
             if (!sendfileTurnedOff) {
                 throw new IllegalStateException("couldn't turn off sendfile support");
             }
-            nasp = Nasp.newNaspIntegrationHandler();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -218,11 +214,11 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
 
     @Override
     public ServerSocketChannel openServerSocketChannel() throws IOException {
-        return new NaspServerSocketChannel(this, nasp);
+        return new NaspServerSocketChannel(this);
     }
 
     @Override
     public SocketChannel openSocketChannel() throws IOException {
-        return new NaspSocketChannel(this, nasp);
+        return new NaspSocketChannel(this);
     }
 }

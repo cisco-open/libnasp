@@ -54,6 +54,7 @@ const (
 )
 
 var logger = klog.NewKlogr()
+var integrationHandler = newNaspIntegrationHandler()
 
 // TCP related structs and functions
 
@@ -67,7 +68,7 @@ type TCPListener struct {
 	acceptInProgress atomic.Bool
 }
 
-type NaspIntegrationHandler struct {
+type naspIntegrationHandler struct {
 	iih    *istio.IstioIntegrationHandler
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -208,7 +209,7 @@ func (s *Selector) WakeUp() {
 	s.queue <- NewSelectedKey(OP_WAKEUP, 0)
 }
 
-func NewNaspIntegrationHandler() (*NaspIntegrationHandler, error) {
+func newNaspIntegrationHandler() *naspIntegrationHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
@@ -217,25 +218,25 @@ func NewNaspIntegrationHandler() (*NaspIntegrationHandler, error) {
 	}, logger)
 	if err != nil {
 		cancel()
-		return nil, err
+		panic(err)
 	}
 
 	go iih.Run(ctx)
 
-	return &NaspIntegrationHandler{
+	return &naspIntegrationHandler{
 		iih:    iih,
 		ctx:    ctx,
 		cancel: cancel,
-	}, nil
+	}
 }
 
-func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, error) {
+func Bind(address string, port int) (*TCPListener, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, err
 	}
 
-	listener, err = h.iih.GetTCPListener(listener)
+	listener, err = integrationHandler.iih.GetTCPListener(listener)
 	if err != nil {
 		return nil, err
 	}
@@ -504,10 +505,10 @@ type TCPDialer struct {
 	asyncConnections     []*Connection
 }
 
-func (h *NaspIntegrationHandler) NewTCPDialer() (*TCPDialer, error) {
-	dialer, err := h.iih.GetTCPDialer()
+func NewTCPDialer() (*TCPDialer, error) {
+	dialer, err := integrationHandler.iih.GetTCPDialer()
 	if err != nil {
-		h.cancel()
+		integrationHandler.cancel()
 		return nil, err
 	}
 
@@ -593,10 +594,10 @@ type HTTPResponse struct {
 	Body       []byte
 }
 
-func (h *NaspIntegrationHandler) NewHTTPTransport() (*HTTPTransport, error) {
-	transport, err := h.iih.GetHTTPTransport(http.DefaultTransport)
+func NewHTTPTransport() (*HTTPTransport, error) {
+	transport, err := integrationHandler.iih.GetHTTPTransport(http.DefaultTransport)
 	if err != nil {
-		h.cancel()
+		integrationHandler.cancel()
 		return nil, err
 	}
 
@@ -606,8 +607,8 @@ func (h *NaspIntegrationHandler) NewHTTPTransport() (*HTTPTransport, error) {
 
 	return &HTTPTransport{
 		client: client,
-		ctx:    h.ctx,
-		cancel: h.cancel,
+		ctx:    integrationHandler.ctx,
+		cancel: integrationHandler.cancel,
 	}, nil
 }
 
@@ -641,10 +642,10 @@ func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error)
 	}, nil
 }
 
-func (h *NaspIntegrationHandler) ListenAndServe(address string, handler HttpHandler) error {
+func ListenAndServe(address string, handler HttpHandler) error {
 	var err error
 	go func() {
-		err = h.iih.ListenAndServe(h.ctx, address, &NaspHttpHandler{handler: handler})
+		err = integrationHandler.iih.ListenAndServe(integrationHandler.ctx, address, &NaspHttpHandler{handler: handler})
 	}()
 	time.Sleep(1 * time.Second)
 	return err
