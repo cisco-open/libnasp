@@ -99,6 +99,7 @@ class NaspSelector extends SelectorImpl {
     @Override
     protected void implDereg(SelectionKeyImpl ski) throws IOException {
         selectionKeyTable.remove(ski.hashCode());
+        runningAsyncOps.remove(ski.hashCode());
     }
 
     @Override
