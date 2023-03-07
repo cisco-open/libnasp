@@ -82,9 +82,6 @@ type Connection struct {
 	readLock     sync.RWMutex
 	writeChannel chan []byte
 
-	readInProgress  atomic.Bool
-	writeInProgress atomic.Bool
-
 	terminated atomic.Bool
 
 	EOF atomic.Bool
@@ -114,6 +111,9 @@ type Selector struct {
 	selected     map[uint32]SelectedKey
 	writableKeys sync.Map
 	readableKeys sync.Map
+
+	readInProgress  sync.Map
+	writeInProgress sync.Map
 }
 
 func NewSelector() *Selector {
@@ -124,6 +124,8 @@ func (s *Selector) Close() {
 	close(s.queue)
 	s.writableKeys = sync.Map{}
 	s.readableKeys = sync.Map{}
+	s.readInProgress = sync.Map{}
+	s.writeInProgress = sync.Map{}
 	s.selected = nil
 }
 
@@ -156,6 +158,8 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 			default:
 				// best effort non-blocking read
 			}
+		} else if v, _ := s.readInProgress.Load(key.(int32)); v != nil && !v.(bool) {
+			s.unregisterReader(key.(int32))
 		}
 		return true
 	})
@@ -200,10 +204,16 @@ func (s *Selector) registerWriter(selectedKeyId int32, check func() bool) {
 
 func (s *Selector) unregisterWriter(selectedKeyId int32) {
 	s.writableKeys.Delete(selectedKeyId)
+	s.writeInProgress.Delete(selectedKeyId)
 }
 
 func (s *Selector) registerReader(selectedKeyId int32, check func() bool) {
 	s.readableKeys.Store(selectedKeyId, check)
+}
+
+func (s *Selector) unregisterReader(selectedKeyId int32) {
+	s.readableKeys.Delete(selectedKeyId)
+	s.readInProgress.Delete(selectedKeyId)
 }
 
 func (s *Selector) WakeUp() {
@@ -348,7 +358,8 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	logger := logger.WithName("StartAsyncRead")
 	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 
-	if !c.readInProgress.CompareAndSwap(false, true) {
+	//nolint:forcetypeassert
+	if v, _ := selector.readInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
 		return
 	}
 
@@ -359,7 +370,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if err != nil {
 				if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.ECONNRESET) {
 					c.setEofReceived()
-					c.readInProgress.Store(false)
+					selector.readInProgress.Store(selectedKeyId, false)
 					break
 				}
 
@@ -369,7 +380,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 					// TODO: is it correct to invoke setEofReceived here or rather have a separate flag for tls related errors
 					// TODO: as these are not EOF ??
 					c.setEofReceived()
-					c.readInProgress.Store(false)
+					selector.readInProgress.Store(selectedKeyId, false)
 					break
 				}
 
@@ -415,7 +426,9 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 	}
 	logger := logger.WithName("StartAsyncWrite")
-	if !c.writeInProgress.CompareAndSwap(false, true) {
+
+	//nolint:forcetypeassert
+	if v, _ := selector.writeInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
 		return
 	}
 
@@ -434,12 +447,12 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				num, err := c.Write(buff)
 				if err != nil {
 					if c.isTerminated() {
-						c.writeInProgress.Store(false)
+						selector.writeInProgress.Store(selectedKeyId, false)
 						break out
 					}
 					if errors.Is(err, io.EOF) {
 						c.setEofReceived()
-						c.writeInProgress.Store(false)
+						selector.writeInProgress.Store(selectedKeyId, false)
 						break out
 					}
 					logger.Error(err, "received error while writing data to connection", logCtx...)
@@ -453,7 +466,6 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 			}
 		}
 		selector.unregisterWriter(selectedKeyId)
-		c.writeInProgress.Store(false)
 		logger.Info("StartAsyncWrite finished", "id", c.id, "selected key id", selectedKeyId)
 	}()
 }
