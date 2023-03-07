@@ -82,7 +82,6 @@ type Connection struct {
 	readLock     sync.RWMutex
 	writeChannel chan []byte
 
-	readInProgress  atomic.Bool
 	writeInProgress atomic.Bool
 
 	terminated atomic.Bool
@@ -110,10 +109,11 @@ func (k SelectedKey) SelectedKeyId() uint32 {
 }
 
 type Selector struct {
-	queue        chan SelectedKey
-	selected     map[uint32]SelectedKey
-	writableKeys sync.Map
-	readableKeys sync.Map
+	queue          chan SelectedKey
+	selected       map[uint32]SelectedKey
+	writableKeys   sync.Map
+	readableKeys   sync.Map
+	readInProgress sync.Map
 }
 
 func NewSelector() *Selector {
@@ -124,6 +124,7 @@ func (s *Selector) Close() {
 	close(s.queue)
 	s.writableKeys = sync.Map{}
 	s.readableKeys = sync.Map{}
+	s.readInProgress = sync.Map{}
 	s.selected = nil
 }
 
@@ -156,6 +157,8 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 			default:
 				// best effort non-blocking read
 			}
+		} else if v, _ := s.readInProgress.Load(key.(int32)); v != nil && !v.(bool) {
+			s.unregisterReader(key.(int32))
 		}
 		return true
 	})
@@ -204,6 +207,11 @@ func (s *Selector) unregisterWriter(selectedKeyId int32) {
 
 func (s *Selector) registerReader(selectedKeyId int32, check func() bool) {
 	s.readableKeys.Store(selectedKeyId, check)
+}
+
+func (s *Selector) unregisterReader(selectedKeyId int32) {
+	s.readableKeys.Delete(selectedKeyId)
+	s.readInProgress.Delete(selectedKeyId)
 }
 
 func (s *Selector) WakeUp() {
@@ -348,7 +356,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	logger := logger.WithName("StartAsyncRead")
 	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 
-	if !c.readInProgress.CompareAndSwap(false, true) {
+	if v, _ := selector.readInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
 		return
 	}
 
@@ -359,7 +367,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if err != nil {
 				if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.ECONNRESET) {
 					c.setEofReceived()
-					c.readInProgress.Store(false)
+					selector.readInProgress.Store(selectedKeyId, false)
 					break
 				}
 
@@ -369,7 +377,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 					// TODO: is it correct to invoke setEofReceived here or rather have a separate flag for tls related errors
 					// TODO: as these are not EOF ??
 					c.setEofReceived()
-					c.readInProgress.Store(false)
+					selector.readInProgress.Store(selectedKeyId, false)
 					break
 				}
 
