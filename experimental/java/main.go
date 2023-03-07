@@ -55,6 +55,7 @@ const (
 )
 
 var logger = klog.NewKlogr()
+var integrationHandler = newNaspIntegrationHandler()
 
 // TCP related structs and functions
 
@@ -68,7 +69,7 @@ type TCPListener struct {
 	acceptInProgress atomic.Bool
 }
 
-type NaspIntegrationHandler struct {
+type naspIntegrationHandler struct {
 	iih    *istio.IstioIntegrationHandler
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -209,34 +210,34 @@ func (s *Selector) WakeUp() {
 	s.queue <- NewSelectedKey(OP_WAKEUP, 0)
 }
 
-func NewNaspIntegrationHandler(heimdallURL, authorizationToken string) (*NaspIntegrationHandler, error) {
+func newNaspIntegrationHandler() *naspIntegrationHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterAuto,
 		UseTLS:              true,
 	}, logger)
 	if err != nil {
 		cancel()
-		return nil, err
+		panic(err)
 	}
 
 	go iih.Run(ctx)
 
-	return &NaspIntegrationHandler{
+	return &naspIntegrationHandler{
 		iih:    iih,
 		ctx:    ctx,
 		cancel: cancel,
-	}, nil
+	}
 }
 
-func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, error) {
+func Bind(address string, port int) (*TCPListener, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, err
 	}
 
-	listener, err = h.iih.GetTCPListener(listener)
+	listener, err = integrationHandler.iih.GetTCPListener(listener)
 	if err != nil {
 		return nil, err
 	}
@@ -511,40 +512,21 @@ func (c *Connection) Write(b []byte) (int, error) {
 }
 
 type TCPDialer struct {
-	iih    *istio.IstioIntegrationHandler
 	dialer itcp.Dialer
-	ctx    context.Context
-	cancel context.CancelFunc
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
 }
 
-func NewTCPDialer(heimdallURL, authorizationToken string) (*TCPDialer, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-	}, logger)
+func NewTCPDialer() (*TCPDialer, error) {
+	dialer, err := integrationHandler.iih.GetTCPDialer()
 	if err != nil {
-		cancel()
+		integrationHandler.cancel()
 		return nil, err
 	}
-
-	dialer, err := iih.GetTCPDialer()
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	go iih.Run(ctx)
 
 	return &TCPDialer{
-		iih:    iih,
 		dialer: dialer,
-		ctx:    ctx,
-		cancel: cancel,
 	}, nil
 }
 
@@ -601,7 +583,6 @@ func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
 // HTTP related structs and functions
 
 type HTTPTransport struct {
-	iih    *istio.IstioIntegrationHandler
 	client *http.Client
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -626,35 +607,21 @@ type HTTPResponse struct {
 	Body       []byte
 }
 
-func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-	}, logger)
+func NewHTTPTransport() (*HTTPTransport, error) {
+	transport, err := integrationHandler.iih.GetHTTPTransport(http.DefaultTransport)
 	if err != nil {
-		cancel()
+		integrationHandler.cancel()
 		return nil, err
 	}
-
-	transport, err := iih.GetHTTPTransport(http.DefaultTransport)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	go iih.Run(ctx)
 
 	client := &http.Client{
 		Transport: transport,
 	}
 
 	return &HTTPTransport{
-		iih:    iih,
 		client: client,
-		ctx:    ctx,
-		cancel: cancel,
+		ctx:    integrationHandler.ctx,
+		cancel: integrationHandler.cancel,
 	}, nil
 }
 
@@ -688,10 +655,10 @@ func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error)
 	}, nil
 }
 
-func (t *HTTPTransport) ListenAndServe(address string, handler HttpHandler) error {
+func ListenAndServe(address string, handler HttpHandler) error {
 	var err error
 	go func() {
-		err = t.iih.ListenAndServe(t.ctx, address, &NaspHttpHandler{handler: handler})
+		err = integrationHandler.iih.ListenAndServe(integrationHandler.ctx, address, &NaspHttpHandler{handler: handler})
 	}()
 	time.Sleep(1 * time.Second)
 	return err

@@ -87,6 +87,12 @@ var (
 		}
 	}
 	IstioCAConfigGetterAuto = func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
+		if heimdallURL := os.Getenv("HEIMDALL_URL"); heimdallURL != "" {
+			c := IstioCAConfigGetterHeimdall(context.Background(), heimdallURL, os.Getenv("HEIMDALL_AUTH_TOKEN"), os.Getenv("NASP_APP_VERSION"))
+
+			return c(e)
+		}
+
 		fe := func(filename string) bool {
 			info, err := os.Stat(filename)
 			if os.IsNotExist(err) {
@@ -97,12 +103,6 @@ var (
 
 		if fe(istio_ca.K8sSATrustworthyJWTFileName) {
 			return IstioCAConfigGetterLocal(e)
-		}
-
-		if heimdallURL := os.Getenv("HEIMDALL_URL"); heimdallURL != "" {
-			c := IstioCAConfigGetterHeimdall(context.Background(), heimdallURL, os.Getenv("HEIMDALL_AUTH_TOKEN"), os.Getenv("NASP_APP_VERSION"))
-
-			return c(e)
 		}
 
 		return IstioCAConfigGetterRemote(e)
