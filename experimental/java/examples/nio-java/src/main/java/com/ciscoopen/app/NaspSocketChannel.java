@@ -89,7 +89,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public boolean connect(SocketAddress remote) throws IOException {
         try {
-            naspTcpDialer = Nasp.newTCPDialer("https://localhost:16443/config", System.getenv("NASP_AUTH_TOKEN"));
+            naspTcpDialer = Nasp.newTCPDialer();
         } catch (Exception e) {
             throw new IOException("could not get nasp tcp dialer", e);
         }
