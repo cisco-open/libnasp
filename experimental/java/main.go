@@ -82,8 +82,6 @@ type Connection struct {
 	readLock     sync.RWMutex
 	writeChannel chan []byte
 
-	writeInProgress atomic.Bool
-
 	terminated atomic.Bool
 
 	EOF atomic.Bool
@@ -109,11 +107,13 @@ func (k SelectedKey) SelectedKeyId() uint32 {
 }
 
 type Selector struct {
-	queue          chan SelectedKey
-	selected       map[uint32]SelectedKey
-	writableKeys   sync.Map
-	readableKeys   sync.Map
-	readInProgress sync.Map
+	queue        chan SelectedKey
+	selected     map[uint32]SelectedKey
+	writableKeys sync.Map
+	readableKeys sync.Map
+
+	readInProgress  sync.Map
+	writeInProgress sync.Map
 }
 
 func NewSelector() *Selector {
@@ -125,6 +125,7 @@ func (s *Selector) Close() {
 	s.writableKeys = sync.Map{}
 	s.readableKeys = sync.Map{}
 	s.readInProgress = sync.Map{}
+	s.writeInProgress = sync.Map{}
 	s.selected = nil
 }
 
@@ -203,6 +204,7 @@ func (s *Selector) registerWriter(selectedKeyId int32, check func() bool) {
 
 func (s *Selector) unregisterWriter(selectedKeyId int32) {
 	s.writableKeys.Delete(selectedKeyId)
+	s.writeInProgress.Delete(selectedKeyId)
 }
 
 func (s *Selector) registerReader(selectedKeyId int32, check func() bool) {
@@ -423,7 +425,8 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 	}
 	logger := logger.WithName("StartAsyncWrite")
-	if !c.writeInProgress.CompareAndSwap(false, true) {
+
+	if v, _ := selector.writeInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
 		return
 	}
 
@@ -442,12 +445,12 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				num, err := c.Write(buff)
 				if err != nil {
 					if c.isTerminated() {
-						c.writeInProgress.Store(false)
+						selector.writeInProgress.Store(selectedKeyId, false)
 						break out
 					}
 					if errors.Is(err, io.EOF) {
 						c.setEofReceived()
-						c.writeInProgress.Store(false)
+						selector.writeInProgress.Store(selectedKeyId, false)
 						break out
 					}
 					logger.Error(err, "received error while writing data to connection", logCtx...)
@@ -461,7 +464,6 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 			}
 		}
 		selector.unregisterWriter(selectedKeyId)
-		c.writeInProgress.Store(false)
 		logger.Info("StartAsyncWrite finished", "id", c.id, "selected key id", selectedKeyId)
 	}()
 }
