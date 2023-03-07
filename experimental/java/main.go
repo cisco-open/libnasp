@@ -358,6 +358,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	logger := logger.WithName("StartAsyncRead")
 	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
 
+	//nolint:forcetypeassert
 	if v, _ := selector.readInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
 		return
 	}
@@ -426,6 +427,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	}
 	logger := logger.WithName("StartAsyncWrite")
 
+	//nolint:forcetypeassert
 	if v, _ := selector.writeInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
 		return
 	}
