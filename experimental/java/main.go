@@ -191,10 +191,12 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 			// add current running ops to selected key
 			var runningOps uint64
 			readInProgress, _ := s.readInProgress.Load(int32(k))
+			//nolint:forcetypeassert
 			if readInProgress != nil && readInProgress.(bool) {
 				runningOps |= uint64(OP_READ)
 			}
 			writeInProgress, _ := s.writeInProgress.Load(int32(k))
+			//nolint:forcetypeassert
 			if writeInProgress != nil && writeInProgress.(bool) {
 				runningOps |= uint64(OP_WRITE)
 			}
