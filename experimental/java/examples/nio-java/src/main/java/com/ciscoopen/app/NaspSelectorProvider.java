@@ -23,11 +23,15 @@ import java.util.function.Consumer;
 class NaspSelector extends SelectorImpl {
 
     static int getOperation(long selectedKey) {
-        return (int) (selectedKey >> 32);
+        return (int) (selectedKey >> 32 & 0xFF);
     }
 
     static int getSelectedKeyId(long selectedKey) {
         return (int) selectedKey;
+    }
+
+    static int getAsyncRunningOpsFromSelectedKey(long selectedKey) {
+        return (int) (selectedKey >> 40 & 0xFF);
     }
 
     private final nasp.Selector selector = new nasp.Selector();
@@ -62,7 +66,11 @@ class NaspSelector extends SelectorImpl {
         int numKeysUpdated = 0;
         while (selectedKeys.remaining() > 0) {
             long selectedKey = selectedKeys.getLong();
-            SelectionKeyImpl selectionKey = selectionKeyTable.get(getSelectedKeyId(selectedKey));
+            int selectedKeyId = getSelectedKeyId(selectedKey);
+
+            updateRunningAsyncOps(selectedKeyId, getAsyncRunningOpsFromSelectedKey(selectedKey));
+
+            SelectionKeyImpl selectionKey = selectionKeyTable.get(selectedKeyId);
             if (selectionKey != null) {
                 if (selectionKey.isValid()) {
                     numKeysUpdated += processReadyEvents(getOperation(selectedKey), selectionKey, action);
@@ -71,6 +79,23 @@ class NaspSelector extends SelectorImpl {
         }
 
         return numKeysUpdated;
+    }
+
+    private void updateRunningAsyncOps(int selectedKeyId, int updateOps) {
+        int runningOps = 0;
+        if (runningAsyncOps.containsKey(selectedKeyId)) {
+            runningOps = runningAsyncOps.get(selectedKeyId);
+        }
+        if ((updateOps & SelectionKey.OP_READ) != 0) {
+            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
+        } else {
+            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_READ);
+        }
+        if ((updateOps & SelectionKey.OP_WRITE) != 0) {
+            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_WRITE);
+        } else {
+            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_WRITE);
+        }
     }
 
     private byte[] nativeSelect(long timeout) {

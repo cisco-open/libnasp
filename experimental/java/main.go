@@ -92,14 +92,17 @@ type Address struct {
 	Port int32
 }
 
+// SelectedKey holds the data of a Selected Key formatted on 64 bits as follows:
+// |----16bits---|-----------------------------8bits------------|---------8bits--------|----32bits-----|
+// |    unused   |read/write running ops status for selected key|selected key ready ops|selected key id|
 type SelectedKey uint64
 
 func NewSelectedKey(operation ReadyOps, id uint32) SelectedKey {
-	return SelectedKey((uint64(operation) << 32) | uint64(id))
+	return SelectedKey((uint64(operation) & 0xFF << 32) | uint64(id))
 }
 
 func (k SelectedKey) Operation() ReadyOps {
-	return ReadyOps(k >> 32)
+	return ReadyOps(k >> 32 & 0xFF)
 }
 
 func (k SelectedKey) SelectedKeyId() uint32 {
@@ -108,7 +111,6 @@ func (k SelectedKey) SelectedKeyId() uint32 {
 
 type Selector struct {
 	queue        chan SelectedKey
-	selected     map[uint32]SelectedKey
 	writableKeys sync.Map
 	readableKeys sync.Map
 
@@ -117,7 +119,7 @@ type Selector struct {
 }
 
 func NewSelector() *Selector {
-	return &Selector{queue: make(chan SelectedKey, 64), selected: map[uint32]SelectedKey{}}
+	return &Selector{queue: make(chan SelectedKey, 64)}
 }
 
 func (s *Selector) Close() {
@@ -126,7 +128,6 @@ func (s *Selector) Close() {
 	s.readableKeys = sync.Map{}
 	s.readInProgress = sync.Map{}
 	s.writeInProgress = sync.Map{}
-	s.selected = nil
 }
 
 func (s *Selector) Select(timeoutMs int64) []byte {
@@ -170,9 +171,9 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 
 	select {
 	case e := <-s.queue:
-
+		selected := make(map[uint32]SelectedKey)
 		if e.Operation() != OP_WAKEUP {
-			s.selected[e.SelectedKeyId()] |= e
+			selected[e.SelectedKeyId()] |= e
 		}
 
 		l := len(s.queue)
@@ -180,15 +181,27 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 		for i := 0; i < l; i++ {
 			e := <-s.queue
 			if e.Operation() != OP_WAKEUP {
-				s.selected[e.SelectedKeyId()] |= e
+				selected[e.SelectedKeyId()] |= e
 			}
 		}
 
-		b := make([]byte, len(s.selected)*8)
+		b := make([]byte, len(selected)*8)
 		i := 0
-		for k, v := range s.selected {
-			delete(s.selected, k)
-			binary.BigEndian.PutUint64(b[i*8:], uint64(v))
+		for k, v := range selected {
+			// add current running ops to selected key
+			var runningOps uint64
+			readInProgress, _ := s.readInProgress.Load(int32(k))
+			//nolint:forcetypeassert
+			if readInProgress != nil && readInProgress.(bool) {
+				runningOps |= uint64(OP_READ)
+			}
+			writeInProgress, _ := s.writeInProgress.Load(int32(k))
+			//nolint:forcetypeassert
+			if writeInProgress != nil && writeInProgress.(bool) {
+				runningOps |= uint64(OP_WRITE)
+			}
+
+			binary.BigEndian.PutUint64(b[i*8:], uint64(v)|(runningOps<<40))
 			i++
 		}
 
@@ -352,11 +365,10 @@ func (c *Connection) GetRemoteAddress() (*Address, error) {
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	logCtx := []interface{}{
 		"selected key id", selectedKeyId,
-		"id", c.id,
 	}
 
 	logger := logger.WithName("StartAsyncRead")
-	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
+	logger.Info("invoked", logCtx...)
 
 	//nolint:forcetypeassert
 	if v, _ := selector.readInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
@@ -377,8 +389,6 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 				logger.Error(err, "reading data from connection failed", logCtx...)
 				var tlsErr tls.RecordHeaderError
 				if errors.As(err, &tlsErr) { // e.g. tls handshake error
-					// TODO: is it correct to invoke setEofReceived here or rather have a separate flag for tls related errors
-					// TODO: as these are not EOF ??
 					c.setEofReceived()
 					selector.readInProgress.Store(selectedKeyId, false)
 					break
@@ -407,7 +417,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			})
 		}
 
-		logger.Info("StartAsyncRead finished", "id", c.id, "selected key id", selectedKeyId)
+		logger.Info("finished", logCtx...)
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
@@ -426,6 +436,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 	}
 	logger := logger.WithName("StartAsyncWrite")
+	logger.Info("invoked", logCtx...)
 
 	//nolint:forcetypeassert
 	if v, _ := selector.writeInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
@@ -435,7 +446,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	selector.registerWriter(selectedKeyId, func() bool {
 		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
 		if !b {
-			logger.Info("write channel is full !!!")
+			logger.Info("write channel is full !")
 		}
 		return b
 	})
@@ -466,7 +477,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 			}
 		}
 		selector.unregisterWriter(selectedKeyId)
-		logger.Info("StartAsyncWrite finished", "id", c.id, "selected key id", selectedKeyId)
+		logger.Info("finished", logCtx...)
 	}()
 }
 
