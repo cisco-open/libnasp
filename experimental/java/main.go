@@ -371,7 +371,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	}
 
 	logger := logger.WithName("StartAsyncRead")
-	logger.Info("invoked", logCtx...)
+	logger.V(1).Info("invoked", logCtx...)
 
 	//nolint:forcetypeassert
 	if v, _ := selector.readInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
@@ -407,10 +407,10 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 					logger.Error(err, "couldn't write data to read buffer", logCtx...)
 				}
 				if n != num {
-					logger.Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
+					logger.V(1).Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
 				}
 			} else {
-				logger.Info("received 0 bytes on connection", logCtx...)
+				logger.V(1).Info("received 0 bytes on connection", logCtx...)
 			}
 
 			selector.registerReader(selectedKeyId, func() bool {
@@ -420,7 +420,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			})
 		}
 
-		logger.Info("finished", logCtx...)
+		logger.V(1).Info("finished", logCtx...)
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
@@ -439,7 +439,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 	}
 	logger := logger.WithName("StartAsyncWrite")
-	logger.Info("invoked", logCtx...)
+	logger.V(1).Info("invoked", logCtx...)
 
 	//nolint:forcetypeassert
 	if v, _ := selector.writeInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
@@ -449,7 +449,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	selector.registerWriter(selectedKeyId, func() bool {
 		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
 		if !b {
-			logger.Info("write channel is full !")
+			logger.V(1).Info("write channel is full !")
 		}
 		return b
 	})
@@ -480,7 +480,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 			}
 		}
 		selector.unregisterWriter(selectedKeyId)
-		logger.Info("finished", logCtx...)
+		logger.V(1).Info("finished", logCtx...)
 	}()
 }
 
@@ -507,7 +507,6 @@ func (c *Connection) Close() {
 
 	c.setEofReceived()
 
-	logger.Info("CLOSING CONNECTION", "id", c.id)
 	err := c.conn.Close()
 	if err != nil {
 		logger.Error(err, "couldn't close connection")
