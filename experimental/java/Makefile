@@ -12,7 +12,8 @@ install-gomobile:
 
 install-linux-dependencies:
 	sudo apt update
-	sudo apt install golang default-jdk git
+	sudo snap install go --classic
+	sudo apt install default-jdk git
 	sudo apt install gcc-aarch64-linux-gnu gcc-x86-64-linux-gnu
 
 setup-vm: install-linux-dependencies install-gomobile
