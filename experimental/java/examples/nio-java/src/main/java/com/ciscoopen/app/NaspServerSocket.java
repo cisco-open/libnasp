@@ -9,13 +9,11 @@ import java.net.SocketException;
 import java.nio.channels.spi.SelectorProvider;
 
 import nasp.Nasp;
-import nasp.NaspIntegrationHandler;
 import nasp.TCPListener;
 import nasp.Connection;
 
 public class NaspServerSocket extends ServerSocket {
 
-    private final NaspIntegrationHandler nasp;
     private TCPListener naspTcpListener;
     private final SelectorProvider selectorProvider;
 
@@ -23,12 +21,6 @@ public class NaspServerSocket extends ServerSocket {
     private InetSocketAddress address;
 
     public NaspServerSocket(SelectorProvider selectorProvider) throws IOException {
-        try {
-            nasp = Nasp.newNaspIntegrationHandler("https://localhost:16443/config", System.getenv("NASP_AUTH_TOKEN"));
-        } catch (Exception e) {
-            throw new IOException("could not get nasp tcp listener", e);
-        }
-
         this.selectorProvider = selectorProvider;
     }
 
@@ -38,7 +30,7 @@ public class NaspServerSocket extends ServerSocket {
             try {
                 address = (InetSocketAddress) endpoint;
                 localPort = ((InetSocketAddress) endpoint).getPort();
-                naspTcpListener = nasp.bind(((InetSocketAddress) endpoint).getHostString(), localPort);
+                naspTcpListener = Nasp.bind(((InetSocketAddress) endpoint).getHostString(), localPort);
             } catch (Exception e) {
                 throw new IOException(e);
             }

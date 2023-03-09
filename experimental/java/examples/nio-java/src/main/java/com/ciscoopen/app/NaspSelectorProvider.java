@@ -1,5 +1,6 @@
 package com.ciscoopen.app;
 
+import nasp.Nasp;
 import sun.nio.ch.FileChannelImpl;
 import sun.nio.ch.SelectionKeyImpl;
 import sun.nio.ch.SelectorImpl;
@@ -22,15 +23,20 @@ import java.util.function.Consumer;
 class NaspSelector extends SelectorImpl {
 
     static int getOperation(long selectedKey) {
-        return (int) (selectedKey >> 32);
+        return (int) (selectedKey >> 32 & 0xFF);
     }
 
     static int getSelectedKeyId(long selectedKey) {
         return (int) selectedKey;
     }
 
+    static int getAsyncRunningOpsFromSelectedKey(long selectedKey) {
+        return (int) (selectedKey >> 40 & 0xFF);
+    }
+
     private final nasp.Selector selector = new nasp.Selector();
     private final Map<Integer, SelectionKeyImpl> selectionKeyTable = new HashMap<>();
+    private final Map<Integer, Integer> runningAsyncOps = new HashMap<>();
 
     protected NaspSelector(SelectorProvider sp) {
         super(sp);
@@ -41,22 +47,30 @@ class NaspSelector extends SelectorImpl {
         int to = (int) Math.min(timeout, Integer.MAX_VALUE); // max poll timeout
         boolean blocking = (to != 0);
 
-        byte[] selectedKeysRaw;
+        byte[] selectedKeysNative;
         try {
             begin(blocking);
-            selectedKeysRaw = selector.select(timeout);
+            selectedKeysNative = nativeSelect(timeout);
         } finally {
             end(blocking);
         }
 
+        if (selectedKeysNative == null) {
+            return 0;
+        }
+
         processDeregisterQueue();
 
-        ByteBuffer selectedKeys = ByteBuffer.wrap(selectedKeysRaw);
+        ByteBuffer selectedKeys = ByteBuffer.wrap(selectedKeysNative);
 
         int numKeysUpdated = 0;
         while (selectedKeys.remaining() > 0) {
             long selectedKey = selectedKeys.getLong();
-            SelectionKeyImpl selectionKey = selectionKeyTable.get(getSelectedKeyId(selectedKey));
+            int selectedKeyId = getSelectedKeyId(selectedKey);
+
+            updateRunningAsyncOps(selectedKeyId, getAsyncRunningOpsFromSelectedKey(selectedKey));
+
+            SelectionKeyImpl selectionKey = selectionKeyTable.get(selectedKeyId);
             if (selectionKey != null) {
                 if (selectionKey.isValid()) {
                     numKeysUpdated += processReadyEvents(getOperation(selectedKey), selectionKey, action);
@@ -65,6 +79,27 @@ class NaspSelector extends SelectorImpl {
         }
 
         return numKeysUpdated;
+    }
+
+    private void updateRunningAsyncOps(int selectedKeyId, int updateOps) {
+        int runningOps = 0;
+        if (runningAsyncOps.containsKey(selectedKeyId)) {
+            runningOps = runningAsyncOps.get(selectedKeyId);
+        }
+        if ((updateOps & SelectionKey.OP_READ) != 0) {
+            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
+        } else {
+            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_READ);
+        }
+        if ((updateOps & SelectionKey.OP_WRITE) != 0) {
+            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_WRITE);
+        } else {
+            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_WRITE);
+        }
+    }
+
+    private byte[] nativeSelect(long timeout) {
+        return selector.select(timeout);
     }
 
     @Override
@@ -77,6 +112,9 @@ class NaspSelector extends SelectorImpl {
     protected void implRegister(SelectionKeyImpl ski) {
         super.implRegister(ski);
         selectionKeyTable.put(ski.hashCode(), ski);
+
+        int interestOps = ski.interestOps();
+        handleAsyncOps(ski, interestOps);
     }
 
     @Override
@@ -87,28 +125,80 @@ class NaspSelector extends SelectorImpl {
     @Override
     protected void implDereg(SelectionKeyImpl ski) throws IOException {
         selectionKeyTable.remove(ski.hashCode());
+        runningAsyncOps.remove(ski.hashCode());
     }
 
     @Override
     protected void setEventOps(SelectionKeyImpl ski) {
+        int opsDiff = getAsyncOpsDiff(ski);
+
+        handleAsyncOps(ski, opsDiff);
+    }
+
+    /**
+     * Returns the diff between running async ops and the list the interest ops registered in the provided ski
+     *
+     * @param ski specifies the list of ops we are interested in
+     * @return the diff between running async ops and the list the interest ops
+     */
+    protected int getAsyncOpsDiff(SelectionKeyImpl ski) {
+        if (ski == null)
+            return 0;
+
+        int interestOps = ski.interestOps();
+        Integer runningOps = runningAsyncOps.get(ski.hashCode());
+        if (runningOps == null || runningOps == 0) {
+            return interestOps;
+        }
+
+        int mask = interestOps ^ runningOps;
+
+        return interestOps & mask;
+    }
+
+    protected void handleAsyncOps(SelectionKeyImpl ski, int opsDiff) {
+        int selectedKeyId = ski.hashCode();
+        int runningOps = 0;
+        if (runningAsyncOps.containsKey(selectedKeyId)) {
+            runningOps = runningAsyncOps.get(selectedKeyId);
+        }
+
         if (ski.channel() instanceof NaspServerSocketChannel naspServerSockChan) {
-            naspServerSockChan.socket().getNaspTcpListener().startAsyncAccept(ski.hashCode(), selector);
-        } else if (ski.channel() instanceof NaspSocketChannel naspSockChan) {
-            int interestOps = ski.interestOps();
-            if ((interestOps & SelectionKey.OP_READ) != 0) {
-                naspSockChan.getConnection().startAsyncRead(ski.hashCode(), selector);
+            handleAsyncOps(naspServerSockChan, ski.hashCode(), runningOps, opsDiff);
+            return;
+        }
+
+        if (ski.channel() instanceof NaspSocketChannel naspSockChan) {
+            handleAsyncOps(naspSockChan, ski.hashCode(), runningOps, opsDiff);
+        }
+    }
+
+    protected void handleAsyncOps(NaspSocketChannel naspSocketChannel, int selectedKeyId, int runningOps, int opsDiff) {
+        if ((opsDiff & SelectionKey.OP_READ) != 0) {
+            naspSocketChannel.getConnection().startAsyncRead(selectedKeyId, selector);
+            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
+        }
+
+        if ((opsDiff & SelectionKey.OP_WRITE) != 0) {
+            naspSocketChannel.getConnection().startAsyncWrite(selectedKeyId, selector);
+            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_WRITE);
+        }
+        
+        if ((opsDiff & SelectionKey.OP_CONNECT) != 0) {
+            //This could happen if we are servers not clients
+            if (naspSocketChannel.getNaspTcpDialer() != null) {
+                InetSocketAddress address = naspSocketChannel.getAddress();
+                naspSocketChannel.getNaspTcpDialer().startAsyncDial(selectedKeyId, selector,
+                        address.getHostString(), address.getPort());
+                runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
             }
-            if ((interestOps & SelectionKey.OP_WRITE) != 0) {
-                naspSockChan.getConnection().startAsyncWrite(ski.hashCode(), selector);
-            }
-            if ((interestOps & SelectionKey.OP_CONNECT) != 0) {
-                //This could happen if we are servers not clients
-                if (naspSockChan.getNaspTcpDialer() != null) {
-                    InetSocketAddress address = naspSockChan.getAddress();
-                    naspSockChan.getNaspTcpDialer().startAsyncDial(ski.hashCode(), selector,
-                            address.getHostString(), address.getPort());
-                }
-            }
+        }
+    }
+
+    protected void handleAsyncOps(NaspServerSocketChannel naspServerSocketChannel, int selectedKeyId, int runningOps, int opsDiff) {
+        if ((opsDiff & SelectionKey.OP_ACCEPT) != 0) {
+            naspServerSocketChannel.socket().getNaspTcpListener().startAsyncAccept(selectedKeyId, selector);
+            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_ACCEPT);
         }
     }
 }

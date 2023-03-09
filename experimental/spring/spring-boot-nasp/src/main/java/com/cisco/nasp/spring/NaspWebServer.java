@@ -21,13 +21,13 @@ public class NaspWebServer implements WebServer {
     @Override
     public void start() throws WebServerException {
         try {
-            transport = Nasp.newHTTPTransport(configuration.getHeimdallURL(), configuration.getHeimdallAuthorizationToken());
+            transport = Nasp.newHTTPTransport();
         } catch (Exception e) {
             throw new WebServerException("failed to create nasp transport", e);
         }
 
         try {
-            transport.listenAndServe(":" + port, httpHandler);
+            Nasp.listenAndServe(":" + port, httpHandler);
         } catch (Exception e) {
             throw new WebServerException("failed to listen on nasp transport", e);
         }

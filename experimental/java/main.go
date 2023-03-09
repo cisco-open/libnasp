@@ -17,6 +17,7 @@ package nasp
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -54,6 +55,7 @@ const (
 )
 
 var logger = klog.NewKlogr()
+var integrationHandler = newNaspIntegrationHandler()
 
 // TCP related structs and functions
 
@@ -67,7 +69,7 @@ type TCPListener struct {
 	acceptInProgress atomic.Bool
 }
 
-type NaspIntegrationHandler struct {
+type naspIntegrationHandler struct {
 	iih    *istio.IstioIntegrationHandler
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -77,11 +79,8 @@ type Connection struct {
 	id           string
 	conn         net.Conn
 	readBuffer   *bytes.Buffer
-	readLock     sync.Mutex
+	readLock     sync.RWMutex
 	writeChannel chan []byte
-
-	readInProgress  atomic.Bool
-	writeInProgress atomic.Bool
 
 	terminated atomic.Bool
 
@@ -93,14 +92,17 @@ type Address struct {
 	Port int32
 }
 
+// SelectedKey holds the data of a Selected Key formatted on 64 bits as follows:
+// |----16bits---|-----------------------------8bits------------|---------8bits--------|----32bits-----|
+// |    unused   |read/write running ops status for selected key|selected key ready ops|selected key id|
 type SelectedKey uint64
 
 func NewSelectedKey(operation ReadyOps, id uint32) SelectedKey {
-	return SelectedKey((uint64(operation) << 32) | uint64(id))
+	return SelectedKey((uint64(operation) & 0xFF << 32) | uint64(id))
 }
 
 func (k SelectedKey) Operation() ReadyOps {
-	return ReadyOps(k >> 32)
+	return ReadyOps(k >> 32 & 0xFF)
 }
 
 func (k SelectedKey) SelectedKeyId() uint32 {
@@ -109,18 +111,23 @@ func (k SelectedKey) SelectedKeyId() uint32 {
 
 type Selector struct {
 	queue        chan SelectedKey
-	selected     map[uint32]SelectedKey
 	writableKeys sync.Map
+	readableKeys sync.Map
+
+	readInProgress  sync.Map
+	writeInProgress sync.Map
 }
 
 func NewSelector() *Selector {
-	return &Selector{queue: make(chan SelectedKey, 64), selected: map[uint32]SelectedKey{}}
+	return &Selector{queue: make(chan SelectedKey, 64)}
 }
 
 func (s *Selector) Close() {
 	close(s.queue)
 	s.writableKeys = sync.Map{}
-	s.selected = nil
+	s.readableKeys = sync.Map{}
+	s.readInProgress = sync.Map{}
+	s.writeInProgress = sync.Map{}
 }
 
 func (s *Selector) Select(timeoutMs int64) []byte {
@@ -143,15 +150,30 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 		return true
 	})
 
+	//nolint:forcetypeassert
+	s.readableKeys.Range(func(key, value any) bool {
+		check := value.(func() bool)
+		if check() {
+			select {
+			case s.queue <- NewSelectedKey(OP_READ, uint32(key.(int32))):
+			default:
+				// best effort non-blocking read
+			}
+		} else if v, _ := s.readInProgress.Load(key.(int32)); v != nil && !v.(bool) {
+			s.unregisterReader(key.(int32))
+		}
+		return true
+	})
+
 	if (timeoutMs == 0) && len(s.queue) == 0 {
 		return nil
 	}
 
 	select {
 	case e := <-s.queue:
-
+		selected := make(map[uint32]SelectedKey)
 		if e.Operation() != OP_WAKEUP {
-			s.selected[e.SelectedKeyId()] |= e
+			selected[e.SelectedKeyId()] |= e
 		}
 
 		l := len(s.queue)
@@ -159,15 +181,27 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 		for i := 0; i < l; i++ {
 			e := <-s.queue
 			if e.Operation() != OP_WAKEUP {
-				s.selected[e.SelectedKeyId()] |= e
+				selected[e.SelectedKeyId()] |= e
 			}
 		}
 
-		b := make([]byte, len(s.selected)*8)
+		b := make([]byte, len(selected)*8)
 		i := 0
-		for k, v := range s.selected {
-			delete(s.selected, k)
-			binary.BigEndian.PutUint64(b[i*8:], uint64(v))
+		for k, v := range selected {
+			// add current running ops to selected key
+			var runningOps uint64
+			readInProgress, _ := s.readInProgress.Load(int32(k))
+			//nolint:forcetypeassert
+			if readInProgress != nil && readInProgress.(bool) {
+				runningOps |= uint64(OP_READ)
+			}
+			writeInProgress, _ := s.writeInProgress.Load(int32(k))
+			//nolint:forcetypeassert
+			if writeInProgress != nil && writeInProgress.(bool) {
+				runningOps |= uint64(OP_WRITE)
+			}
+
+			binary.BigEndian.PutUint64(b[i*8:], uint64(v)|(runningOps<<40))
 			i++
 		}
 
@@ -183,43 +217,53 @@ func (s *Selector) registerWriter(selectedKeyId int32, check func() bool) {
 
 func (s *Selector) unregisterWriter(selectedKeyId int32) {
 	s.writableKeys.Delete(selectedKeyId)
+	s.writeInProgress.Delete(selectedKeyId)
+}
+
+func (s *Selector) registerReader(selectedKeyId int32, check func() bool) {
+	s.readableKeys.Store(selectedKeyId, check)
+}
+
+func (s *Selector) unregisterReader(selectedKeyId int32) {
+	s.readableKeys.Delete(selectedKeyId)
+	s.readInProgress.Delete(selectedKeyId)
 }
 
 func (s *Selector) WakeUp() {
 	s.queue <- NewSelectedKey(OP_WAKEUP, 0)
 }
 
-func NewNaspIntegrationHandler(heimdallURL, authorizationToken string) (*NaspIntegrationHandler, error) {
+func newNaspIntegrationHandler() *naspIntegrationHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
+		IstioCAConfigGetter: istio.IstioCAConfigGetterAuto,
 		UseTLS:              true,
 	}, logger)
 	if err != nil {
 		cancel()
-		return nil, err
+		panic(err)
 	}
 
 	if err := iih.Run(ctx); err != nil {
 		cancel()
-		return nil, err
+		panic(err)
 	}
 
-	return &NaspIntegrationHandler{
+	return &naspIntegrationHandler{
 		iih:    iih,
 		ctx:    ctx,
 		cancel: cancel,
-	}, nil
+	}
 }
 
-func (h *NaspIntegrationHandler) Bind(address string, port int) (*TCPListener, error) {
+func Bind(address string, port int) (*TCPListener, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
 		return nil, err
 	}
 
-	listener, err = h.iih.GetTCPListener(listener)
+	listener, err = integrationHandler.iih.GetTCPListener(listener)
 	if err != nil {
 		return nil, err
 	}
@@ -324,14 +368,16 @@ func (c *Connection) GetRemoteAddress() (*Address, error) {
 func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 	logCtx := []interface{}{
 		"selected key id", selectedKeyId,
-		"id", c.id,
-	}
-	if !c.readInProgress.CompareAndSwap(false, true) {
-		return
 	}
 
 	logger := logger.WithName("StartAsyncRead")
-	logger.Info("Invoked", logCtx...) // log to see if StartAsyncRead is invoked multiple times on the same connection with same selected key id which should not happen !!!
+	logger.V(1).Info("invoked", logCtx...)
+
+	//nolint:forcetypeassert
+	if v, _ := selector.readInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
+		return
+	}
+
 	go func() {
 		tempBuffer := make([]byte, 1024)
 		for {
@@ -339,28 +385,42 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if err != nil {
 				if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.ECONNRESET) {
 					c.setEofReceived()
-					c.readInProgress.Store(false)
+					selector.readInProgress.Store(selectedKeyId, false)
 					break
 				}
+
 				logger.Error(err, "reading data from connection failed", logCtx...)
+				var tlsErr tls.RecordHeaderError
+				if errors.As(err, &tlsErr) { // e.g. tls handshake error
+					c.setEofReceived()
+					selector.readInProgress.Store(selectedKeyId, false)
+					break
+				}
+
 				continue
 			}
-			if num == 0 {
-				logger.Info("received 0 bytes on connection", logCtx...)
+			if num > 0 {
+				c.readLock.Lock()
+				n, err := c.readBuffer.Write(tempBuffer[:num])
+				c.readLock.Unlock()
+				if err != nil {
+					logger.Error(err, "couldn't write data to read buffer", logCtx...)
+				}
+				if n != num {
+					logger.V(1).Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
+				}
+			} else {
+				logger.V(1).Info("received 0 bytes on connection", logCtx...)
 			}
-			c.readLock.Lock()
-			n, err := c.readBuffer.Write(tempBuffer[:num])
-			c.readLock.Unlock()
-			if err != nil {
-				logger.Error(err, "couldn't write data to read buffer", logCtx...)
-			}
-			if n != num {
-				logger.Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
-			}
-			selector.queue <- NewSelectedKey(OP_READ, uint32(selectedKeyId))
+
+			selector.registerReader(selectedKeyId, func() bool {
+				c.readLock.RLock()
+				defer c.readLock.RUnlock()
+				return c.readBuffer.Len() > 0
+			})
 		}
 
-		logger.Info("StartAsyncRead finished", "id", c.id, "selected key id", selectedKeyId)
+		logger.V(1).Info("finished", logCtx...)
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
@@ -379,14 +439,17 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 	}
 	logger := logger.WithName("StartAsyncWrite")
-	if !c.writeInProgress.CompareAndSwap(false, true) {
+	logger.V(1).Info("invoked", logCtx...)
+
+	//nolint:forcetypeassert
+	if v, _ := selector.writeInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
 		return
 	}
 
 	selector.registerWriter(selectedKeyId, func() bool {
 		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
 		if !b {
-			logger.Info("write channel is full !!!")
+			logger.V(1).Info("write channel is full !")
 		}
 		return b
 	})
@@ -398,12 +461,12 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 				num, err := c.Write(buff)
 				if err != nil {
 					if c.isTerminated() {
-						c.writeInProgress.Store(false)
+						selector.writeInProgress.Store(selectedKeyId, false)
 						break out
 					}
 					if errors.Is(err, io.EOF) {
 						c.setEofReceived()
-						c.writeInProgress.Store(false)
+						selector.writeInProgress.Store(selectedKeyId, false)
 						break out
 					}
 					logger.Error(err, "received error while writing data to connection", logCtx...)
@@ -417,8 +480,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 			}
 		}
 		selector.unregisterWriter(selectedKeyId)
-		c.writeInProgress.Store(false)
-		logger.Info("StartAsyncWrite finished", "id", c.id, "selected key id", selectedKeyId)
+		logger.V(1).Info("finished", logCtx...)
 	}()
 }
 
@@ -445,7 +507,6 @@ func (c *Connection) Close() {
 
 	c.setEofReceived()
 
-	logger.Info("CLOSING CONNECTION", "id", c.id)
 	err := c.conn.Close()
 	if err != nil {
 		logger.Error(err, "couldn't close connection")
@@ -454,7 +515,7 @@ func (c *Connection) Close() {
 
 func (c *Connection) AsyncWrite(b []byte) (int32, error) {
 	if c.eofReceived() {
-		return -1, nil
+		return 0, nil
 	}
 
 	bCopy := make([]byte, len(b))
@@ -476,43 +537,21 @@ func (c *Connection) Write(b []byte) (int, error) {
 }
 
 type TCPDialer struct {
-	iih    *istio.IstioIntegrationHandler
 	dialer itcp.Dialer
-	ctx    context.Context
-	cancel context.CancelFunc
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
 }
 
-func NewTCPDialer(heimdallURL, authorizationToken string) (*TCPDialer, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-	}, logger)
+func NewTCPDialer() (*TCPDialer, error) {
+	dialer, err := integrationHandler.iih.GetTCPDialer()
 	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	dialer, err := iih.GetTCPDialer()
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	if err := iih.Run(ctx); err != nil {
-		cancel()
+		integrationHandler.cancel()
 		return nil, err
 	}
 
 	return &TCPDialer{
-		iih:    iih,
 		dialer: dialer,
-		ctx:    ctx,
-		cancel: cancel,
 	}, nil
 }
 
@@ -569,7 +608,6 @@ func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
 // HTTP related structs and functions
 
 type HTTPTransport struct {
-	iih    *istio.IstioIntegrationHandler
 	client *http.Client
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -594,26 +632,10 @@ type HTTPResponse struct {
 	Body       []byte
 }
 
-func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-	}, logger)
+func NewHTTPTransport() (*HTTPTransport, error) {
+	transport, err := integrationHandler.iih.GetHTTPTransport(http.DefaultTransport)
 	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	transport, err := iih.GetHTTPTransport(http.DefaultTransport)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-
-	if err := iih.Run(ctx); err != nil {
-		cancel()
+		integrationHandler.cancel()
 		return nil, err
 	}
 
@@ -622,10 +644,9 @@ func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, e
 	}
 
 	return &HTTPTransport{
-		iih:    iih,
 		client: client,
-		ctx:    ctx,
-		cancel: cancel,
+		ctx:    integrationHandler.ctx,
+		cancel: integrationHandler.cancel,
 	}, nil
 }
 
@@ -659,10 +680,10 @@ func (t *HTTPTransport) Request(method, url, body string) (*HTTPResponse, error)
 	}, nil
 }
 
-func (t *HTTPTransport) ListenAndServe(address string, handler HttpHandler) error {
+func ListenAndServe(address string, handler HttpHandler) error {
 	var err error
 	go func() {
-		err = t.iih.ListenAndServe(t.ctx, address, &NaspHttpHandler{handler: handler})
+		err = integrationHandler.iih.ListenAndServe(integrationHandler.ctx, address, &NaspHttpHandler{handler: handler})
 	}()
 	time.Sleep(1 * time.Second)
 	return err

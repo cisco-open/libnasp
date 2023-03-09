@@ -89,7 +89,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     @Override
     public boolean connect(SocketAddress remote) throws IOException {
         try {
-            naspTcpDialer = Nasp.newTCPDialer("https://localhost:16443/config", System.getenv("NASP_AUTH_TOKEN"));
+            naspTcpDialer = Nasp.newTCPDialer();
         } catch (Exception e) {
             throw new IOException("could not get nasp tcp dialer", e);
         }
@@ -129,10 +129,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public int read(ByteBuffer dst) throws IOException {
-        //TODO revise this to be more efficient
         try {
             byte[] buff = new byte[dst.remaining()];
-            int num = connection.asyncRead(buff);
+            int num = nativeRead(buff);
             if (num == -1) {
                 return -1;
             }
@@ -141,6 +140,10 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         } catch (Exception e) {
             throw new IOException(e);
         }
+    }
+
+    private int nativeRead(byte[] buff) throws Exception {
+        return connection.asyncRead(buff);
     }
 
     @Override
@@ -156,12 +159,22 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
                 return 0;
             }
 
+            int srcBufPos = src.position();
             byte[] temp = new byte[rem];
-            src.get(temp, src.position(), src.limit());
-            return connection.asyncWrite(temp);
+            src.get(temp, 0, rem);
+            int writtenBytes = nativeWrite(temp);
+
+            if (writtenBytes < rem) {
+                src.position(srcBufPos + writtenBytes);
+            }
+            return writtenBytes;
         } catch (Exception e) {
             throw new IOException(e);
         }
+    }
+
+    private int nativeWrite(byte[] temp) throws Exception {
+        return connection.asyncWrite(temp);
     }
 
     @Override
@@ -170,12 +183,18 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
         int totalLength = 0;
         for (int i = offset; i < offset + length; i++) {
-            int writtenBytes = write(srcs[i]);
-            if (writtenBytes == -1) {
-                return -1;
+            int expectedWriteCount =  srcs[i].remaining();
+            if (expectedWriteCount == 0) {
+                continue;
             }
+            int writtenBytes = write(srcs[i]);
             totalLength += writtenBytes;
 
+            if (writtenBytes < expectedWriteCount) {
+                // in case the data of one of the byte buffers from the array can not be written to the connection
+                // entirely we need to stop the write operation to ensure the byte buffers are written out in order
+                break;
+            }
         }
         return totalLength;
     }
