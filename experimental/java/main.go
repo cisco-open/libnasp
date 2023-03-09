@@ -247,7 +247,7 @@ func newNaspIntegrationHandler() *naspIntegrationHandler {
 
 	if err := iih.Run(ctx); err != nil {
 		cancel()
-		return nil, err
+		panic(err)
 	}
 
 	return &naspIntegrationHandler{
