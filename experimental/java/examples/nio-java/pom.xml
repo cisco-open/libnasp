@@ -96,6 +96,8 @@
                     </execution>
                 </executions>
                 <configuration>
+                    <shadedArtifactAttached>true</shadedArtifactAttached>
+                    <shadedClassifierName>${nasp.os}</shadedClassifierName>
                     <artifactSet>
                         <includes>
                             <include>nasp:nasp:${nasp.os}</include>
