@@ -15,6 +15,7 @@
 package api
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/url"
@@ -73,6 +74,9 @@ type HTTPRequest interface {
 	Trailer() HeaderMap
 	Body() io.ReadCloser
 	SetBody(io.ReadCloser)
+	ContentLength() int64
+	Context() context.Context
+	WithContext(ctx context.Context) HTTPRequest
 
 	HTTPProtocol() string
 	Host() string

@@ -26,6 +26,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.19.0
+	github.com/openzipkin/zipkin-go v0.4.1
 	github.com/pborman/uuid v1.2.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/sethvargo/go-envconfig v0.8.2
@@ -34,8 +35,8 @@ require (
 	go.uber.org/atomic v1.10.0
 	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	google.golang.org/genproto v0.0.0-20220628213854-d9e0b6570c03
-	google.golang.org/grpc v1.47.0
+	google.golang.org/genproto v0.0.0-20221010155953-15ba04fc1c0e
+	google.golang.org/grpc v1.50.0
 	google.golang.org/protobuf v1.28.1
 	istio.io/api v0.0.0-20220826132550-04f2b20dc284
 	istio.io/istio v0.0.0-20220831174539-e3364ab424b7
@@ -130,7 +131,7 @@ require (
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
+	golang.org/x/crypto v0.0.0-20221010152910-d6f0a8c073c2 // indirect
 	golang.org/x/crypto v0.5.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect

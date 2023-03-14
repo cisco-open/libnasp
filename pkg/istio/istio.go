@@ -26,6 +26,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openzipkin/zipkin-go"
+
+	"github.com/cisco-open/nasp/pkg/istio/tracing"
+
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
 	"github.com/pborman/uuid"
@@ -171,6 +175,8 @@ type istioIntegrationHandler struct {
 	pluginManager api.WasmPluginManager
 	environment   *environment.IstioEnvironment
 
+	zipkinTracer *zipkin.Tracer
+
 	discoveryClient discovery.DiscoveryClient
 }
 
@@ -277,6 +283,8 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 		s.metricsPusher = createMetricsPusher(config.PushgatewayConfig, jobName, httpClient, registry)
 	}
 
+	s.zipkinTracer = tracing.SetupZipkinTracing()
+
 	return s, nil
 }
 
@@ -311,6 +319,7 @@ func (h *istioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOption, error
 	}
 
 	grpcDialer := pwgrpc.NewGRPCDialer(h.caClient, streamHandler, h.discoveryClient, h.logger)
+
 	grpcDialer.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
 	grpcDialer.AddMiddleware(NewIstioHTTPHandlerMiddleware())
 
@@ -333,6 +342,8 @@ func (h *istioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 	}
 
 	httpHandler := pwhttp.NewHandler(handler, streamHandler, api.ListenerDirectionInbound)
+
+	httpHandler.AddMiddleware(tracing.NewZipkinHTTPTracingMiddleware(h.zipkinTracer))
 	httpHandler.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
 	httpHandler.AddMiddleware(NewIstioHTTPHandlerMiddleware())
 
