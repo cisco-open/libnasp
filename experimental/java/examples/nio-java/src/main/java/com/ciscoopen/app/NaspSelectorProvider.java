@@ -239,9 +239,6 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-
-        logger.getL
-
     }
 
     public NaspSelectorProvider() {
@@ -267,9 +264,5 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
     @Override
     public SocketChannel openSocketChannel() throws IOException {
         return new NaspSocketChannel(this);
-    }
-
-    protected void finalize() throws Throwable {
-
     }
 }
