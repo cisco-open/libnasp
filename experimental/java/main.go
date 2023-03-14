@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/go-logr/logr"
 	"io"
 	"math"
 	"net"
@@ -38,8 +39,6 @@ import (
 
 	"github.com/cisco-open/nasp/pkg/istio"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
-
-	"k8s.io/klog/v2"
 )
 
 const MAX_WRITE_BUFFERS = 64
@@ -54,7 +53,6 @@ const (
 	OP_WAKEUP  ReadyOps = 1 << 5
 )
 
-var logger = klog.NewKlogr()
 var integrationHandler = newNaspIntegrationHandler()
 
 // TCP related structs and functions
@@ -234,7 +232,7 @@ func (s *Selector) WakeUp() {
 }
 
 func newNaspIntegrationHandler() *naspIntegrationHandler {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(logr.NewContext(context.Background(), logger))
 
 	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
 		IstioCAConfigGetter: istio.IstioCAConfigGetterAuto,
