@@ -22,13 +22,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-logr/logr"
 	"io"
 	"math"
 	"net"
 	"strconv"
 	"sync/atomic"
 	"syscall"
+
+	"github.com/go-logr/logr"
 
 	"net/http"
 	"strings"
