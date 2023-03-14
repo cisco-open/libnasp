@@ -15,6 +15,7 @@
 package grpc
 
 import (
+	"context"
 	"io"
 	"net/url"
 
@@ -158,6 +159,18 @@ func (r *GRPCRequest) Method() string {
 
 func (r *GRPCRequest) ConnectionState() network.ConnectionState {
 	return r.connectionState
+}
+
+func (r *GRPCRequest) ContentLength() int64 {
+	return 0
+}
+
+func (r *GRPCRequest) Context() context.Context {
+	return nil
+}
+
+func (r *GRPCRequest) WithContext(ctx context.Context) api.HTTPRequest {
+	return nil
 }
 
 type grpcHeaderMap struct {
