@@ -89,6 +89,7 @@
                     <source>17</source>
                     <target>17</target>
                     <compilerArgs>
+                        <arg>--enable-preview</arg>
                         <arg>--add-exports</arg>
                         <arg>java.base/sun.nio.ch=ALL-UNNAMED</arg>
                     </compilerArgs>
