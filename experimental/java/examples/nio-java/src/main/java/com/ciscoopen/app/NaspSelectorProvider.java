@@ -239,9 +239,7 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
 
-    public NaspSelectorProvider() {
         executorService.scheduleAtFixedRate(() -> {
             byte[] logBatch = Nasp.nextLogBatchJSON(10);
             if (logBatch != null) {

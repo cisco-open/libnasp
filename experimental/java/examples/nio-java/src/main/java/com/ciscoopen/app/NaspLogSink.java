@@ -25,9 +25,12 @@ public class NaspLogSink {
 
             Iterator<JsonNode> it = jsonNode.elements();
             while (it.hasNext()) {
+                StringBuilder sb = new StringBuilder();
                 JsonNode logLine = it.next();
 
-                Map restoreMDC = MDC.getCopyOfContextMap();
+                if (logLine.has("message")) {
+                    sb.append(logLine.get("message").asText());
+                }
 
                 Iterator<Map.Entry<String, JsonNode>> logLineFields = logLine.fields();
                 while (logLineFields.hasNext()) {
@@ -36,13 +39,12 @@ public class NaspLogSink {
                         continue;
                     }
 
-                    MDC.put(field.getKey(), field.getValue().asText());
+                    if (sb.length() > 0) {
+                        sb.append(" ");
+                    }
+                    sb.append(field.getKey()).append("=").append(field.getValue().asText());
                 }
-
-                String logMessage = "";
-                if (logLine.has("message")) {
-                    logMessage = logLine.get("message").asText();
-                }
+                String logMessage = sb.toString();
 
                 String level = "";
                 if (logLine.has("level")) {
@@ -67,12 +69,6 @@ public class NaspLogSink {
                         logger.trace(logMessage);
                         break;
                     default: // ignore
-                }
-
-                if (restoreMDC != null) {
-                    MDC.setContextMap(restoreMDC);
-                } else {
-                    MDC.clear();
                 }
             }
 
