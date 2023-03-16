@@ -1,6 +1,8 @@
 package com.ciscoopen.app;
 
 import nasp.Nasp;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import sun.nio.ch.FileChannelImpl;
 import sun.nio.ch.SelectionKeyImpl;
 import sun.nio.ch.SelectorImpl;
@@ -18,6 +20,9 @@ import java.nio.channels.spi.AbstractSelector;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 class NaspSelector extends SelectorImpl {
@@ -204,6 +209,9 @@ class NaspSelector extends SelectorImpl {
 }
 
 public class NaspSelectorProvider extends SelectorProviderImpl {
+    private static final Logger logger = LoggerFactory.getLogger(Nasp.class);
+    private static final NaspLogSink naspLogSink = new NaspLogSink(logger);
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     static {
         try {
@@ -231,6 +239,14 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+
+        executorService.scheduleAtFixedRate(() -> {
+            byte[] logBatch = Nasp.nextLogBatchJSON(10);
+            if (logBatch != null) {
+                naspLogSink.Log(logBatch);
+            }
+
+        }, 2000, 100, TimeUnit.MILLISECONDS);
     }
 
     @Override
