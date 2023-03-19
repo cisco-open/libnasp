@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - "acceptance-test-*"
   pull_request:
 
 env:
@@ -42,13 +45,33 @@ jobs:
         id: set-git-refname
         run: echo "git_refname=$(echo "${{ github.ref }}" | sed -r 's@refs/(heads|pull|tags)/@@g')" >> $GITHUB_OUTPUT
 
-      - name: Deploy to kind cluster
+      - name: Deploy to kind cluster (istio-operator)
         run: |
           test/deploy-kind.sh
         env:
           DOCKER_BUILDKIT: "1"
 
-      - name: Run simple go http client
+      - name: Run simple go http client (istio-operator)
         working-directory: examples/http
         run: |
           make run-client
+        env:
+          CLIENT_REQUEST_URL: "http://echo.testing:80"
+
+      - name: Kind cluster cleanup
+        run: |
+          kind delete cluster --name nasp-test-cluster
+
+      - name: Deploy to kind cluster (istioctl)
+        run: |
+          test/deploy-kind.sh
+        env:
+          DOCKER_BUILDKIT: "1"
+          ISTIO_INSTALLER: istioctl
+
+      - name: Run simple go http client (istioctl)
+        working-directory: examples/http
+        run: |
+          make run-client
+        env:
+          CLIENT_REQUEST_URL: "http://echo.testing:80"
