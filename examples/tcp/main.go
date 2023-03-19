@@ -31,10 +31,12 @@ import (
 
 var mode string
 var heimdallURL string
+var serverAddress string
 
 func init() {
 	flag.StringVar(&heimdallURL, "heimdall-url", "https://localhost:16443/config", "Heimdall URL")
 	flag.StringVar(&mode, "mode", "server", "mode")
+	flag.StringVar(&serverAddress, "server-address", "echo.testing:9000", "tcp server address")
 	klog.InitFlags(nil)
 	flag.Parse()
 }
@@ -52,6 +54,10 @@ func getIIH(ctx context.Context) (*istio.IstioIntegrationHandler, error) {
 
 	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, klog.TODO())
 	if err != nil {
+		return nil, err
+	}
+
+	if err := iih.Run(context.Background()); err != nil {
 		return nil, err
 	}
 
@@ -129,26 +135,36 @@ func client() {
 		panic(err)
 	}
 
-	conn, err := d.DialContext(ctx, "tcp", "localhost:10000")
+	conn, err := d.DialContext(ctx, "tcp", serverAddress)
 	if err != nil {
 		panic(err)
 	}
 
 	defer conn.Close()
 
-	bytes := []byte("hello!")
+	for i := 0; i < 5; i++ {
+		if err := sendReceive(conn, fmt.Sprintf("name %d", i)); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func sendReceive(conn net.Conn, msg string) error {
+	bytes := []byte(msg + "\n")
+
 	fmt.Printf("request: %s", bytes)
 
-	_, err = conn.Write(bytes)
-	if err != nil {
-		panic(err)
+	if _, err := conn.Write(bytes); err != nil {
+		return err
 	}
 
 	reply := make([]byte, 1024)
 	n, err := conn.Read(reply)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	fmt.Printf("response: %s", reply[:n])
+
+	return nil
 }
