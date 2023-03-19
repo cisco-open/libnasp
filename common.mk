@@ -58,7 +58,7 @@ ${REPO_ROOT}/bin/istioctl: ${REPO_ROOT}/bin/istioctl-${ISTIO_VERSION}
 	@ln -sf istioctl-${ISTIO_VERSION} ${REPO_ROOT}/bin/istioctl
 
 ${REPO_ROOT}/bin/istioctl-${ISTIO_VERSION}:
-	ISTIO_VERSION=${ISTIO_VERSION} ${REPO_ROOT}/scripts/getIstioCtl.sh
+	ISTIO_VERSION=${ISTIO_VERSION} /bin/bash ${REPO_ROOT}/scripts/getIstioCtl.sh
 	@ln -sf istioctl-${ISTIO_VERSION} ${REPO_ROOT}/bin/istioctl
 
 .PHONY: install-istioctl

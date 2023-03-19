@@ -5,7 +5,7 @@ metadata:
   labels:
     k8s-app: echo
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       k8s-app: echo
