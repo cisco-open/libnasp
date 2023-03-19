@@ -1,0 +1,20 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: cp-v115x
+spec:
+  revision: cp-v115x
+  values:
+    global:
+      meshID: mesh1
+      multiCluster:
+        clusterName: nasp-test-cluster
+      network: network1
+      meshNetworks:
+        network1:
+          gateways: 
+          - address: 127.0.0.1
+            port: 15443
+    pilot:
+      env:
+        PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION: "true"

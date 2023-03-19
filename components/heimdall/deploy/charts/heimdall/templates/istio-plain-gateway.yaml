@@ -1,0 +1,187 @@
+{{- if and .Values.istio.meshGateway.enabled (not .Values.istio.meshGateway.withIstioOperator) -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: {{ include "heimdall.fullname" . }}-gw
+    istio.io/rev: {{ .Values.istio.revision }}
+  name: {{ include "heimdall.fullname" . }}-gw
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: {{ include "heimdall.fullname" . }}-gw
+    istio.io/rev: {{ .Values.istio.revision }}
+  name: {{ include "heimdall.fullname" . }}-gw
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: {{ include "heimdall.fullname" . }}-gw
+      istio.io/rev: {{ .Values.istio.revision }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app: {{ include "heimdall.fullname" . }}-gw
+    istio.io/rev: {{ .Values.istio.revision }}
+  name: {{ include "heimdall.fullname" . }}-gw-sds
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app: {{ include "heimdall.fullname" . }}-gw
+    istio.io/rev: {{ .Values.istio.revision }}
+  name: {{ include "heimdall.fullname" . }}-gw-sds
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "heimdall.fullname" . }}-gw-sds
+subjects:
+- kind: ServiceAccount
+  name: {{ include "heimdall.fullname" . }}-gw
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  labels:
+    app: {{ include "heimdall.fullname" . }}-gw
+    istio.io/rev: {{ .Values.istio.revision }}
+  name: {{ include "heimdall.fullname" . }}-gw
+spec:
+  maxReplicas: 5
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 80
+        type: Utilization
+    type: Resource
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "heimdall.fullname" . }}-gw
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.banzaicloud.io/ip-address-override: 127.0.0.1
+  labels:
+    app: {{ include "heimdall.fullname" . }}-gw
+    istio.io/rev: {{ .Values.istio.revision }}
+  name: {{ include "heimdall.fullname" . }}-gw
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8443
+    {{- if .Values.istio.meshGateway.nodePort }}
+    nodePort: {{ .Values.istio.meshGateway.nodePort }}
+    {{- end }}
+  selector:
+    app: {{ include "heimdall.fullname" . }}-gw
+    istio.io/rev: {{ .Values.istio.revision }}
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ include "heimdall.fullname" . }}-gw
+    istio.io/rev: {{ .Values.istio.revision }}
+  name: {{ include "heimdall.fullname" . }}-gw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "heimdall.fullname" . }}-gw
+      istio.io/rev: {{ .Values.istio.revision }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        inject.istio.io/templates: gateway
+        prometheus.io/path: /stats/prometheus
+        prometheus.io/port: "15020"
+        prometheus.io/scrape: "true"
+        sidecar.istio.io/inject: "true"
+      labels:
+        app: {{ include "heimdall.fullname" . }}-gw
+        istio.io/rev: {{ .Values.istio.revision }}
+        sidecar.istio.io/inject: "true"
+        gateway-name: {{ include "heimdall.fullname" . }}-gw
+        gateway-type: ingress
+    spec:
+      containers:
+      - env:
+        - name: ISTIO_META_REQUESTED_NETWORK_VIEW
+          value: network1
+        - name: ISTIO_META_UNPRIVILEGED_POD
+          value: "true"
+        image: auto
+        imagePullPolicy: Always
+        name: istio-proxy
+        ports:
+        - containerPort: 8443
+          protocol: TCP
+        - containerPort: 15090
+          name: http-envoy-prom
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "2"
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /etc/istio/ingressgateway-certs
+          name: ingressgateway-certs
+          readOnly: true
+        - mountPath: /etc/istio/ingressgateway-ca-certs
+          name: ingressgateway-ca-certs
+          readOnly: true
+      securityContext:
+        fsGroup: 1337
+        runAsGroup: 1337
+        runAsNonRoot: true
+        runAsUser: 1337
+      serviceAccountName: {{ include "heimdall.fullname" . }}-gw
+      volumes:
+      - name: ingressgateway-certs
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: {{ include "heimdall.fullname" . }}-gw-certs
+      - name: ingressgateway-ca-certs
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: {{ include "heimdall.fullname" . }}-gw-ca-certs
+{{- end }}

@@ -106,6 +106,7 @@ istio:
   caAddress: "istiod-cp-v115x.istio-system.svc:15012"
   meshGateway:
     enabled: false
+    withIstioOperator: true
     # nodePort: "16443"
 
 controller:

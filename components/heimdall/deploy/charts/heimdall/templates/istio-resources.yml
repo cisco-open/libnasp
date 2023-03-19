@@ -1,0 +1,36 @@
+{{- if and .Values.istio.meshGateway.enabled -}}
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ include "heimdall.fullname" . }}
+spec:
+  selector:
+    gateway-name: {{ include "heimdall.fullname" . }}-gw
+    gateway-type: ingress
+  servers:
+  - hosts:
+    - '*'
+    port:
+      name: https
+      number: 443
+      protocol: HTTPS
+    tls:
+      credentialName: {{ include "heimdall.fullname" . }}
+      mode: SIMPLE
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "heimdall.fullname" . }}
+spec:
+  gateways:
+  - {{ include "heimdall.fullname" . }}
+  hosts:
+  - '*'
+  http:
+  - route:
+    - destination:
+        host: {{ include "heimdall.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+        port:
+          number: 8080
+{{- end }}

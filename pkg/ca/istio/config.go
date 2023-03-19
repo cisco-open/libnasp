@@ -45,10 +45,13 @@ import (
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/cisco-open/nasp/pkg/environment"
+	"github.com/cisco-open/nasp/pkg/k8s/service"
 )
 
 var (
 	istioNamespace = "istio-system"
+
+	eastwestGatewayNotFoundError = errors.New("eastwest gateway service is not found")
 )
 
 const (
@@ -113,13 +116,25 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 		return IstioCAClientConfig{}, errors.WrapIf(err, "could not get istiod service")
 	}
 
-	pod, address, err := GetIMGWData(cl, config, scheme, istioRevision)
-	if err != nil {
-		return IstioCAClientConfig{}, errors.WrapIf(err, "could not get imgw data")
+	var externalAddress string
+
+	externalAddress, err = GetEastWestGWAddress(cl, istioRevision)
+	if err != nil && !errors.Is(errors.Cause(err), errors.Cause(eastwestGatewayNotFoundError)) {
+		return IstioCAClientConfig{}, errors.WrapIf(err, "could not get external address")
+	} else if externalAddress == "" {
+		externalAddress, err = GetIMGWAddress(cl, istioRevision)
+		if err != nil {
+			return IstioCAClientConfig{}, errors.WrapIf(err, "could not get external address")
+		}
 	}
 
 	var token []byte
 	if saObjectKey == nil {
+		pod, err := GetIMGWPod(cl, istioRevision)
+		if err != nil {
+			return IstioCAClientConfig{}, errors.WrapIf(err, "could not get imgw data")
+		}
+
 		token, err = GetIstioTokenFromPod(config, scheme, pod.GetName(), pod.GetNamespace())
 		if err != nil {
 			return IstioCAClientConfig{}, errors.WrapIf(err, "could not get token from mexp pod")
@@ -142,7 +157,7 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 	}
 
 	return IstioCAClientConfig{
-		CAEndpoint:    address + ":15012",
+		CAEndpoint:    externalAddress + ":15012",
 		CAEndpointSAN: fmt.Sprintf("%s.%s.svc", svc.GetName(), svc.GetNamespace()),
 		Token:         token,
 		CApem:         pem,
@@ -181,15 +196,26 @@ func CreateK8SToken(ctx context.Context, config *rest.Config, saName, saNamespac
 }
 
 func GetIstiodService(cl client.Client, istioRevision string) (*corev1.Service, error) {
-	labels := map[string]string{
-		"istio":        "istiod",
-		"istio.io/rev": istioRevision,
+	labelsSets := []map[string]string{
+		{ // istio-operator
+			"istio":        "istiod",
+			"istio.io/rev": istioRevision,
+		},
+		{ // istioctl
+			"istio":        "pilot",
+			"istio.io/rev": istioRevision,
+		},
 	}
 
 	services := &corev1.ServiceList{}
-	err := cl.List(context.Background(), services, client.InNamespace(istioNamespace), client.MatchingLabels(labels))
-	if err != nil {
-		return nil, errors.WrapIf(err, "could not get istiod pods")
+	for _, labels := range labelsSets {
+		err := cl.List(context.Background(), services, client.InNamespace(istioNamespace), client.MatchingLabels(labels))
+		if err != nil {
+			return nil, errors.WrapIf(err, "could not get istiod pods")
+		}
+		if len(services.Items) > 0 {
+			break
+		}
 	}
 
 	if len(services.Items) < 1 {
@@ -199,40 +225,60 @@ func GetIstiodService(cl client.Client, istioRevision string) (*corev1.Service, 
 	return &services.Items[0], nil
 }
 
-func GetIMGWData(cl client.Client, config *rest.Config, scheme *runtime.Scheme, istioRevision string) (pod corev1.Pod, address string, err error) {
-	pods := &corev1.PodList{}
-	err = cl.List(context.Background(), pods, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
-		"gateway-type": "ingress",
-		"release":      "istio-meshgateway",
+func GetEastWestGWAddress(cl client.Client, istioRevision string) (string, error) {
+	svcs := &corev1.ServiceList{}
+	err := cl.List(context.Background(), svcs, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
+		"istio":        "eastwestgateway",
 		"istio.io/rev": istioRevision,
 	}))
 	if err != nil {
-		err = errors.WrapIf(err, "could not get mexp pods")
-		return
+		return "", errors.WrapIf(err, "could not get eastwest gateway service")
+	}
+
+	if len(svcs.Items) < 1 {
+		return "", eastwestGatewayNotFoundError
+	}
+
+	ips, _, err := service.GetServiceEndpointIPs(svcs.Items[0])
+	if err != nil {
+		return "", errors.WrapIf(err, "could not get service endpoint ip")
+	}
+
+	return ips[0], nil
+}
+
+func GetIMGWPod(cl client.Client, istioRevision string) (*corev1.Pod, error) {
+	pods := &corev1.PodList{}
+	if err := cl.List(context.Background(), pods, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
+		"gateway-type": "ingress",
+		"release":      "istio-meshgateway",
+		"istio.io/rev": istioRevision,
+	})); err != nil {
+		return nil, errors.WrapIf(err, "could not get mexp pods")
 	}
 
 	if len(pods.Items) < 1 {
-		err = errors.New("mexp pod is not found")
-		return
+		return nil, errors.New("mexp pod is not found")
 	}
 
-	pod = pods.Items[0]
+	return &pods.Items[0], nil
+}
+
+func GetIMGWAddress(cl client.Client, istioRevision string) (string, error) {
+	var address string
 
 	imgws := &unstructured.UnstructuredList{}
 	imgws.SetAPIVersion("servicemesh.cisco.com/v1alpha1")
 	imgws.SetKind("IstioMeshGatewayList")
-	err = cl.List(context.Background(), imgws, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
+	if err := cl.List(context.Background(), imgws, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
 		"app":          "istio-meshexpansion-gateway",
 		"istio.io/rev": istioRevision,
-	}))
-	if err != nil {
-		err = errors.WrapIf(err, "could not list imgws")
-		return
+	})); err != nil {
+		return address, errors.WrapIf(err, "could not list imgws")
 	}
 
 	if len(imgws.Items) < 1 {
-		err = errors.New("imgw is not found")
-		return
+		return address, errors.New("imgw is not found")
 	}
 
 	status := imgws.Items[0].UnstructuredContent()["status"]
@@ -245,38 +291,41 @@ func GetIMGWData(cl client.Client, config *rest.Config, scheme *runtime.Scheme, 
 	}
 
 	if address == "" {
-		err = errors.New("imgw address is not found")
+		return address, errors.New("imgw address is not found")
 	}
 
-	return pod, address, err
+	return address, nil
 }
 
 func GetIstioRootCAPEM(cl client.Client, istioRevision string) ([]byte, error) {
 	cms := &corev1.ConfigMapList{}
-	err := cl.List(context.Background(), cms, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
-		"istio.io/rev":    istioRevision,
-		"istio.io/config": "true",
-	}))
-	if err != nil {
-		return nil, errors.WrapIf(err, "could not get configmaps")
+
+	labelSets := []map[string]string{
+		{ // istio-operator
+			"istio.io/rev":    istioRevision,
+			"istio.io/config": "true",
+		},
+		{ // istioctl
+			"istio.io/config": "true",
+		},
 	}
 
-	if len(cms.Items) == 0 {
-		err := cl.List(context.Background(), cms, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
-			"istio.io/config": "true",
-		}))
+	for _, labels := range labelSets {
+		err := cl.List(context.Background(), cms, client.InNamespace(istioNamespace), client.MatchingLabels(labels))
 		if err != nil {
 			return nil, errors.WrapIf(err, "could not get configmaps")
+		}
+		if len(cms.Items) > 0 {
+			break
 		}
 	}
 
 	if len(cms.Items) == 0 {
-		return nil, errors.New("root ca config is not found")
+		return nil, errors.New("root ca configmap is not found")
 	}
 
 	configmap := &corev1.ConfigMap{}
-	err = cl.Get(context.Background(), client.ObjectKeyFromObject(&cms.Items[0]), configmap)
-	if err != nil {
+	if err := cl.Get(context.Background(), client.ObjectKeyFromObject(&cms.Items[0]), configmap); err != nil {
 		return nil, errors.WrapIf(err, "could not get istio root ca configmap")
 	}
 
@@ -287,7 +336,6 @@ func GetMeshConfig(cl client.Client, istioRevision string) (*meshv1alpha1.MeshCo
 	cms := &corev1.ConfigMapList{}
 	err := cl.List(context.Background(), cms, client.InNamespace(istioNamespace), client.MatchingLabels(map[string]string{
 		"istio.io/rev": istioRevision,
-		"istio":        "meshconfig",
 	}))
 	if err != nil {
 		return nil, errors.WrapIf(err, "could not get configmaps")
@@ -298,9 +346,16 @@ func GetMeshConfig(cl client.Client, istioRevision string) (*meshv1alpha1.MeshCo
 	}
 
 	configmap := &corev1.ConfigMap{}
-	err = cl.Get(context.Background(), client.ObjectKeyFromObject(&cms.Items[0]), configmap)
-	if err != nil {
-		return nil, errors.WrapIf(err, "could not get istio mesh config configmap")
+	for _, cm := range cms.Items {
+		_configmap := &corev1.ConfigMap{}
+		err = cl.Get(context.Background(), client.ObjectKeyFromObject(&cm), _configmap)
+		if err != nil {
+			return nil, errors.WrapIf(err, "could not get istio mesh config configmap")
+		}
+		if _, ok := _configmap.Data["mesh"]; ok {
+			configmap = _configmap
+			break
+		}
 	}
 
 	yamlMeshConfig, ok := configmap.Data["mesh"]

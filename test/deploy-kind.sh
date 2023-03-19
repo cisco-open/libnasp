@@ -17,7 +17,10 @@
 set -euo pipefail
 
 DIRECTORY=`dirname $(readlink -f $0)`
+BINDIR="${DIRECTORY}/../bin"
 BUILD_IMAGE=${BUILD_IMAGE:-true}
+ISTIO_INSTALLER=${ISTIO_INSTALLER:-operator}
+REVISION="icp-v115x.istio-system"
 
 function log() {
     echo -e "\n>>> ${1}\n"
@@ -27,13 +30,36 @@ function create_and_label_namespace() {
     if ! kubectl get namespace ${1} >/dev/null 2>&1; then
     kubectl create namespace ${1}
     fi
-    kubectl label namespace ${1} istio.io/rev=icp-v115x.istio-system --overwrite
+    kubectl label namespace ${1} istio.io/rev=${REVISION} --overwrite
 }
 
 function create_sa() {
     if ! kubectl -n ${1} get sa ${2} >/dev/null 2>&1; then
         kubectl -n ${1} create sa ${2}
     fi
+}
+
+function downloadIstioCtl() {
+    make -C "${DIRECTORY}/.." install-istioctl
+}
+
+function installIstioWithIstioCtl() {
+    downloadIstioCtl
+    ${BINDIR}/istioctl install -y -f ${DIRECTORY}/istioctl-cp.yaml
+    ${BINDIR}/istioctl install -y -f ${DIRECTORY}/istioctl-eastwestgw.yaml
+    kubectl apply --namespace istio-system -f ${DIRECTORY}/istioctl-resources.yaml
+}
+
+function installIstioWithOperator() {
+    log "install istio"
+    helm upgrade --install --create-namespace --namespace=istio-system istio-operator banzaicloud-stable/istio-operator --version 2.0.24 --wait
+    kubectl apply --namespace istio-system -f ${DIRECTORY}/istio-controlplane.yaml
+
+    log "waiting for istio controlplane to be available"
+    while [ "$(kubectl get icp -n istio-system icp-v115x -o jsonpath='{.status.status}')" != "Available" ];
+    do
+        sleep 2
+    done
 }
 
 if ! kind get kubeconfig --name nasp-test-cluster &> /dev/null; then
@@ -53,15 +79,22 @@ log "install metallb"
 helm upgrade --install -n metallb-system --create-namespace metallb metallb/metallb --wait
 kubectl apply -f ${DIRECTORY}/metallb-config.yaml
 
-log "install istio"
-helm upgrade --install --create-namespace --namespace=istio-system istio-operator banzaicloud-stable/istio-operator --version 2.0.18 --wait
-kubectl apply --namespace istio-system -f ${DIRECTORY}/istio-controlplane.yaml
+HEIMDALL_VALUES_FILE="heimdall-values.yaml"
 
-log "waiting for istio controlplane to be available"
-while [ "$(kubectl get icp -n istio-system icp-v115x -o jsonpath='{.status.status}')" != "Available" ];
-do
-    sleep 2
-done
+case ${ISTIO_INSTALLER} in
+    operator)
+        installIstioWithOperator
+        ;;
+    istioctl)
+        installIstioWithIstioCtl
+        HEIMDALL_VALUES_FILE="istioctl-heimdall-values.yaml"
+        REVISION="cp-v115x"
+        ;;
+    *)
+        echo "'{$ISTIO_INSTALLER}': invalid Istio installer method"
+        exit 2
+        ;;
+esac
 
 if [ ${BUILD_IMAGE} == "true" ]; then
     log "build and load heimdall image"
@@ -71,7 +104,7 @@ fi
 
 log "install heimdall"
 create_and_label_namespace heimdall
-helm upgrade --install -n heimdall heimdall ${DIRECTORY}/../components/heimdall/deploy/charts/heimdall --wait --values ${DIRECTORY}/heimdall-values.yaml
+helm upgrade --install -n heimdall heimdall ${DIRECTORY}/../components/heimdall/deploy/charts/heimdall --wait --values ${DIRECTORY}/${HEIMDALL_VALUES_FILE}
 
 log "install echo service for testing"
 create_and_label_namespace testing
