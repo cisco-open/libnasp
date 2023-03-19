@@ -2,6 +2,7 @@ REPO_ROOT=$(shell git rev-parse --show-toplevel)
 
 LICENSEI_VERSION = 0.7.0
 GOLANGCI_VERSION = 1.51.2
+ISTIO_VERSION ?= 1.15.6
 
 .PHONY: fmt
 fmt: ## Run go fmt against code
@@ -52,3 +53,13 @@ license-check: ${REPO_ROOT}/bin/licensei ## Run license check
 .PHONY: license-cache
 license-cache: ${REPO_ROOT}/bin/licensei ## Generate license cache
 	${REPO_ROOT}/bin/licensei --config ${REPO_ROOT}/.licensei.toml cache
+
+${REPO_ROOT}/bin/istioctl: ${REPO_ROOT}/bin/istioctl-${ISTIO_VERSION}
+	@ln -sf istioctl-${ISTIO_VERSION} ${REPO_ROOT}/bin/istioctl
+
+${REPO_ROOT}/bin/istioctl-${ISTIO_VERSION}:
+	ISTIO_VERSION=${ISTIO_VERSION} ${REPO_ROOT}/scripts/getIstioCtl.sh
+	@ln -sf istioctl-${ISTIO_VERSION} ${REPO_ROOT}/bin/istioctl
+
+.PHONY: install-istioctl
+install-istioctl: ${REPO_ROOT}/bin/istioctl ## Install IstioCtl

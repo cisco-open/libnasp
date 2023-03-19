@@ -4,11 +4,10 @@ image:
   tag: test
 
 istio:
-  controlPlane: icp-v115x
-  controlPlaneNamespace: istio-system
   version: "1.15.6"
-  revision: icp-v115x.istio-system
+  revision: cp-v115x
   clusterId: nasp-test-cluster
   meshGateway:
     enabled: true
+    withIstioOperator: false
     nodePort: "16443"
