@@ -99,6 +99,18 @@ func (c *wrappedConn) Close() error {
 }
 
 func (c *wrappedConn) Read(b []byte) (int, error) {
+	n, err := c.read(b)
+
+	// try another read if the return len is zero without EOF
+	// most probably a wasm module drained the read buffer
+	if n == 0 && err == nil {
+		return c.read(b)
+	}
+
+	return n, err
+}
+
+func (c *wrappedConn) read(b []byte) (int, error) {
 	c.readMu.Lock()
 	defer c.readMu.Unlock()
 
@@ -145,7 +157,8 @@ func (c *wrappedConn) Read(b []byte) (int, error) {
 		_, _ = io.Copy(c.readCacheBuffer, c.readBuffer)
 	}()
 
-	if n, err := c.readBuffer.Read(b[x:]); err != nil {
+	// do not return eof on readbuffer here
+	if n, err := c.readBuffer.Read(b[x:]); err != nil && !errors.Is(err, io.EOF) {
 		return n, err
 	} else {
 		x += n
