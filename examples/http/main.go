@@ -142,11 +142,13 @@ func main() {
 	if mode == "client" {
 		var wg sync.WaitGroup
 		i := 0
+		clientErrors := []error{}
 		for i < requestCount {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				if err := sendHTTPRequest(requestURL, transport, logger); err != nil {
+					clientErrors = append(clientErrors, err)
 					logger.Error(err, "could not send http request")
 				}
 			}()
@@ -156,6 +158,10 @@ func main() {
 		time.Sleep(sleepBeforeClientExit)
 
 		wg.Wait()
+
+		if len(clientErrors) > 0 {
+			os.Exit(2)
+		}
 
 		return
 	}
