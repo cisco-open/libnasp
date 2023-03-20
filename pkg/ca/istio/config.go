@@ -51,7 +51,7 @@ import (
 var (
 	istioNamespace = "istio-system"
 
-	eastwestGatewayNotFoundError = errors.New("eastwest gateway service is not found")
+	errEastwestGatewayNotFound = errors.New("eastwest gateway service is not found")
 )
 
 const (
@@ -119,7 +119,7 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 	var externalAddress string
 
 	externalAddress, err = GetEastWestGWAddress(cl, istioRevision)
-	if err != nil && !errors.Is(errors.Cause(err), errors.Cause(eastwestGatewayNotFoundError)) {
+	if err != nil && !errors.Is(errors.Cause(err), errors.Cause(errEastwestGatewayNotFound)) {
 		return IstioCAClientConfig{}, errors.WrapIf(err, "could not get external address")
 	} else if externalAddress == "" {
 		externalAddress, err = GetIMGWAddress(cl, istioRevision)
@@ -236,7 +236,7 @@ func GetEastWestGWAddress(cl client.Client, istioRevision string) (string, error
 	}
 
 	if len(svcs.Items) < 1 {
-		return "", eastwestGatewayNotFoundError
+		return "", errEastwestGatewayNotFound
 	}
 
 	ips, _, err := service.GetServiceEndpointIPs(svcs.Items[0])
@@ -347,6 +347,7 @@ func GetMeshConfig(cl client.Client, istioRevision string) (*meshv1alpha1.MeshCo
 
 	configmap := &corev1.ConfigMap{}
 	for _, cm := range cms.Items {
+		cm := cm
 		_configmap := &corev1.ConfigMap{}
 		err = cl.Get(context.Background(), client.ObjectKeyFromObject(&cm), _configmap)
 		if err != nil {
