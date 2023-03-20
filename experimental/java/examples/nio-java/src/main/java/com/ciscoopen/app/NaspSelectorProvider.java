@@ -240,6 +240,21 @@ public class NaspSelectorProvider extends SelectorProviderImpl {
             throw new RuntimeException(e);
         }
 
+        long naspLogLevel = 0;
+        if (logger.isTraceEnabled()) {
+            naspLogLevel = 0;
+        } else if (logger.isDebugEnabled()) {
+            naspLogLevel = 1;
+        } else if (logger.isInfoEnabled()) {
+            naspLogLevel = 2;
+        } else if (logger.isWarnEnabled()) {
+            naspLogLevel = 3;
+        } else if (logger.isErrorEnabled()) {
+            naspLogLevel = 4;
+        }
+
+        Nasp.setup(naspLogLevel);
+
         executorService.scheduleAtFixedRate(() -> {
             byte[] logBatch = Nasp.nextLogBatchJSON(10);
             if (logBatch != null) {
