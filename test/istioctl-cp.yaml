@@ -4,6 +4,13 @@ metadata:
   name: cp-v115x
 spec:
   revision: cp-v115x
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
   values:
     global:
       meshID: mesh1

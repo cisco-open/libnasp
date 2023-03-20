@@ -78,6 +78,7 @@ func GetServiceEndpointIPs(service corev1.Service) ([]string, bool, error) {
 
 			return ips, true, nil
 		}
+	case corev1.ServiceTypeExternalName, corev1.ServiceTypeNodePort:
 	}
 
 	return ips, false, nil

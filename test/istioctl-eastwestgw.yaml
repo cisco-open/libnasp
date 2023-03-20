@@ -13,6 +13,10 @@ spec:
           app: istio-eastwestgateway
         enabled: true
         k8s:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
           serviceAnnotations:
             service.banzaicloud.io/ip-address-override: 127.0.0.1
           env:
