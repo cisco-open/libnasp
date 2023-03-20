@@ -17,15 +17,57 @@ package nasp
 
 import (
 	"code.cloudfoundry.org/go-diodes"
+	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
 	"github.com/rs/zerolog"
 )
 
-var logOutput = diodes.NewManyToOne(1000, nil)
+// LogLevel defines log levels.
+type LogLevel int
 
-var zl = zerolog.New(newLogOutputWriter(logOutput)).
-	Level(zerolog.InfoLevel) // TODO: pass in current log level of the hosting app
-var logger = zerologr.New(&zl)
+const (
+	// TraceLogLevel defines trace log level.
+	TraceLogLevel LogLevel = iota
+
+	// DebugLogLevel defines debug log level.
+	DebugLogLevel
+
+	// InfoLogLevel defines info log level.
+	InfoLogLevel
+
+	// WarnLogLevel defines warn log level.
+	WarnLogLevel
+
+	// ErrorLogLevel defines error log level.
+	ErrorLogLevel
+)
+
+var logOutput diodes.Diode
+var logger logr.Logger
+
+func setupLogger(logLevel LogLevel) {
+	logOutput = diodes.NewManyToOne(1000, nil)
+	zlLogLevel := zerolog.InfoLevel
+
+	switch logLevel {
+	case TraceLogLevel:
+		zlLogLevel = zerolog.TraceLevel
+	case DebugLogLevel:
+		zlLogLevel = zerolog.DebugLevel
+	case InfoLogLevel:
+		zlLogLevel = zerolog.InfoLevel
+	case WarnLogLevel:
+		zlLogLevel = zerolog.WarnLevel
+	case ErrorLogLevel:
+		zlLogLevel = zerolog.ErrorLevel
+	}
+
+	zl := zerolog.New(newLogOutputWriter(logOutput)).
+		With().Caller().Logger().
+		Level(zlLogLevel)
+
+	logger = zerologr.New(&zl)
+}
 
 // NextLogBatchJSON return the next log lines batch in json format if available otherwise nil
 func NextLogBatchJSON(batchSize int) []byte {

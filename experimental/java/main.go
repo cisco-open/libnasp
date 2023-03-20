@@ -54,7 +54,15 @@ const (
 	OP_WAKEUP  ReadyOps = 1 << 5
 )
 
-var integrationHandler = newNaspIntegrationHandler()
+var setupOnce = &sync.Once{}
+var integrationHandler *naspIntegrationHandler
+
+func Setup(logLevel int) {
+	setupOnce.Do(func() {
+		setupLogger(LogLevel(logLevel))
+		integrationHandler = newNaspIntegrationHandler()
+	})
+}
 
 // TCP related structs and functions
 
@@ -66,6 +74,8 @@ type TCPListener struct {
 	terminated           atomic.Bool
 
 	acceptInProgress atomic.Bool
+
+	logger logr.Logger
 }
 
 type naspIntegrationHandler struct {
@@ -84,6 +94,8 @@ type Connection struct {
 	terminated atomic.Bool
 
 	EOF atomic.Bool
+
+	logger logr.Logger
 }
 
 type Address struct {
@@ -269,6 +281,7 @@ func Bind(address string, port int) (*TCPListener, error) {
 
 	return &TCPListener{
 		listener: listener,
+		logger:   logger.WithName("TCPListener"),
 	}, nil
 }
 
@@ -284,7 +297,7 @@ func (l *TCPListener) Close() {
 
 	err := l.listener.Close()
 	if err != nil {
-		logger.Error(err, "couldn't close listener", "address", l.listener.Addr())
+		l.logger.Error(err, "couldn't close listener", "address", l.listener.Addr())
 	}
 }
 
@@ -299,6 +312,7 @@ func (l *TCPListener) Accept() (*Connection, error) {
 		readBuffer:   new(bytes.Buffer),
 		writeChannel: make(chan []byte, MAX_WRITE_BUFFERS),
 		id:           uuid.New(),
+		logger:       l.logger.WithName("Connection"),
 	}, nil
 }
 
@@ -369,8 +383,8 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		"selected key id", selectedKeyId,
 	}
 
-	logger := logger.WithName("StartAsyncRead")
-	logger.V(1).Info("invoked", logCtx...)
+	logger := c.logger.WithValues(logCtx...)
+	logger.V(1).Info("StartAsyncRead invoked")
 
 	//nolint:forcetypeassert
 	if v, _ := selector.readInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
@@ -388,7 +402,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 					break
 				}
 
-				logger.Error(err, "reading data from connection failed", logCtx...)
+				logger.Error(err, "reading data from connection failed")
 				var tlsErr tls.RecordHeaderError
 				if errors.As(err, &tlsErr) { // e.g. tls handshake error
 					c.setEofReceived()
@@ -403,13 +417,13 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 				n, err := c.readBuffer.Write(tempBuffer[:num])
 				c.readLock.Unlock()
 				if err != nil {
-					logger.Error(err, "couldn't write data to read buffer", logCtx...)
+					logger.Error(err, "couldn't write data to read buffer")
 				}
 				if n != num {
-					logger.V(1).Info("wrote less data into read buffer than the received amount of data !!!", logCtx...)
+					logger.Info("wrote less data into read buffer than the received amount of data!")
 				}
 			} else {
-				logger.V(1).Info("received 0 bytes on connection", logCtx...)
+				logger.V(1).Info("received 0 bytes on connection")
 			}
 
 			selector.registerReader(selectedKeyId, func() bool {
@@ -419,7 +433,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			})
 		}
 
-		logger.V(1).Info("finished", logCtx...)
+		logger.V(1).Info("StartAsyncRead finished")
 	}()
 }
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
@@ -437,8 +451,9 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	logCtx := []interface{}{
 		"selected key id", selectedKeyId,
 	}
-	logger := logger.WithName("StartAsyncWrite")
-	logger.V(1).Info("invoked", logCtx...)
+
+	logger := c.logger.WithValues(logCtx...)
+	logger.V(1).Info("StartAsyncWrite invoked")
 
 	//nolint:forcetypeassert
 	if v, _ := selector.writeInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
@@ -448,7 +463,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	selector.registerWriter(selectedKeyId, func() bool {
 		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
 		if !b {
-			logger.V(1).Info("write channel is full !")
+			logger.V(1).Info("write channel is full!")
 		}
 		return b
 	})
@@ -468,7 +483,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 						selector.writeInProgress.Store(selectedKeyId, false)
 						break out
 					}
-					logger.Error(err, "received error while writing data to connection", logCtx...)
+					logger.Error(err, "received error while writing data to connection")
 					continue
 				}
 				if len(buff) == num {
@@ -479,7 +494,7 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 			}
 		}
 		selector.unregisterWriter(selectedKeyId)
-		logger.V(1).Info("finished", logCtx...)
+		logger.V(1).Info("StartAsyncWrite finished")
 	}()
 }
 
@@ -508,7 +523,7 @@ func (c *Connection) Close() {
 
 	err := c.conn.Close()
 	if err != nil {
-		logger.Error(err, "couldn't close connection")
+		c.logger.Error(err, "couldn't close connection")
 	}
 }
 
@@ -540,6 +555,8 @@ type TCPDialer struct {
 
 	asyncConnectionsLock sync.Mutex
 	asyncConnections     []*Connection
+
+	logger logr.Logger
 }
 
 func NewTCPDialer() (*TCPDialer, error) {
@@ -551,6 +568,7 @@ func NewTCPDialer() (*TCPDialer, error) {
 
 	return &TCPDialer{
 		dialer: dialer,
+		logger: logger.WithName("TCPDialer"),
 	}, nil
 }
 
@@ -558,11 +576,7 @@ func (d *TCPDialer) StartAsyncDial(selectedKeyId int32, selector *Selector, addr
 	go func() {
 		conn, err := d.Dial(address, port)
 		if err != nil {
-			println(err.Error())
-			return
-		}
-		if err != nil {
-			println(err.Error())
+			d.logger.Error(err, "couldn't connect to address", "address", address, "port", port)
 			return
 		}
 
@@ -601,6 +615,7 @@ func (d *TCPDialer) Dial(address string, port int) (*Connection, error) {
 		readBuffer:   new(bytes.Buffer),
 		writeChannel: make(chan []byte, MAX_WRITE_BUFFERS),
 		id:           uuid.New(),
+		logger:       d.logger.WithName("Connection"),
 	}, nil
 }
 
