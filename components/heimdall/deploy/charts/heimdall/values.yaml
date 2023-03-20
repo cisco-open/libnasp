@@ -96,7 +96,7 @@ testConnection:
   enabled: true
 
 istio:
-  controlPlane: icp-v115x
+  controlPlane: cp-v115x
   controlPlaneNamespace: istio-system
   version: "1.15.2"
   revision: cp-v115x.istio-system

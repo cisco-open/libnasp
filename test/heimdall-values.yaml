@@ -9,6 +9,7 @@ istio:
   version: "1.15.6"
   revision: icp-v115x.istio-system
   clusterId: nasp-test-cluster
+  caAddress: "istiod-icp-v115x.istio-system.svc:15012"
   meshGateway:
     enabled: true
     nodePort: "16443"
