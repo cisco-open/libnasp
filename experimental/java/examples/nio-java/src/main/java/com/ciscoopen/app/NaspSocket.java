@@ -10,7 +10,7 @@ import java.nio.channels.spi.SelectorProvider;
 import nasp.Connection;
 
 public class NaspSocket extends Socket {
-    private final Connection conn;
+    private Connection conn;
     private final SocketChannel channel;
 
     private InetSocketAddress address;
@@ -52,6 +52,15 @@ public class NaspSocket extends Socket {
         }
         return -1;
     }
+    @Override
+    public SocketAddress getRemoteSocketAddress() {
+        return new InetSocketAddress(getInetAddress(), getPort());
+    }
+
+    @Override
+    public SocketAddress getLocalSocketAddress() {
+        return new InetSocketAddress(getLocalAddress(), getLocalPort());
+    }
 
     @Override
     public InetAddress getInetAddress() {
@@ -88,5 +97,13 @@ public class NaspSocket extends Socket {
     @Override
     public SocketChannel getChannel() {
         return channel;
+    }
+
+    public Connection getConnection () {
+        return conn;
+    }
+
+    public void setConnection (Connection conn) {
+        this.conn = conn;
     }
 }

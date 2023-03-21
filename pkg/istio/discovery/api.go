@@ -30,6 +30,7 @@ type DiscoveryClient interface {
 	NewConnectionCloseWrapper() ConnectionCloseWrapper
 	NewDialWrapper() DialWrapper
 	Logger() logr.Logger
+	ResolveHost(hostName string) ([]net.IP, error)
 }
 
 type ClientDiscoveryClient interface {

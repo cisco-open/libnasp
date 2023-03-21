@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc"
 
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
+	"github.com/cisco-open/nasp/pkg/istio/discovery"
 )
 
 type passthroughIstioIntegrationHandler struct {
@@ -44,6 +45,10 @@ func (h *passthroughIstioIntegrationHandler) ListenAndServe(ctx context.Context,
 		Addr:    listenAddress,
 		Handler: handler,
 	}).ListenAndServe()
+}
+
+func (h *passthroughIstioIntegrationHandler) GetDiscoveryClient() discovery.DiscoveryClient {
+	return nil
 }
 
 func (h *passthroughIstioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOption, error) {

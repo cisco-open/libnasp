@@ -38,6 +38,7 @@ import (
 
 	"github.com/pborman/uuid"
 
+	"github.com/cisco-open/nasp/pkg/ads"
 	"github.com/cisco-open/nasp/pkg/istio"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
 )
@@ -265,6 +266,17 @@ func newNaspIntegrationHandler() *naspIntegrationHandler {
 		ctx:    ctx,
 		cancel: cancel,
 	}
+}
+
+func CheckAddress(address string) (string, error) {
+	ips, err := integrationHandler.iih.GetDiscoveryClient().ResolveHost(address)
+	if err != nil && !errors.Is(err, &ads.HostNotFoundError{HostName: address}) {
+		return "", err
+	}
+	if len(ips) != 0 {
+		return ips[0].String(), nil
+	}
+	return "", nil
 }
 
 func Bind(address string, port int) (*TCPListener, error) {

@@ -212,7 +212,7 @@ func (c *client) getTCPClientPropertiesByHost(input getTCPClientPropertiesByHost
 // getTCPClientTargetCluster returns the Envoy upstream cluster which TCP traffic is directed to when
 // clients connect to host:port
 func (c *client) getTCPClientTargetCluster(host string, port int) (*envoy_config_cluster_v3.Cluster, error) {
-	hostIPs, err := c.resolveHost(host)
+	hostIPs, err := c.ResolveHost(host)
 	if err != nil {
 		return nil, errors.WrapIff(err, "couldn't resolve host %q", host)
 	}
