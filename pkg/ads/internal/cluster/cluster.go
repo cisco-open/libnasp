@@ -17,6 +17,8 @@ package cluster
 import (
 	"math"
 
+	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
@@ -125,28 +127,15 @@ func GetMetadata(cluster *envoy_config_cluster_v3.Cluster) (map[string]interface
 }
 
 // GetTlsServerName returns the SNI to be used when connecting to endpoints in the selectedCluster using TLS
-func GetTlsServerName(cluster *envoy_config_cluster_v3.Cluster) string {
-	if cluster.GetTransportSocketMatches() != nil {
-		for _, tsm := range cluster.GetTransportSocketMatches() {
-			if tsm.GetTransportSocket().GetName() != wellknown.TransportSocketTLS {
-				continue
-			}
+func GetTlsServerName(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map[string]interface{}) string {
+	transportSockets := GetMatchingTransportSockets(cluster, endpointMetadataMatch)
 
-			config, err := tsm.GetTransportSocket().GetTypedConfig().UnmarshalNew()
-			if err == nil {
-				if upstreamTlsCtx, ok := config.(*envoy_extensions_transport_sockets_tls_v3.UpstreamTlsContext); ok {
-					return upstreamTlsCtx.GetSni()
-				}
-			}
-		}
-
+	// the first match from the matching transport socket config is used when a connection is made to the endpoint
+	if len(transportSockets) == 0 || transportSockets[0].GetName() != wellknown.TransportSocketTLS {
 		return ""
 	}
 
-	if cluster.GetTransportSocket().GetName() != wellknown.TransportSocketTLS {
-		return ""
-	}
-	config, err := cluster.GetTransportSocket().GetTypedConfig().UnmarshalNew()
+	config, err := transportSockets[0].GetTypedConfig().UnmarshalNew()
 	if err == nil {
 		if upstreamTlsCtx, ok := config.(*envoy_extensions_transport_sockets_tls_v3.UpstreamTlsContext); ok {
 			return upstreamTlsCtx.GetSni()
@@ -156,39 +145,73 @@ func GetTlsServerName(cluster *envoy_config_cluster_v3.Cluster) string {
 	return ""
 }
 
-// UsesTls returns true if the endpoints in the given cluster accepts TLS traffic
-func UsesTls(cluster *envoy_config_cluster_v3.Cluster) bool {
-	if cluster.GetTransportSocketMatches() != nil {
-		for _, tsm := range cluster.GetTransportSocketMatches() {
-			if tsm.GetTransportSocket().GetName() == wellknown.TransportSocketTLS {
-				return true
-			}
-		}
+// UsesTls returns true if the endpoint matched by the given endpoint metadate match fields accepts TLS traffic
+func UsesTls(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map[string]interface{}) bool {
+	transportSockets := GetMatchingTransportSockets(cluster, endpointMetadataMatch)
+
+	// the first match from the matching transport socket config is used when a connection is made to the endpoint
+	if len(transportSockets) == 0 {
 		return false
 	}
 
-	// If no transport socket matches configuration is specified check transport socket configuration
-	return cluster.GetTransportSocket().GetName() == wellknown.TransportSocketTLS
+	return transportSockets[0].GetName() == wellknown.TransportSocketTLS
 }
 
 // IsPermissive returns true if the endpoints in the given cluster can accept both plaintext and mutual TLS traffic
-func IsPermissive(cluster *envoy_config_cluster_v3.Cluster) bool {
-	if cluster.GetTransportSocketMatches() != nil {
-		tlsTransportSocket := false
-		rawBufferTransportSocket := false
-		for _, tsm := range cluster.GetTransportSocketMatches() {
-			switch tsm.GetTransportSocket().GetName() {
-			case wellknown.TransportSocketTLS:
-				tlsTransportSocket = true
-			case wellknown.TransportSocketRawBuffer:
-				rawBufferTransportSocket = true
-			}
-		}
+func IsPermissive(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map[string]interface{}) bool {
+	tlsTransportSocket := false
+	rawBufferTransportSocket := false
 
-		// If there are transport socket matches for both tls and raw_buffer than the
-		// endpoints in the given cluster can accept both plaintext and mutual TLS traffic
-		return tlsTransportSocket && rawBufferTransportSocket
+	for _, transportSocket := range GetMatchingTransportSockets(cluster, endpointMetadataMatch) {
+		switch transportSocket.GetName() {
+		case wellknown.TransportSocketTLS:
+			tlsTransportSocket = true
+		case wellknown.TransportSocketRawBuffer:
+			rawBufferTransportSocket = true
+		}
 	}
 
-	return false
+	// If there are transport socket matches for both tls and raw_buffer than the
+	// endpoints in the given cluster can accept both plaintext and mutual TLS traffic
+	return tlsTransportSocket && rawBufferTransportSocket
+}
+
+// GetMatchingTransportSockets returns the list of TransportSocket configs that matches the given endpoint
+// metadata match criteria
+func GetMatchingTransportSockets(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map[string]interface{}) []*corev3.TransportSocket {
+	var transportSockets []*corev3.TransportSocket
+	for _, tsm := range cluster.GetTransportSocketMatches() {
+		var sm map[string]interface{}
+		if tsm.GetMatch() != nil {
+			sm = tsm.GetMatch().AsMap()
+		}
+
+		if len(sm) == 0 {
+			// empty transport socket match criteria matches any endpoint
+			if tsm.GetTransportSocket() != nil {
+				transportSockets = append(transportSockets, tsm.GetTransportSocket())
+			}
+			continue // check next tsm
+		}
+
+		if len(endpointMetadataMatch) == len(sm) {
+			ok := true
+			for k, v := range sm {
+				//nolint:forcetypeassert
+				if endpointMetadataMatch[k].(string) != v.(string) {
+					ok = false
+					break
+				}
+			}
+			if ok && tsm.GetTransportSocket() != nil {
+				transportSockets = append(transportSockets, tsm.GetTransportSocket())
+			}
+		}
+	}
+
+	// add cluster's default transport socket to the end of the list of defined
+	if cluster.GetTransportSocket() != nil {
+		transportSockets = append(transportSockets, cluster.GetTransportSocket())
+	}
+	return transportSockets
 }

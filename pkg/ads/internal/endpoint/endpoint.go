@@ -20,6 +20,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cisco-open/nasp/pkg/ads/internal/util"
+
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_config_endpoint_v3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 
@@ -79,6 +81,22 @@ func GetAddress(ep *envoy_config_endpoint_v3.Endpoint) net.Addr {
 		IP:   net.ParseIP(address.GetAddress()),
 		Port: int(address.GetPortValue()),
 	}
+}
+
+func GetMetadata(cla *envoy_config_endpoint_v3.ClusterLoadAssignment, endpointAddress net.Addr) (map[string]interface{}, error) {
+	for _, localityLbEp := range cla.GetEndpoints() {
+		for _, lbEp := range localityLbEp.GetLbEndpoints() {
+			sockAddr := GetAddress(lbEp.GetEndpoint())
+			if sockAddr == nil {
+				continue
+			}
+
+			if sockAddr.String() == endpointAddress.String() {
+				return util.GetUnifiedMetadata(lbEp.GetMetadata())
+			}
+		}
+	}
+	return nil, nil
 }
 
 type LbEndpointsFilterOption interface {
