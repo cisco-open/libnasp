@@ -382,17 +382,31 @@ func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, route 
 		}
 	}
 
+	endpointMetadata, err := endpoint.GetMetadata(cla, endpointAddress)
+	if err != nil {
+		return nil, errors.WrapIff(err, "couldn't get endpoint metadata, address=%q", endpointAddress.String())
+	}
+
+	var endpointMatchMetadata map[string]interface{}
+
+	if tsm, ok := endpointMetadata["envoy.transport_socket_match"]; ok {
+		if endpointMatchMetadata, ok = tsm.(map[string]interface{}); !ok {
+			return nil, errors.WrapIff(err, "'envoy.transport_socket_match' endpoint metadata has unexpected format, address=%q", endpointAddress.String())
+		}
+	}
+
 	metadata := map[string]interface{}{
-		"cluster_name":     cl.GetName(),
-		"cluster_metadata": clusterMetadata,
-		"route_name":       route.GetName(),
-		"route_metadata":   routeMetadata,
+		"cluster_name":      cl.GetName(),
+		"cluster_metadata":  clusterMetadata,
+		"route_name":        route.GetName(),
+		"route_metadata":    routeMetadata,
+		"endpoint_metadata": endpointMetadata,
 	}
 
 	clientProps := &clientProperties{
-		permissive: cluster.IsPermissive(cl),
-		serverName: cluster.GetTlsServerName(cl),
-		useTLS:     cluster.UsesTls(cl),
+		permissive: cluster.IsPermissive(cl, endpointMatchMetadata),
+		serverName: cluster.GetTlsServerName(cl, endpointMatchMetadata),
+		useTLS:     cluster.UsesTls(cl, endpointMatchMetadata),
 		address:    endpointAddress,
 		metadata:   metadata,
 	}

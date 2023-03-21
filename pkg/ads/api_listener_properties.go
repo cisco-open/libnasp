@@ -220,13 +220,13 @@ func (c *client) getListenerProperties(input getListenerPropertiesInput) (Listen
 
 			metadata, err := listener.GetMetadata(lstnr)
 			if err != nil {
-				return nil, errors.WrapIf(err, "couldn't get lstnr metadata")
+				return nil, errors.WrapIf(err, "couldn't get listener metadata")
 			}
 
 			lp = &listenerProperties{
-				// if at least one of the filter chain uses TLS proto for matching than the lstnr support TLS communication
+				// if at least one of the filter chain uses TLS proto for matching than the listener support TLS communication
 				useTLS: tlsTransportProto,
-				// if there are filter chains for both TLS and raw_buffer proto than the lstnr is PERMISSIVE
+				// if there are filter chains for both TLS and raw_buffer proto than the listener is PERMISSIVE
 				permissive: tlsTransportProto && rawBufferTransProto,
 				// shows whether client certificate is required
 				requireClientCertificate: requireClientCertificate,
