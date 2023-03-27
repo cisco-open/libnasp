@@ -128,6 +128,9 @@ func GetTargetClusterName(route *envoy_config_route_v3.Route, clustersStats *clu
 	return ""
 }
 
-func GetMetadata(route *envoy_config_route_v3.Route) (map[string]interface{}, error) {
-	return util.GetUnifiedMetadata(route.GetMetadata())
+// GetFilterMetadata returns the route configuration metadata stored under the 'metadata.typed_filter_metadata'
+// and 'metadata.filter_metadata' of the given route configuration.
+// If a key is present on both the one from 'metadata.typed_filter_metadata' will be taken into account.
+func GetFilterMetadata(route *envoy_config_route_v3.Route) (map[string]interface{}, error) {
+	return util.GetUnifiedFilterMetadata(route.GetMetadata())
 }

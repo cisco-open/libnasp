@@ -17,7 +17,7 @@ package cluster
 import (
 	"math"
 
-	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 
@@ -122,14 +122,15 @@ func GetLoadBalancingPolicy(cluster *envoy_config_cluster_v3.Cluster) envoy_conf
 	return cluster.GetLbPolicy()
 }
 
-func GetMetadata(cluster *envoy_config_cluster_v3.Cluster) (map[string]interface{}, error) {
-	return util.GetUnifiedMetadata(cluster.GetMetadata())
+// GetFilterMetadata returns the cluster metadata stored under the 'metadata.typed_filter_metadata'
+// and 'metadata.filter_metadata' of the given envoy cluster.
+// If a key is present on both the one from 'metadata.typed_filter_metadata' will be taken into account.
+func GetFilterMetadata(cluster *envoy_config_cluster_v3.Cluster) (map[string]interface{}, error) {
+	return util.GetUnifiedFilterMetadata(cluster.GetMetadata())
 }
 
 // GetTlsServerName returns the SNI to be used when connecting to endpoints in the selectedCluster using TLS
-func GetTlsServerName(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map[string]interface{}) string {
-	transportSockets := GetMatchingTransportSockets(cluster, endpointMetadataMatch)
-
+func GetTlsServerName(transportSockets []*envoy_config_core_v3.TransportSocket) string {
 	// the first match from the matching transport socket config is used when a connection is made to the endpoint
 	if len(transportSockets) == 0 || transportSockets[0].GetName() != wellknown.TransportSocketTLS {
 		return ""
@@ -146,9 +147,7 @@ func GetTlsServerName(cluster *envoy_config_cluster_v3.Cluster, endpointMetadata
 }
 
 // UsesTls returns true if the endpoint matched by the given endpoint metadate match fields accepts TLS traffic
-func UsesTls(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map[string]interface{}) bool {
-	transportSockets := GetMatchingTransportSockets(cluster, endpointMetadataMatch)
-
+func UsesTls(transportSockets []*envoy_config_core_v3.TransportSocket) bool {
 	// the first match from the matching transport socket config is used when a connection is made to the endpoint
 	if len(transportSockets) == 0 {
 		return false
@@ -158,11 +157,11 @@ func UsesTls(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map
 }
 
 // IsPermissive returns true if the endpoints in the given cluster can accept both plaintext and mutual TLS traffic
-func IsPermissive(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map[string]interface{}) bool {
+func IsPermissive(transportSockets []*envoy_config_core_v3.TransportSocket) bool {
 	tlsTransportSocket := false
 	rawBufferTransportSocket := false
 
-	for _, transportSocket := range GetMatchingTransportSockets(cluster, endpointMetadataMatch) {
+	for _, transportSocket := range transportSockets {
 		switch transportSocket.GetName() {
 		case wellknown.TransportSocketTLS:
 			tlsTransportSocket = true
@@ -178,8 +177,8 @@ func IsPermissive(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatc
 
 // GetMatchingTransportSockets returns the list of TransportSocket configs that matches the given endpoint
 // metadata match criteria
-func GetMatchingTransportSockets(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map[string]interface{}) []*corev3.TransportSocket {
-	var transportSockets []*corev3.TransportSocket
+func GetMatchingTransportSockets(cluster *envoy_config_cluster_v3.Cluster, endpointMetadataMatch map[string]interface{}) []*envoy_config_core_v3.TransportSocket {
+	var transportSockets []*envoy_config_core_v3.TransportSocket
 	for _, tsm := range cluster.GetTransportSocketMatches() {
 		var sm map[string]interface{}
 		if tsm.GetMatch() != nil {

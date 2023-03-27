@@ -218,7 +218,7 @@ func (c *client) getListenerProperties(input getListenerPropertiesInput) (Listen
 				}
 			}
 
-			metadata, err := listener.GetMetadata(lstnr)
+			metadata, err := listener.GetFilterMetadata(lstnr)
 			if err != nil {
 				return nil, errors.WrapIf(err, "couldn't get listener metadata")
 			}

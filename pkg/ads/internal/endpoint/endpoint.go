@@ -83,7 +83,10 @@ func GetAddress(ep *envoy_config_endpoint_v3.Endpoint) net.Addr {
 	}
 }
 
-func GetMetadata(cla *envoy_config_endpoint_v3.ClusterLoadAssignment, endpointAddress net.Addr) (map[string]interface{}, error) {
+// GetFilterMetadata returns the cluster load assignment (CLA) metadata stored under the 'metadata.typed_filter_metadata'
+// and 'metadata.filter_metadata' for the given endpoint address of the CLA.
+// If a key is present on both the one from 'metadata.typed_filter_metadata' will be taken into account.
+func GetFilterMetadata(cla *envoy_config_endpoint_v3.ClusterLoadAssignment, endpointAddress net.Addr) (map[string]interface{}, error) {
 	for _, localityLbEp := range cla.GetEndpoints() {
 		for _, lbEp := range localityLbEp.GetLbEndpoints() {
 			sockAddr := GetAddress(lbEp.GetEndpoint())
@@ -92,7 +95,7 @@ func GetMetadata(cla *envoy_config_endpoint_v3.ClusterLoadAssignment, endpointAd
 			}
 
 			if sockAddr.String() == endpointAddress.String() {
-				return util.GetUnifiedMetadata(lbEp.GetMetadata())
+				return util.GetUnifiedFilterMetadata(lbEp.GetMetadata())
 			}
 		}
 	}
