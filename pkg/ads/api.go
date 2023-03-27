@@ -85,6 +85,61 @@ type Client interface {
 	DecrementActiveRequestsCount(address string)
 }
 
+// NetworkFilter represents a network filter configuration which a filter chain consists of
+type NetworkFilter interface {
+	// Name returns the name of the network filter configuration
+	Name() string
+
+	// Configuration returns filter specific configuration which depends on the filter being instantiated.
+	Configuration() map[string]interface{}
+}
+
+// ConnectionOptions holds the inbound connections' options used to determine the
+// filter chain to be instantiated for the stream
+type ConnectionOptions struct {
+	// destinationPort is the destination port of the connection
+	destinationPort uint32
+
+	// serverName is the server name used with TLS connections
+	serverName string
+
+	// transportProtocol is the transport protocol of the connection
+	transportProtocol string
+
+	// applicationProtocols is the list of application protocols (e.g. ALPN for TLS protocol) of the connection
+	applicationProtocols []string
+}
+
+type ConnectionOption func(*ConnectionOptions)
+
+// ConnectionWithDestinationPort specifies the given destination port as connection option
+func ConnectionWithDestinationPort(destinationPort uint32) ConnectionOption {
+	return func(o *ConnectionOptions) {
+		o.destinationPort = destinationPort
+	}
+}
+
+// TLSConnectionWithServerName specifies the given server name as TLS connection option
+func TLSConnectionWithServerName(serverName string) ConnectionOption {
+	return func(o *ConnectionOptions) {
+		o.serverName = serverName
+	}
+}
+
+// ConnectionWithTransportProtocol specifies the given transport protocol as connection option
+func ConnectionWithTransportProtocol(transportProtocol string) ConnectionOption {
+	return func(o *ConnectionOptions) {
+		o.transportProtocol = transportProtocol
+	}
+}
+
+// ConnectionWithApplicationProtocols specifies the given application protocols as connection option
+func ConnectionWithApplicationProtocols(applicationProtocols []string) ConnectionOption {
+	return func(o *ConnectionOptions) {
+		o.applicationProtocols = applicationProtocols
+	}
+}
+
 // ListenerPropertiesResponse contains the result for the API call
 // to retrieve ListenerProperties for a given address.
 type ListenerPropertiesResponse interface {
@@ -107,6 +162,10 @@ type ListenerProperties interface {
 
 	// Metadata returns the metadata associated with this listener
 	Metadata() map[string]interface{}
+
+	// NetworkFilters returns the network filter chain that inbound traffic flows through
+	// when client workload connects with the given connection options.
+	NetworkFilters(connectionsOpts ...ConnectionOption) ([]NetworkFilter, error)
 }
 
 // ClientPropertiesResponse contains the result for the API call
@@ -135,6 +194,10 @@ type ClientProperties interface {
 
 	// Metadata returns the metadata associated with the target service
 	Metadata() map[string]interface{}
+
+	// NetworkFilters returns the network filter chain that outbound traffic flows through to the target service
+	// when client workload connects with the given connection options
+	NetworkFilters(connectionsOpts ...ConnectionOption) ([]NetworkFilter, error)
 }
 
 // HTTPClientPropertiesResponse contains the result for the API call

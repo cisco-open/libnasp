@@ -16,11 +16,16 @@ package ads
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
 	"reflect"
 	"strconv"
+
+	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/cisco-open/nasp/pkg/ads/internal/filterchain"
 
 	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
 	"github.com/cisco-open/nasp/pkg/ads/internal/loadbalancer"
@@ -42,11 +47,12 @@ import (
 )
 
 type clientProperties struct {
-	useTLS     bool
-	permissive bool
-	serverName string
-	address    net.Addr
-	metadata   map[string]interface{}
+	useTLS           bool
+	permissive       bool
+	serverName       string
+	address          net.Addr
+	metadata         map[string]interface{}
+	outboundListener *envoy_config_listener_v3.Listener
 }
 
 func (p *clientProperties) UseTLS() bool {
@@ -78,6 +84,94 @@ func (p *clientProperties) String() string {
 		addr = epAddr.String()
 	}
 	return fmt.Sprintf("{serverName=%s, useTLS=%t, permissive=%t, address=%s}", p.ServerName(), p.UseTLS(), p.Permissive(), addr)
+}
+
+func (p *clientProperties) NetworkFilters(connectionsOpts ...ConnectionOption) ([]NetworkFilter, error) {
+	if p.outboundListener == nil {
+		return nil, nil
+	}
+
+	var connOpts ConnectionOptions
+	for _, opt := range connectionsOpts {
+		opt(&connOpts)
+	}
+
+	var filterChainMatchOpts []filterchain.MatchOption
+	if p.address != nil {
+		tcpAddress, ok := p.address.(*net.TCPAddr)
+		if !ok {
+			return nil, errors.Errorf("expected *TCPAddress but got: %T", p.address)
+		}
+
+		filterChainMatchOpts = append(filterChainMatchOpts,
+			filterchain.WithDestinationPort(uint32(tcpAddress.Port)),
+			filterchain.WithDestinationIP(tcpAddress.IP))
+	}
+	if len(connOpts.serverName) > 0 {
+		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithServerName(connOpts.serverName))
+	}
+	if len(connOpts.transportProtocol) > 0 {
+		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithTransportProtocol(connOpts.transportProtocol))
+	}
+	if len(connOpts.applicationProtocols) > 0 {
+		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithApplicationProtocols(connOpts.applicationProtocols))
+	}
+
+	filterChains, err := filterchain.Filter(p.outboundListener, filterChainMatchOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(filterChains) == 0 && p.outboundListener.GetDefaultFilterChain() != nil {
+		// if no filter chains found, use default filter chain of the listener
+		filterChains = append(filterChains, p.outboundListener.GetDefaultFilterChain())
+	}
+
+	if len(filterChains) == 0 {
+		return nil, errors.Errorf("couldn't find a filter chain for listener %q, with matching fields:%s",
+			p.outboundListener.GetName(),
+			filterChainMatchOpts)
+	}
+
+	if len(filterChains) > 1 {
+		fcNames := make([]string, 0, len(filterChains))
+		for _, fc := range filterChains {
+			fcNames = append(fcNames, fc.GetName())
+		}
+		return nil, errors.Errorf("multiple filter chains for listener %q, with matching fields:%s, filter chains:%s",
+			p.outboundListener.GetName(),
+			filterChainMatchOpts,
+			fcNames)
+	}
+
+	networkFilters := make([]NetworkFilter, 0, len(filterChains[0].GetFilters()))
+	for _, filter := range filterChains[0].GetFilters() {
+		if filter == nil {
+			continue
+		}
+
+		configuration := make(map[string]interface{})
+		proto, err := filter.GetTypedConfig().UnmarshalNew()
+		if err != nil {
+			return nil, err
+		}
+
+		configurationJson, err := protojson.Marshal(proto)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = json.Unmarshal(configurationJson, &configuration); err != nil {
+			return nil, err
+		}
+
+		networkFilters = append(networkFilters, &networkFilter{
+			name:          filter.GetName(),
+			configuration: configuration,
+		})
+	}
+
+	return networkFilters, nil
 }
 
 type clientPropertiesResponse struct {
@@ -196,12 +290,22 @@ func (c *client) getTCPClientPropertiesByHost(input getTCPClientPropertiesByHost
 		return nil, nil
 	}
 
-	cluster, err := c.getTCPClientTargetCluster(input.host, int(input.port))
+	hostIPs, err := c.resolveHost(input.host)
 	if err != nil {
-		return nil, errors.WrapIf(err, "couldn't get target upstream cluster")
+		return nil, errors.WrapIff(err, "couldn't resolve host %q", input.host)
 	}
 
-	clientProps, err := c.newClientProperties(cluster, nil)
+	listener, err := c.getTCPOutboundListener(hostIPs, int(input.port))
+	if err != nil {
+		return nil, errors.WrapIff(err, "couldn't get TCP outbound listener for address: %s:%d", input.host, input.port)
+	}
+
+	cluster, err := c.getTCPClientTargetCluster(listener)
+	if err != nil {
+		return nil, errors.WrapIff(err, "couldn't get target upstream cluster for address: %s:%d", input.host, input.port)
+	}
+
+	clientProps, err := c.newClientProperties(cluster, listener, nil)
 	if err != nil {
 		return nil, errors.WrapIff(err, "couldn't create client properties for target service at %s:%d", input.host, input.port)
 	}
@@ -210,20 +314,10 @@ func (c *client) getTCPClientPropertiesByHost(input getTCPClientPropertiesByHost
 }
 
 // getTCPClientTargetCluster returns the Envoy upstream cluster which TCP traffic is directed to when
-// clients connect to host:port
-func (c *client) getTCPClientTargetCluster(host string, port int) (*envoy_config_cluster_v3.Cluster, error) {
-	hostIPs, err := c.resolveHost(host)
-	if err != nil {
-		return nil, errors.WrapIff(err, "couldn't resolve host %q", host)
-	}
-
-	listener, err := c.getTCPOutboundListener(hostIPs, port)
-	if err != nil {
-		return nil, errors.WrapIff(err, "couldn't get TCP outbound listener for address: %s:%d", host, port)
-	}
-
+// clients connect to tcp service listening on the address described by the provided listener
+func (c *client) getTCPClientTargetCluster(targetListener *envoy_config_listener_v3.Listener) (*envoy_config_cluster_v3.Cluster, error) {
 	var clusterName string
-	for _, fc := range listener.GetFilterChains() {
+	for _, fc := range targetListener.GetFilterChains() {
 		for _, f := range fc.GetFilters() {
 			if f.GetName() != wellknown.TCPProxy {
 				continue
@@ -235,11 +329,16 @@ func (c *client) getTCPClientTargetCluster(host string, port int) (*envoy_config
 			}
 
 			if tcpProxy.GetCluster() != "" {
+				if clusterName != "" {
+					return nil, errors.New("multiple clusters found for outbound traffic")
+				}
 				clusterName = tcpProxy.GetCluster() // traffic is routed to single upstream cluster
-				break
 			}
 
 			if tcpProxy.GetWeightedClusters() != nil {
+				if clusterName != "" {
+					return nil, errors.New("multiple clusters found for outbound traffic")
+				}
 				// traffic is routed to multiple upstream clusters according to cluster weights
 				clustersWeightMap := make(map[string]uint32)
 				for _, weightedCluster := range tcpProxy.GetWeightedClusters().GetClusters() {
@@ -247,15 +346,12 @@ func (c *client) getTCPClientTargetCluster(host string, port int) (*envoy_config
 				}
 
 				clusterName = cluster.SelectCluster(clustersWeightMap, c.clustersStats)
-				if clusterName != "" {
-					break
-				}
 			}
 		}
 	}
 
 	if clusterName == "" {
-		return nil, errors.Errorf("no cluster found for outbound traffic for address: %s:%d", host, port)
+		return nil, errors.New("no cluster found for outbound traffic")
 	}
 
 	cluster, err := c.getCluster(clusterName)
@@ -308,7 +404,7 @@ func (c *client) getTCPOutboundListener(hostIPs []net.IP, port int) (*envoy_conf
 
 // newClientProperties returns a new clientProperties instance populated with data from the given cluster and route
 // and selecting endpoint address according to the LB policy of the cluster
-func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, route *envoy_config_route_v3.Route) (*clientProperties, error) {
+func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, listener *envoy_config_listener_v3.Listener, route *envoy_config_route_v3.Route) (*clientProperties, error) {
 	cla, err := c.getClusterLoadAssignmentForCluster(cl)
 	if err != nil {
 		return nil, errors.WrapIff(err, "couldn't list endpoints, cluster name=%q", cl.GetName())
@@ -405,11 +501,12 @@ func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, route 
 	transports := cluster.GetMatchingTransportSockets(cl, endpointMatchMetadata)
 
 	clientProps := &clientProperties{
-		permissive: cluster.IsPermissive(transports),
-		serverName: cluster.GetTlsServerName(transports),
-		useTLS:     cluster.UsesTls(transports),
-		address:    endpointAddress,
-		metadata:   metadata,
+		permissive:       cluster.IsPermissive(transports),
+		serverName:       cluster.GetTlsServerName(transports),
+		useTLS:           cluster.UsesTls(transports),
+		address:          endpointAddress,
+		metadata:         metadata,
+		outboundListener: listener,
 	}
 
 	return clientProps, nil

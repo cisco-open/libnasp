@@ -151,8 +151,8 @@ func GetRouteReferences(listeners []*envoy_config_listener_v3.Listener) []string
 
 // GetRouteConfigName returns the name of the route configuration in RDS that the specified http listener references
 func GetRouteConfigName(listener *envoy_config_listener_v3.Listener) string {
-	for _, chain := range listener.FilterChains {
-		for _, filter := range chain.Filters {
+	for _, chain := range listener.GetFilterChains() {
+		for _, filter := range chain.GetFilters() {
 			if filter.Name != wellknown.HTTPConnectionManager {
 				continue
 			}

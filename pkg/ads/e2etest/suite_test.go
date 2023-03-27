@@ -396,6 +396,21 @@ var _ = Describe("The management server is running", func() {
 			Expect(listenerProps.UseTLS()).To(BeTrue())
 			Expect(listenerProps.IsClientCertificateRequired()).To(BeTrue())
 			Expect(listenerProps.Permissive()).To(BeTrue())
+			// network filter chain for incoming TLS connection
+			Expect(listenerProps.NetworkFilters(
+				ads.ConnectionWithDestinationPort(8080),
+				ads.ConnectionWithTransportProtocol("tls"),
+				ads.ConnectionWithApplicationProtocols([]string{"istio"})),
+			).Should(HaveExactElements(
+				HaveField("Name()", "istio.metadata_exchange"),
+				HaveField("Name()", "envoy.filters.network.http_connection_manager")))
+			// network filter chain for incoming non-TLS connection
+			Expect(listenerProps.NetworkFilters(
+				ads.ConnectionWithDestinationPort(8080),
+				ads.ConnectionWithTransportProtocol("raw_buffer")),
+			).Should(HaveExactElements(
+				HaveField("Name()", "istio.metadata_exchange"),
+				HaveField("Name()", "envoy.filters.network.http_connection_manager")))
 
 			By("verify that correct tcp client properties are returned for 10.10.42.110:12050")
 			tcpResp, err := adsClient.GetTCPClientPropertiesByHost(ctx, "10.10.42.110:12050")
@@ -418,6 +433,10 @@ var _ = Describe("The management server is running", func() {
 			Expect(tcpClientProps.UseTLS()).To(BeTrue())
 			Expect(tcpClientProps.ServerName()).To(Equal("outbound_.12050_._.echo.demo.svc.cluster.local"))
 			Expect(tcpClientProps.Address()).To(Equal(&net.TCPAddr{IP: net.ParseIP("10.20.160.131"), Port: 8080}))
+			Expect(tcpClientProps.NetworkFilters()).Should(HaveExactElements(
+				HaveField("Name()", "istio.stats"),
+				HaveField("Name()", "envoy.filters.network.tcp_proxy"),
+			))
 
 			By("verify that correct http client properties are returned for 10.10.42.110:80")
 			httpResp, err := adsClient.GetHTTPClientPropertiesByHost(ctx, "10.10.42.110:80")
@@ -440,6 +459,10 @@ var _ = Describe("The management server is running", func() {
 			Expect(httpClientProps.UseTLS()).To(BeTrue())
 			Expect(httpClientProps.ServerName()).To(Equal("outbound_.80_._.echo.demo.svc.cluster.local"))
 			Expect(httpClientProps.Address()).To(Equal(&net.TCPAddr{IP: net.ParseIP("10.20.160.131"), Port: 8080}))
+			Expect(tcpClientProps.NetworkFilters()).To(HaveExactElements(
+				HaveField("Name()", "istio.stats"),
+				HaveField("Name()", "envoy.filters.network.tcp_proxy"),
+			))
 
 			// --- load config_v1.json which contains three echo endpoints in the demo namespace as the 'echo' deployment has been scaled up to three
 			// replicas into Management server

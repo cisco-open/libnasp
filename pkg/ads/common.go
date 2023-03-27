@@ -468,3 +468,16 @@ func newEmptyResource(resourceType resource_v3.Type) proto.Message {
 		return nil
 	}
 }
+
+type networkFilter struct {
+	name          string
+	configuration map[string]interface{}
+}
+
+func (n *networkFilter) Name() string {
+	return n.name
+}
+
+func (n *networkFilter) Configuration() map[string]interface{} {
+	return n.configuration
+}

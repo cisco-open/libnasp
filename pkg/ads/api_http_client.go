@@ -152,12 +152,22 @@ func (c *client) getHTTPClientPropertiesByHost(input getHTTPClientPropertiesByHo
 		return nil, nil
 	}
 
-	cluster, route, err := c.getHttpClientTargetCluster(input.host, int(input.port))
+	hostIPs, err := c.resolveHost(input.host)
 	if err != nil {
-		return nil, errors.WrapIf(err, "couldn't get target cluster")
+		return nil, errors.WrapIff(err, "couldn't resolve host %q", input.host)
 	}
 
-	clientProps, err := c.newClientProperties(cluster, route)
+	listener, err := c.getHTTPOutboundListener(hostIPs, int(input.port))
+	if err != nil {
+		return nil, errors.WrapIff(err, "couldn't get HTTP outbound listener for address: %s:%d", input.host, input.port)
+	}
+
+	cluster, route, err := c.getHttpClientTargetCluster(input.host, int(input.port), hostIPs, listener)
+	if err != nil {
+		return nil, errors.WrapIff(err, "couldn't get target cluster for address: %s:%d", input.host, input.port)
+	}
+
+	clientProps, err := c.newClientProperties(cluster, listener, route)
 	if err != nil {
 		return nil, errors.WrapIff(err, "couldn't create client properties for target service at %s:%d", input.host, input.port)
 	}
@@ -167,20 +177,10 @@ func (c *client) getHTTPClientPropertiesByHost(input getHTTPClientPropertiesByHo
 
 // getHttpClientTargetCluster returns the upstream cluster which HTTP traffic is directed to when
 // clients connect to host:port
-func (c *client) getHttpClientTargetCluster(host string, port int) (*envoy_config_cluster_v3.Cluster, *envoy_config_route_v3.Route, error) {
-	hostIPs, err := c.resolveHost(host)
-	if err != nil {
-		return nil, nil, errors.WrapIff(err, "couldn't resolve host %q", host)
-	}
-
-	lstnr, err := c.getHTTPOutboundListener(hostIPs, port)
-	if err != nil {
-		return nil, nil, errors.WrapIff(err, "couldn't get HTTP outbound listener for address: %s:%d", host, port)
-	}
-
-	routeConfigName := listener.GetRouteConfigName(lstnr)
+func (c *client) getHttpClientTargetCluster(host string, port int, hostIPs []net.IP, targetListener *envoy_config_listener_v3.Listener) (*envoy_config_cluster_v3.Cluster, *envoy_config_route_v3.Route, error) {
+	routeConfigName := listener.GetRouteConfigName(targetListener)
 	if routeConfigName == "" {
-		return nil, nil, errors.Errorf("no route config found for address: %s:%d", host, port)
+		return nil, nil, errors.New("couldn't determine route config")
 	}
 	routeConfig, err := c.getRouteConfig(routeConfigName)
 	if err != nil {
