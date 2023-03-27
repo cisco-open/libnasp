@@ -172,6 +172,9 @@ func GetRouteConfigName(listener *envoy_config_listener_v3.Listener) string {
 	return ""
 }
 
-func GetMetadata(listener *envoy_config_listener_v3.Listener) (map[string]interface{}, error) {
-	return util.GetUnifiedMetadata(listener.GetMetadata())
+// GetFilterMetadata returns the listener metadata stored under the 'metadata.typed_filter_metadata'
+// and 'metadata.filter_metadata' of the given listener.
+// If a key is present on both the one from 'metadata.typed_filter_metadata' will be taken into account.
+func GetFilterMetadata(listener *envoy_config_listener_v3.Listener) (map[string]interface{}, error) {
+	return util.GetUnifiedFilterMetadata(listener.GetMetadata())
 }

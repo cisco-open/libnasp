@@ -175,7 +175,10 @@ func GetDownstreamTlsContext(ts *envoy_config_core_v3.TransportSocket) *auth.Dow
 	return nil
 }
 
-func GetUnifiedMetadata(md *envoy_config_core_v3.Metadata) (map[string]interface{}, error) {
+// GetUnifiedFilterMetadata returns the filter metadata stored under the 'metadata.typed_filter_metadata'
+// and 'metadata.filter_metadata' of the given metadat.
+// If a key is present on both the one from 'metadata.typed_filter_metadata' will be taken into account.
+func GetUnifiedFilterMetadata(md *envoy_config_core_v3.Metadata) (map[string]interface{}, error) {
 	rawMetadata := make(map[string]interface{})
 
 	for k, v := range md.GetTypedFilterMetadata() {

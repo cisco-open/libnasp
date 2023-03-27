@@ -313,14 +313,14 @@ func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, route 
 	if err != nil {
 		return nil, errors.WrapIff(err, "couldn't list endpoints, cluster name=%q", cl.GetName())
 	}
-	clusterMetadata, err := cluster.GetMetadata(cl)
+	clusterMetadata, err := cluster.GetFilterMetadata(cl)
 	if err != nil {
 		return nil, errors.WrapIff(err, "couldn't get cluster metadata, cluster name=%q", cl.GetName())
 	}
 
 	var routeMetadata map[string]interface{}
 	if route != nil {
-		routeMetadata, err = routemeta.GetMetadata(route)
+		routeMetadata, err = routemeta.GetFilterMetadata(route)
 		if err != nil {
 			return nil, errors.WrapIff(err, "couldn't get route metadata, route name=%q", route.GetName())
 		}
@@ -382,13 +382,12 @@ func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, route 
 		}
 	}
 
-	endpointMetadata, err := endpoint.GetMetadata(cla, endpointAddress)
+	endpointMetadata, err := endpoint.GetFilterMetadata(cla, endpointAddress)
 	if err != nil {
 		return nil, errors.WrapIff(err, "couldn't get endpoint metadata, address=%q", endpointAddress.String())
 	}
 
 	var endpointMatchMetadata map[string]interface{}
-
 	if tsm, ok := endpointMetadata["envoy.transport_socket_match"]; ok {
 		if endpointMatchMetadata, ok = tsm.(map[string]interface{}); !ok {
 			return nil, errors.WrapIff(err, "'envoy.transport_socket_match' endpoint metadata has unexpected format, address=%q", endpointAddress.String())
@@ -403,10 +402,12 @@ func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, route 
 		"endpoint_metadata": endpointMetadata,
 	}
 
+	transports := cluster.GetMatchingTransportSockets(cl, endpointMatchMetadata)
+
 	clientProps := &clientProperties{
-		permissive: cluster.IsPermissive(cl, endpointMatchMetadata),
-		serverName: cluster.GetTlsServerName(cl, endpointMatchMetadata),
-		useTLS:     cluster.UsesTls(cl, endpointMatchMetadata),
+		permissive: cluster.IsPermissive(transports),
+		serverName: cluster.GetTlsServerName(transports),
+		useTLS:     cluster.UsesTls(transports),
 		address:    endpointAddress,
 		metadata:   metadata,
 	}
