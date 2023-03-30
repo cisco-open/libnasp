@@ -100,6 +100,9 @@ type ConnectionOptions struct {
 	// destinationPort is the destination port of the connection
 	destinationPort uint32
 
+	// destinationIP is the destination IP of the connection
+	destinationIP net.IP
+
 	// serverName is the server name used with TLS connections
 	serverName string
 
@@ -116,6 +119,13 @@ type ConnectionOption func(*ConnectionOptions)
 func ConnectionWithDestinationPort(destinationPort uint32) ConnectionOption {
 	return func(o *ConnectionOptions) {
 		o.destinationPort = destinationPort
+	}
+}
+
+// ConnectionWithDestinationIP specifies the given destination IP as connection option
+func ConnectionWithDestinationIP(destinationIP net.IP) ConnectionOption {
+	return func(o *ConnectionOptions) {
+		o.destinationIP = destinationIP
 	}
 }
 

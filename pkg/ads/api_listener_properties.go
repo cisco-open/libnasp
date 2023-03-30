@@ -75,6 +75,9 @@ func (lp *listenerProperties) NetworkFilters(connectionsOpts ...ConnectionOption
 	if connOpts.destinationPort > 0 {
 		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithDestinationPort(connOpts.destinationPort))
 	}
+	if connOpts.destinationIP != nil {
+		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithDestinationIP(connOpts.destinationIP))
+	}
 	if len(connOpts.transportProtocol) > 0 {
 		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithTransportProtocol(connOpts.transportProtocol))
 	}
