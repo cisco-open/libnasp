@@ -97,11 +97,8 @@ func (p *clientProperties) NetworkFilters(connectionsOpts ...ConnectionOption) (
 	}
 
 	var filterChainMatchOpts []filterchain.MatchOption
-	if p.address != nil {
-		tcpAddress, ok := p.address.(*net.TCPAddr)
-		if !ok {
-			return nil, errors.Errorf("expected *TCPAddress but got: %T", p.address)
-		}
+	if p.outboundListener.GetAddress().GetSocketAddress().GetAddress() != "" && p.outboundListener.GetAddress().GetSocketAddress().GetPortValue() > 0 {
+		tcpAddress := net.TCPAddr{IP: net.ParseIP(p.outboundListener.GetAddress().GetSocketAddress().GetAddress()), Port: int(p.outboundListener.GetAddress().GetSocketAddress().GetPortValue())}
 
 		filterChainMatchOpts = append(filterChainMatchOpts,
 			filterchain.WithDestinationPort(uint32(tcpAddress.Port)),
