@@ -15,8 +15,16 @@
 package ads
 
 import (
+	"encoding/json"
 	"sort"
+	"strings"
 	"sync"
+
+	udpa_type_v1 "github.com/cncf/xds/go/udpa/type/v1"
+	xds_type_v3 "github.com/cncf/xds/go/xds/type/v3"
+	"google.golang.org/protobuf/encoding/protojson"
+
+	"github.com/cisco-open/nasp/pkg/ads/internal/filterchain"
 
 	"emperror.dev/errors"
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
@@ -480,4 +488,104 @@ func (n *networkFilter) Name() string {
 
 func (n *networkFilter) Configuration() map[string]interface{} {
 	return n.configuration
+}
+
+func listenerNetworkFilters(listener *envoy_config_listener_v3.Listener, networkFilterSelectOpts ...NetworkFilterSelectOption) ([]NetworkFilter, error) {
+	if listener == nil {
+		return nil, nil
+	}
+
+	var opts NetworkFilterSelectOptions
+	for _, opt := range networkFilterSelectOpts {
+		opt(&opts)
+	}
+
+	var filterChainMatchOpts []filterchain.MatchOption
+	if opts.destinationPort > 0 {
+		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithDestinationPort(opts.destinationPort))
+	}
+	if opts.destinationIP != nil {
+		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithDestinationIP(opts.destinationIP))
+	}
+	if len(opts.serverName) > 0 {
+		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithServerName(opts.serverName))
+	}
+	if len(opts.transportProtocol) > 0 {
+		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithTransportProtocol(opts.transportProtocol))
+	}
+	if len(opts.applicationProtocols) > 0 {
+		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithApplicationProtocols(opts.applicationProtocols))
+	}
+
+	filterChains, err := filterchain.Filter(listener, filterChainMatchOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(filterChains) == 0 && listener.GetDefaultFilterChain() != nil {
+		// if no filter chains found, use default filter chain of the listener
+		filterChains = append(filterChains, listener.GetDefaultFilterChain())
+	}
+
+	if len(filterChains) == 0 {
+		return nil, errors.Errorf("couldn't find a filter chain for listener %q, with matching fields:%s",
+			listener.GetName(),
+			filterChainMatchOpts)
+	}
+
+	if len(filterChains) > 1 {
+		fcNames := make([]string, 0, len(filterChains))
+		for _, fc := range filterChains {
+			fcNames = append(fcNames, fc.GetName())
+		}
+		return nil, errors.Errorf("multiple filter chains for listener %q, with matching fields:%s, filter chains:%s",
+			listener.GetName(),
+			filterChainMatchOpts,
+			fcNames)
+	}
+
+	networkFilters := make([]NetworkFilter, 0, len(filterChains[0].GetFilters()))
+	for _, filter := range filterChains[0].GetFilters() {
+		if filter == nil {
+			continue
+		}
+
+		proto, err := filter.GetTypedConfig().UnmarshalNew()
+		if err != nil {
+			return nil, err
+		}
+
+		typeUrl := filter.GetTypedConfig().GetTypeUrl()
+
+		if typedStruct, ok := proto.(*udpa_type_v1.TypedStruct); ok {
+			typeUrl = typedStruct.GetTypeUrl()
+		}
+		if typedStruct, ok := proto.(*xds_type_v3.TypedStruct); ok {
+			typeUrl = typedStruct.GetTypeUrl()
+		}
+
+		if len(opts.filterType) > 0 {
+			// skip if provided filter type doesn't match filter's type url
+			if !(opts.filterType == typeUrl || strings.HasSuffix(typeUrl, "/"+opts.filterType)) {
+				continue
+			}
+		}
+
+		configuration := make(map[string]interface{})
+		configurationJson, err := protojson.Marshal(proto)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = json.Unmarshal(configurationJson, &configuration); err != nil {
+			return nil, err
+		}
+
+		networkFilters = append(networkFilters, &networkFilter{
+			name:          filter.GetName(),
+			configuration: configuration,
+		})
+	}
+
+	return networkFilters, nil
 }

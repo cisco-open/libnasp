@@ -16,16 +16,11 @@ package ads
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
 	"reflect"
 	"strconv"
-
-	"google.golang.org/protobuf/encoding/protojson"
-
-	"github.com/cisco-open/nasp/pkg/ads/internal/filterchain"
 
 	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
 	"github.com/cisco-open/nasp/pkg/ads/internal/loadbalancer"
@@ -86,89 +81,19 @@ func (p *clientProperties) String() string {
 	return fmt.Sprintf("{serverName=%s, useTLS=%t, permissive=%t, address=%s}", p.ServerName(), p.UseTLS(), p.Permissive(), addr)
 }
 
-func (p *clientProperties) NetworkFilters(connectionsOpts ...ConnectionOption) ([]NetworkFilter, error) {
-	if p.outboundListener == nil {
-		return nil, nil
-	}
-
-	var connOpts ConnectionOptions
-	for _, opt := range connectionsOpts {
-		opt(&connOpts)
-	}
-
-	var filterChainMatchOpts []filterchain.MatchOption
+func (p *clientProperties) NetworkFilters(networkFilterSelectOpts ...NetworkFilterSelectOption) ([]NetworkFilter, error) {
 	if p.outboundListener.GetAddress().GetSocketAddress().GetAddress() != "" && p.outboundListener.GetAddress().GetSocketAddress().GetPortValue() > 0 {
-		tcpAddress := net.TCPAddr{IP: net.ParseIP(p.outboundListener.GetAddress().GetSocketAddress().GetAddress()), Port: int(p.outboundListener.GetAddress().GetSocketAddress().GetPortValue())}
-
-		filterChainMatchOpts = append(filterChainMatchOpts,
-			filterchain.WithDestinationPort(uint32(tcpAddress.Port)),
-			filterchain.WithDestinationIP(tcpAddress.IP))
-	}
-	if len(connOpts.serverName) > 0 {
-		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithServerName(connOpts.serverName))
-	}
-	if len(connOpts.transportProtocol) > 0 {
-		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithTransportProtocol(connOpts.transportProtocol))
-	}
-	if len(connOpts.applicationProtocols) > 0 {
-		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithApplicationProtocols(connOpts.applicationProtocols))
-	}
-
-	filterChains, err := filterchain.Filter(p.outboundListener, filterChainMatchOpts...)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(filterChains) == 0 && p.outboundListener.GetDefaultFilterChain() != nil {
-		// if no filter chains found, use default filter chain of the listener
-		filterChains = append(filterChains, p.outboundListener.GetDefaultFilterChain())
-	}
-
-	if len(filterChains) == 0 {
-		return nil, errors.Errorf("couldn't find a filter chain for listener %q, with matching fields:%s",
-			p.outboundListener.GetName(),
-			filterChainMatchOpts)
-	}
-
-	if len(filterChains) > 1 {
-		fcNames := make([]string, 0, len(filterChains))
-		for _, fc := range filterChains {
-			fcNames = append(fcNames, fc.GetName())
-		}
-		return nil, errors.Errorf("multiple filter chains for listener %q, with matching fields:%s, filter chains:%s",
-			p.outboundListener.GetName(),
-			filterChainMatchOpts,
-			fcNames)
-	}
-
-	networkFilters := make([]NetworkFilter, 0, len(filterChains[0].GetFilters()))
-	for _, filter := range filterChains[0].GetFilters() {
-		if filter == nil {
-			continue
+		tcpAddress := net.TCPAddr{
+			IP:   net.ParseIP(p.outboundListener.GetAddress().GetSocketAddress().GetAddress()),
+			Port: int(p.outboundListener.GetAddress().GetSocketAddress().GetPortValue()),
 		}
 
-		configuration := make(map[string]interface{})
-		proto, err := filter.GetTypedConfig().UnmarshalNew()
-		if err != nil {
-			return nil, err
-		}
-
-		configurationJson, err := protojson.Marshal(proto)
-		if err != nil {
-			return nil, err
-		}
-
-		if err = json.Unmarshal(configurationJson, &configuration); err != nil {
-			return nil, err
-		}
-
-		networkFilters = append(networkFilters, &networkFilter{
-			name:          filter.GetName(),
-			configuration: configuration,
-		})
+		networkFilterSelectOpts = append(networkFilterSelectOpts,
+			ConnectionWithDestinationPort(uint32(tcpAddress.Port)),
+			ConnectionWithDestinationIP(tcpAddress.IP))
 	}
 
-	return networkFilters, nil
+	return listenerNetworkFilters(p.outboundListener, networkFilterSelectOpts...)
 }
 
 type clientPropertiesResponse struct {

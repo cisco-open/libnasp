@@ -94,9 +94,10 @@ type NetworkFilter interface {
 	Configuration() map[string]interface{}
 }
 
-// ConnectionOptions holds the inbound connections' options used to determine the
-// filter chain to be instantiated for the stream
-type ConnectionOptions struct {
+// NetworkFilterSelectOptions holds the options used to determine the
+// filter chain to be instantiated for inbound/outbound connections
+// and the attributes to filter by the filters of the selected filter chain
+type NetworkFilterSelectOptions struct {
 	// destinationPort is the destination port of the connection
 	destinationPort uint32
 
@@ -111,42 +112,52 @@ type ConnectionOptions struct {
 
 	// applicationProtocols is the list of application protocols (e.g. ALPN for TLS protocol) of the connection
 	applicationProtocols []string
+
+	// filterType is the type of network filter
+	filterType string
 }
 
-type ConnectionOption func(*ConnectionOptions)
+type NetworkFilterSelectOption func(*NetworkFilterSelectOptions)
 
-// ConnectionWithDestinationPort specifies the given destination port as connection option
-func ConnectionWithDestinationPort(destinationPort uint32) ConnectionOption {
-	return func(o *ConnectionOptions) {
+// ConnectionWithDestinationPort specifies the given destination port as connection option to select filter chain by
+func ConnectionWithDestinationPort(destinationPort uint32) NetworkFilterSelectOption {
+	return func(o *NetworkFilterSelectOptions) {
 		o.destinationPort = destinationPort
 	}
 }
 
-// ConnectionWithDestinationIP specifies the given destination IP as connection option
-func ConnectionWithDestinationIP(destinationIP net.IP) ConnectionOption {
-	return func(o *ConnectionOptions) {
+// ConnectionWithDestinationIP specifies the given destination IP as connection option to select filter chain by
+func ConnectionWithDestinationIP(destinationIP net.IP) NetworkFilterSelectOption {
+	return func(o *NetworkFilterSelectOptions) {
 		o.destinationIP = destinationIP
 	}
 }
 
-// TLSConnectionWithServerName specifies the given server name as TLS connection option
-func TLSConnectionWithServerName(serverName string) ConnectionOption {
-	return func(o *ConnectionOptions) {
+// TLSConnectionWithServerName specifies the given server name as TLS connection option to select filter chain by
+func TLSConnectionWithServerName(serverName string) NetworkFilterSelectOption {
+	return func(o *NetworkFilterSelectOptions) {
 		o.serverName = serverName
 	}
 }
 
-// ConnectionWithTransportProtocol specifies the given transport protocol as connection option
-func ConnectionWithTransportProtocol(transportProtocol string) ConnectionOption {
-	return func(o *ConnectionOptions) {
+// ConnectionWithTransportProtocol specifies the given transport protocol as connection option to select filter chain by
+func ConnectionWithTransportProtocol(transportProtocol string) NetworkFilterSelectOption {
+	return func(o *NetworkFilterSelectOptions) {
 		o.transportProtocol = transportProtocol
 	}
 }
 
-// ConnectionWithApplicationProtocols specifies the given application protocols as connection option
-func ConnectionWithApplicationProtocols(applicationProtocols []string) ConnectionOption {
-	return func(o *ConnectionOptions) {
+// ConnectionWithApplicationProtocols specifies the given application protocols as connection option select filter chain by
+func ConnectionWithApplicationProtocols(applicationProtocols []string) NetworkFilterSelectOption {
+	return func(o *NetworkFilterSelectOptions) {
 		o.applicationProtocols = applicationProtocols
+	}
+}
+
+// NetworkFiltersWithType specifies the given type as network filter type to filter by the network filters of the selected filter chain
+func NetworkFiltersWithType(filterType string) NetworkFilterSelectOption {
+	return func(o *NetworkFilterSelectOptions) {
+		o.filterType = filterType
 	}
 }
 
@@ -175,7 +186,7 @@ type ListenerProperties interface {
 
 	// NetworkFilters returns the network filter chain that inbound traffic flows through
 	// when client workload connects with the given connection options.
-	NetworkFilters(connectionsOpts ...ConnectionOption) ([]NetworkFilter, error)
+	NetworkFilters(...NetworkFilterSelectOption) ([]NetworkFilter, error)
 }
 
 // ClientPropertiesResponse contains the result for the API call
@@ -207,7 +218,7 @@ type ClientProperties interface {
 
 	// NetworkFilters returns the network filter chain that outbound traffic flows through to the target service
 	// when client workload connects with the given connection options
-	NetworkFilters(connectionsOpts ...ConnectionOption) ([]NetworkFilter, error)
+	NetworkFilters(connectionsOpts ...NetworkFilterSelectOption) ([]NetworkFilter, error)
 }
 
 // HTTPClientPropertiesResponse contains the result for the API call

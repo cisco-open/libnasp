@@ -23,6 +23,8 @@ import (
 	"syscall"
 	"time"
 
+	xds_type_v3 "github.com/cncf/xds/go/xds/type/v3"
+
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/testr"
 
@@ -305,6 +307,7 @@ var _ = BeforeSuite(func() {
 	_ = metadata_exchange.MetadataExchange{}
 	_ = v2alpha1.FilterConfig{}
 	_ = upda_type_v1.TypedStruct{}
+	_ = xds_type_v3.TypedStruct{}
 	_ = grpcv3.TcpGrpcAccessLogConfig{}
 	_ = httpwasmv3.Wasm{}
 	_ = faultv3.HTTPFault{}
@@ -437,6 +440,14 @@ var _ = Describe("The management server is running", func() {
 				HaveField("Name()", "istio.stats"),
 				HaveField("Name()", "envoy.filters.network.tcp_proxy"),
 			))
+			// filters by type
+			Expect(tcpClientProps.NetworkFilters(ads.NetworkFiltersWithType("envoy.extensions.filters.network.wasm.v3.Wasm"))).
+				Should(HaveExactElements(HaveField("Name()", "istio.stats")))
+			Expect(tcpClientProps.NetworkFilters(ads.NetworkFiltersWithType("type.googleapis.com/envoy.extensions.filters.network.wasm.v3.Wasm"))).
+				Should(HaveExactElements(HaveField("Name()", "istio.stats")))
+			Expect(tcpClientProps.NetworkFilters(ads.NetworkFiltersWithType("envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"))).
+				Should(HaveExactElements(HaveField("Name()", "envoy.filters.network.tcp_proxy")))
+			Expect(tcpClientProps.NetworkFilters(ads.NetworkFiltersWithType("unknown"))).Should(BeEmpty())
 
 			By("verify that correct http client properties are returned for 10.10.42.110:80")
 			httpResp, err := adsClient.GetHTTPClientPropertiesByHost(ctx, "10.10.42.110:80")

@@ -16,14 +16,11 @@ package ads
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
 	"reflect"
 	"strconv"
-
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/cisco-open/nasp/pkg/ads/internal/filterchain"
 
@@ -60,85 +57,8 @@ func (lp *listenerProperties) Metadata() map[string]interface{} {
 	return lp.metadata
 }
 
-func (lp *listenerProperties) NetworkFilters(connectionsOpts ...ConnectionOption) ([]NetworkFilter, error) {
-	if lp.inboundListener == nil {
-		return nil, nil
-	}
-
-	var connOpts ConnectionOptions
-	for _, opt := range connectionsOpts {
-		opt(&connOpts)
-	}
-
-	var filterChainMatchOpts []filterchain.MatchOption
-
-	if connOpts.destinationPort > 0 {
-		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithDestinationPort(connOpts.destinationPort))
-	}
-	if connOpts.destinationIP != nil {
-		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithDestinationIP(connOpts.destinationIP))
-	}
-	if len(connOpts.transportProtocol) > 0 {
-		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithTransportProtocol(connOpts.transportProtocol))
-	}
-	if len(connOpts.applicationProtocols) > 0 {
-		filterChainMatchOpts = append(filterChainMatchOpts, filterchain.WithApplicationProtocols(connOpts.applicationProtocols))
-	}
-
-	filterChains, err := filterchain.Filter(lp.inboundListener, filterChainMatchOpts...)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(filterChains) == 0 && lp.inboundListener.GetDefaultFilterChain() != nil {
-		// if no filter chains found, use default filter chain of the listener
-		filterChains = append(filterChains, lp.inboundListener.GetDefaultFilterChain())
-	}
-
-	if len(filterChains) == 0 {
-		return nil, errors.Errorf("couldn't find a filter chain for listener %q, with matching fields:%s",
-			lp.inboundListener.GetName(),
-			filterChainMatchOpts)
-	}
-	if len(filterChains) > 1 {
-		fcNames := make([]string, 0, len(filterChains))
-		for _, fc := range filterChains {
-			fcNames = append(fcNames, fc.GetName())
-		}
-		return nil, errors.Errorf("multiple filter chains for listener %q, with matching fields:%s, filter chains:%s",
-			lp.inboundListener.GetName(),
-			filterChainMatchOpts,
-			fcNames)
-	}
-
-	networkFilters := make([]NetworkFilter, 0, len(filterChains[0].GetFilters()))
-	for _, filter := range filterChains[0].GetFilters() {
-		if filter == nil {
-			continue
-		}
-
-		configuration := make(map[string]interface{})
-		proto, err := filter.GetTypedConfig().UnmarshalNew()
-		if err != nil {
-			return nil, err
-		}
-
-		configurationJson, err := protojson.Marshal(proto)
-		if err != nil {
-			return nil, err
-		}
-
-		if err = json.Unmarshal(configurationJson, &configuration); err != nil {
-			return nil, err
-		}
-
-		networkFilters = append(networkFilters, &networkFilter{
-			name:          filter.GetName(),
-			configuration: configuration,
-		})
-	}
-
-	return networkFilters, nil
+func (lp *listenerProperties) NetworkFilters(networkFilterSelectOpts ...NetworkFilterSelectOption) ([]NetworkFilter, error) {
+	return listenerNetworkFilters(lp.inboundListener, networkFilterSelectOpts...)
 }
 
 func (lp *listenerProperties) String() string {
