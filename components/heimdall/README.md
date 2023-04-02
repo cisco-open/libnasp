@@ -1,143 +1,45 @@
 # Heimdall
 
-A small microservice to allow external services to obtain an Istio configuration based on some external authentication mechanism, like database or OAuth, etc.
+![Heimdall](images/heimdall-logo.png)
 
-Heimdall is meant to run on Kubernetes.
+Heimdall is a lightweight microservice that is designed to provide seamless Istio environment configuration for microservices-based applications that use Nasp, our new library that integrates with Istio without requiring an envoy sidecar. Heimdall is intended to run on Kubernetes and acts as a component that handles the seamless integration of Nasp with Istio. For authentication of external services, Heimdall relies on the [WorkloadGroup](https://istio.io/latest/docs/reference/config/networking/workload-group/) resource offered by Istio.
 
-## Currently supported auth methods for clients
+With Heimdall, developers can easily configure the Istio environment for services running inside and outside the Kubernetes cluster. The microservice eliminates the need for developers to manually configure Istio settings for applications that use Nasp, by providing automated configuration management that seamlessly integrates with Nasp.
 
-- Kubernetes ConfigMap database (ClientID/ClientSecret)
-- ...
-- TODO
+Nasp itself simplifies the overall application architecture, by removing the need for an envoy sidecar and providing a more efficient, scalable, and secure microservices-based architecture that is easier to build, test, and deploy, while Heimdall acts as a mediator between Istio and applications that use Nasp, ensuring seamless integration between the two.
+
+Heimdall is compatible with Istio installations using both `istioctl` and `istio operator from Cisco`.
 
 ## Installation
 
-Install the Helm chart of Heimdall configure it beforehand:
+Install the Helm chart of Heimdall:
+
+> The default configuration values are based on the assumption that Istio is installed and managed using the Istio operator.
+>
+> Use `--set istio.withIstioOperator=false` otherwise.
 
 ```bash
 helm install -n heimdall --create-namespace heimdall ./components/heimdall/deploy/charts/heimdall
 ```
 
-Take note of the exposed Heimdall service, this can be used in mobile applications for example to get an Istio entry configuration:
+### Expose heimdall
+
+By default, Heimdall is not exposed externally, and you must explicitly enable it using the --set expose.enabled=true flag.
+
+Please take note of the external address of the exposed Heimdall service, as it is required for establishing a connection:
 
 ```bash
 kubectl describe services -n heimdall heimdall-gw | grep Ingress | awk '{print $3}'
 ```
 
-## Populate the client database
+## Internal applications with Nasp
 
-The client database holds the list of clients (indexed by ClientID) and their attributes/configuration for the mesh.
-
-A sample entry:
-
-```yaml
-  16362813-F46B-41AC-B191-A390DB1F6BDF: |
-    {
-    "ClientSecret": "16362813-F46B-41AC-B191-A390DB1F6BDF",
-    "ClientOS": "ios",
-    "WorkloadName": "ios-mobile-app",
-    "PodNamespace": "external",
-    "Network": "network2",
-    "MeshID": "mesh1",
-    "ServiceAccountName": "ios-mobile",
-    "Service": "ios-mobile"
-    }
-```
-
-### Create the identity service account of the workload
-
-Create the service account in the pod namespace referenced by the client entry above.
-
-```bash
-kubectl create sa -n external ios-mobile
-```
-
-# Heimdall Webhook
-
-## Getting Started
-
-You’ll need a Kubernetes cluster to run against. 
-You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
-
-### Running on the cluster
-
-1. Install Instances of Custom Resources:
-
-```sh
-kubectl apply -f config/samples/
-```
-
-2. Build and push your image to the location specified by `IMG`:
-	
-```sh
-make docker-build docker-push IMG=<some-registry>/heimdall:tag
-```
-	
-3. Deploy the controller to the cluster with the image specified by `IMG`:
-
-```sh
-make deploy IMG=<some-registry>/heimdall:tag
-```
-
-### Uninstall CRDs
-
-To delete the CRDs from the cluster:
-
-```sh
-make uninstall
-```
-
-### Undeploy controller
-
-UnDeploy the controller to the cluster:
-
-```sh
-make undeploy
-```
-
-## Contributing
-
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-### How it works
-
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
-
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/) 
-which provides a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster 
-
-### Test It Out
-
-1. Install the CRDs into the cluster:
-
-```sh
-make install
-```
-
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
-
-```sh
-make run
-```
-
-**NOTE:** You can also run this in one step by running: `make install run`
-
-### Modifying the API definitions
-
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
-make manifests
-```
-
-**NOTE:** Run `make --help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+Heimdall leverages a k8s mutating webhook to provide environment configuration to internal applications. To enable Nasp integration for an application, set the `nasp.k8s.cisco.com/inject=true` label to the Pod.
 
 ## License
 
-Copyright 2022.
+```text
+Copyright 2022-2023.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -150,4 +52,4 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
+```
