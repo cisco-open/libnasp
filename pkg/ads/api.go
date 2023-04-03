@@ -218,7 +218,7 @@ type ClientProperties interface {
 
 	// NetworkFilters returns the network filter chain that outbound traffic flows through to the target service
 	// when client workload connects with the given connection options
-	NetworkFilters(connectionsOpts ...NetworkFilterSelectOption) ([]NetworkFilter, error)
+	NetworkFilters(...NetworkFilterSelectOption) ([]NetworkFilter, error)
 }
 
 // HTTPClientPropertiesResponse contains the result for the API call
