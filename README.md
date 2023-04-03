@@ -17,7 +17,6 @@ To learn more about why we created Nasp, and where could it help, read our intro
 
 We use GitHub to track issues and accept contributions. If you'd like to raise an issue or open a pull request with changes, refer to our [contribution guide](./CONTRIBUTING.md).
 
-
 ## Getting started
 
 The easiest way to get started with Nasp is to import the library from Go code, set up a Nasp HTTP `transport`, and use that `transport` to send HTTP requests to an external server. Here's how to do it.
@@ -34,20 +33,16 @@ import (
 Then, create and start an `IstioIntegrationHandler`:
 
 ```go
-istioHandlerConfig := &istio.IstioIntegrationHandlerConfig {
-    MetricsAddress: ":16090",
-    UseTLS:         true,
-        IstioCAConfigGetter: func(e *environment.IstioEnvironment) (istio_ca.IstioCAClientConfig, error) {
-        return istio_ca.GetIstioCAClientConfig(clusterID, istioRevision)
-    },
-}
+istioHandlerConfig := &istio.DefaultIstioIntegrationHandlerConfig
 
 iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, klog.TODO())
 if err != nil {
     panic(err)
 }
 
-iih.Run(ctx)
+if err := iih.Run(ctx); err != nil {
+    panic(err)
+}
 ```
 
 And finally, send an HTTP request through the Nasp transport layer:

@@ -41,18 +41,16 @@ func init() {
 	flag.Parse()
 }
 
-func getIIH(ctx context.Context) (*istio.IstioIntegrationHandler, error) {
+func getIIH(ctx context.Context) (istio.IstioIntegrationHandler, error) {
 	authToken := os.Getenv("NASP_AUTH_TOKEN")
 	if authToken == "" {
 		panic(errors.New("NASP_AUTH_TOKEN env var must be specified."))
 	}
 
-	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authToken, "v1"),
-	}
+	istioHandlerConfig := istio.DefaultIstioIntegrationHandlerConfig
+	istioHandlerConfig.IstioCAConfigGetter = istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authToken, "v1")
 
-	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, klog.TODO())
+	iih, err := istio.NewIstioIntegrationHandler(&istioHandlerConfig, klog.TODO())
 	if err != nil {
 		return nil, err
 	}

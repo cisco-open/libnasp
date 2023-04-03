@@ -30,7 +30,7 @@ import (
 var logger = klog.NewKlogr()
 
 type HTTPTransport struct {
-	iih    *istio.IstioIntegrationHandler
+	iih    istio.IstioIntegrationHandler
 	client *http.Client
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -59,14 +59,14 @@ func NewHTTPTransport(heimdallURL, authorizationToken string) (*HTTPTransport, e
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-		PushgatewayConfig: &istio.PushgatewayConfig{
-			Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
-			UseUniqueIDLabel: true,
-		},
-	}, logger)
+	istioHandlerConfig := istio.DefaultIstioIntegrationHandlerConfig
+	istioHandlerConfig.IstioCAConfigGetter = istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1")
+	istioHandlerConfig.PushgatewayConfig = &istio.PushgatewayConfig{
+		Address:          "push-gw-prometheus-pushgateway.prometheus-pushgateway.svc.cluster.local:9091",
+		UseUniqueIDLabel: true,
+	}
+
+	iih, err := istio.NewIstioIntegrationHandler(&istioHandlerConfig, logger)
 	if err != nil {
 		return nil, err
 	}

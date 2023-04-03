@@ -23,6 +23,7 @@ import (
 )
 
 type IstioEnvironment struct {
+	Enabled           bool              `env:"ENABLED"`
 	Type              string            `env:"TYPE"`
 	PodName           string            `env:"POD_NAME"`
 	PodNamespace      string            `env:"POD_NAMESPACE"`
