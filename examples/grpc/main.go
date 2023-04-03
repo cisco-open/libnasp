@@ -56,10 +56,10 @@ func main() {
 		panic(errors.New("NASP_AUTH_TOKEN env var must be specified."))
 	}
 
-	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authToken, "v1"),
-	}, klog.TODO())
+	istioHandlerConfig := istio.DefaultIstioIntegrationHandlerConfig
+	istioHandlerConfig.IstioCAConfigGetter = istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authToken, "v1")
+
+	iih, err := istio.NewIstioIntegrationHandler(&istioHandlerConfig, klog.TODO())
 	if err != nil {
 		panic(err)
 	}

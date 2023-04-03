@@ -260,6 +260,10 @@ func (m *PodMutator) setEnvs(pod *corev1.Pod, request admission.Request) {
 		}
 		container.Env = append(container.Env, []corev1.EnvVar{
 			{
+				Name:  "NASP_ENABLED",
+				Value: "true",
+			},
+			{
 				Name:  "NASP_TYPE",
 				Value: "sidecar",
 			},
