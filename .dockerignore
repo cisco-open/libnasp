@@ -1,3 +1,5 @@
-experimental/ios-istio
+experimental
+!experimental/java
+!experimental/mobile
 bin
 build
