@@ -111,10 +111,8 @@ func main() {
 		panic(errors.New("NASP_AUTH_TOKEN env var must be specified."))
 	}
 
-	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authToken, "v1"),
-	}
+	istioHandlerConfig := istio.DefaultIstioIntegrationHandlerConfig
+	istioHandlerConfig.IstioCAConfigGetter = istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authToken, "v1")
 
 	if usePushGateway {
 		istioHandlerConfig.PushgatewayConfig = &istio.PushgatewayConfig{
@@ -123,7 +121,7 @@ func main() {
 		}
 	}
 
-	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, logger)
+	iih, err := istio.NewIstioIntegrationHandler(&istioHandlerConfig, logger)
 	if err != nil {
 		panic(err)
 	}

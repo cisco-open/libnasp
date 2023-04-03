@@ -44,8 +44,8 @@ func NewServerCommand() *cobra.Command {
 			options := []server.ServerOption{server.ServerWithLogger(logger)}
 
 			if naspSupportEnabled {
-				istioConfig := istio.DefaultIstioIntegrationHandlerConfig
-				ih, err := istio.NewIstioIntegrationHandler(&istioConfig, logger)
+				istioHandlerConfig := istio.DefaultIstioIntegrationHandlerConfig
+				ih, err := istio.NewIstioIntegrationHandler(&istioHandlerConfig, logger)
 				if err != nil {
 					return errors.WrapIf(err, "could not instantiate NASP istio integration handler")
 				}

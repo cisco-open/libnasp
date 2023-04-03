@@ -53,6 +53,7 @@ import (
 )
 
 var DefaultIstioIntegrationHandlerConfig = IstioIntegrationHandlerConfig{
+	Enabled:        true,
 	MetricsPath:    "/stats/prometheus",
 	MetricsAddress: ":16090",
 	UseTLS:         true,
@@ -110,6 +111,7 @@ var (
 )
 
 type IstioIntegrationHandlerConfig struct {
+	Enabled             bool
 	MetricsPath         string
 	MetricsAddress      string
 	PushgatewayConfig   *PushgatewayConfig
@@ -159,7 +161,7 @@ func (c *IstioIntegrationHandlerConfig) SetDefaults() {
 	}
 }
 
-type IstioIntegrationHandler struct {
+type istioIntegrationHandler struct {
 	config IstioIntegrationHandlerConfig
 	logger logr.Logger
 
@@ -172,13 +174,22 @@ type IstioIntegrationHandler struct {
 	discoveryClient discovery.DiscoveryClient
 }
 
-func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger logr.Logger) (*IstioIntegrationHandler, error) {
+type IstioIntegrationHandler interface {
+	Run(context.Context) error
+	GetGRPCDialOptions() ([]grpc.DialOption, error)
+	ListenAndServe(ctx context.Context, listenAddress string, handler http.Handler) error
+	GetHTTPTransport(transport http.RoundTripper) (http.RoundTripper, error)
+	GetTCPListener(l net.Listener) (net.Listener, error)
+	GetTCPDialer() (itcp.Dialer, error)
+}
+
+func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger logr.Logger) (IstioIntegrationHandler, error) {
 	defaultConfig := DefaultIstioIntegrationHandlerConfig
 	if config == nil {
 		config = &defaultConfig
 	}
 	config.SetDefaults()
-	s := &IstioIntegrationHandler{
+	s := &istioIntegrationHandler{
 		config: *config,
 		logger: logger,
 	}
@@ -187,6 +198,12 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 	if err != nil {
 		return nil, err
 	}
+
+	if !e.Enabled && !config.Enabled {
+		logger.Info("NASP_ENABLED env var is not set to true, istio integration handler is disabled")
+		return &passthroughIstioIntegrationHandler{}, nil
+	}
+
 	s.environment = e
 
 	registry := prometheus.NewRegistry()
@@ -262,11 +279,11 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 	return s, nil
 }
 
-func (h *IstioIntegrationHandler) NewStreamHandler(filters ...api.WasmPluginConfig) (api.StreamHandler, error) {
+func (h *istioIntegrationHandler) NewStreamHandler(filters ...api.WasmPluginConfig) (api.StreamHandler, error) {
 	return proxywasm.NewStreamHandler(h.pluginManager, filters)
 }
 
-func (h *IstioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) (http.RoundTripper, error) {
+func (h *istioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) (http.RoundTripper, error) {
 	streamHandler, err := h.NewStreamHandler(h.defaultClientFilters()...)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get stream handler")
@@ -281,7 +298,7 @@ func (h *IstioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) 
 	return httpTransport, nil
 }
 
-func (h *IstioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOption, error) {
+func (h *istioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOption, error) {
 	streamHandler, err := h.NewStreamHandler(h.defaultClientFilters()...)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get stream handler")
@@ -298,7 +315,7 @@ func (h *IstioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOption, error
 	}, nil
 }
 
-func (h *IstioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddress string, handler http.Handler) error {
+func (h *istioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddress string, handler http.Handler) error {
 	filters := h.config.ServerFilters
 	if len(filters) == 0 {
 		filters = h.defaultServerFilters()
@@ -374,7 +391,7 @@ func (h *IstioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 	return server.ServeWithTLSConfig(ln, tlsConfig)
 }
 
-func (h *IstioIntegrationHandler) Run(ctx context.Context) error {
+func (h *istioIntegrationHandler) Run(ctx context.Context) error {
 	if err := h.discoveryClient.Connect(ctx); err != nil {
 		return err
 	}
@@ -391,7 +408,7 @@ func (h *IstioIntegrationHandler) Run(ctx context.Context) error {
 	return nil
 }
 
-func (h *IstioIntegrationHandler) RunMetricsServer(ctx context.Context) {
+func (h *istioIntegrationHandler) RunMetricsServer(ctx context.Context) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(h.config.MetricsPath, h.metricHandler.HTTPHandler().ServeHTTP)
 	s := http.Server{Addr: h.config.MetricsAddress, Handler: mux, ReadHeaderTimeout: time.Second * 60}
@@ -404,7 +421,7 @@ func (h *IstioIntegrationHandler) RunMetricsServer(ctx context.Context) {
 	_ = s.Shutdown(ctx)
 }
 
-func (h *IstioIntegrationHandler) defaultClientFilters() []api.WasmPluginConfig {
+func (h *istioIntegrationHandler) defaultClientFilters() []api.WasmPluginConfig {
 	return []api.WasmPluginConfig{
 		{
 			Name:   "istio-metadata-exchange",
@@ -433,7 +450,7 @@ func (h *IstioIntegrationHandler) defaultClientFilters() []api.WasmPluginConfig 
 	}
 }
 
-func (h *IstioIntegrationHandler) defaultServerFilters() []api.WasmPluginConfig {
+func (h *istioIntegrationHandler) defaultServerFilters() []api.WasmPluginConfig {
 	return []api.WasmPluginConfig{
 		{
 			Name:   "istio-metadata-exchange",
@@ -475,7 +492,7 @@ func createMetricsPusher(config *PushgatewayConfig, jobName string, httpClient p
 
 	return pusher
 }
-func (h *IstioIntegrationHandler) RunMetricsPusher(ctx context.Context) error {
+func (h *istioIntegrationHandler) RunMetricsPusher(ctx context.Context) error {
 	if h.metricsPusher == nil {
 		return nil
 	}
@@ -502,7 +519,7 @@ func (h *IstioIntegrationHandler) RunMetricsPusher(ctx context.Context) error {
 	}
 }
 
-func (h *IstioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, error) {
+func (h *istioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, error) {
 	streamHandler, err := h.NewStreamHandler(h.defaultTCPServerFilters()...)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get stream handler")
@@ -534,7 +551,7 @@ func (h *IstioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, 
 	return tcp.WrapListener(l, streamHandler), nil
 }
 
-func (h *IstioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error) {
+func (h *istioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error) {
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(h.caClient.GetCAPem())
 
@@ -563,7 +580,7 @@ func (h *IstioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error) {
 	return itcp.NewTCPDialer(streamHandler, tlsConfig, h.discoveryClient), nil
 }
 
-func (h *IstioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConfig {
+func (h *istioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConfig {
 	return []api.WasmPluginConfig{
 		{
 			Name:   "tcp-metadata-exchange",
@@ -590,7 +607,7 @@ func (h *IstioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConf
 	}
 }
 
-func (h *IstioIntegrationHandler) defaultTCPServerFilters() []api.WasmPluginConfig {
+func (h *istioIntegrationHandler) defaultTCPServerFilters() []api.WasmPluginConfig {
 	return []api.WasmPluginConfig{
 		{
 			Name:   "tcp-metadata-exchange",

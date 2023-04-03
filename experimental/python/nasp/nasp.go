@@ -141,13 +141,11 @@ func NewHTTPTransport(heimdallURLPtr, authorizationTokenPtr *C.char,
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	istioHandlerConfig := &istio.IstioIntegrationHandlerConfig{
-		UseTLS:              true,
-		IstioCAConfigGetter: istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1"),
-		PushgatewayConfig:   pgwConfig,
-	}
+	istioHandlerConfig := istio.DefaultIstioIntegrationHandlerConfig
+	istioHandlerConfig.IstioCAConfigGetter = istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authorizationToken, "v1")
+	istioHandlerConfig.PushgatewayConfig = pgwConfig
 
-	iih, err := istio.NewIstioIntegrationHandler(istioHandlerConfig, logger)
+	iih, err := istio.NewIstioIntegrationHandler(&istioHandlerConfig, logger)
 
 	if err != nil {
 		return C.ulonglong(0), cGoError(err)
@@ -209,7 +207,7 @@ func CloseHTTPTransport(httpTransportID C.ulonglong) {
 }
 
 type HTTPTransport struct {
-	iih      *istio.IstioIntegrationHandler
+	iih      istio.IstioIntegrationHandler
 	client   *http.Client
 	cancel   context.CancelFunc
 	refCount uint32

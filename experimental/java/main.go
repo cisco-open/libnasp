@@ -79,7 +79,7 @@ type TCPListener struct {
 }
 
 type naspIntegrationHandler struct {
-	iih    *istio.IstioIntegrationHandler
+	iih    istio.IstioIntegrationHandler
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -247,10 +247,9 @@ func (s *Selector) WakeUp() {
 func newNaspIntegrationHandler() *naspIntegrationHandler {
 	ctx, cancel := context.WithCancel(logr.NewContext(context.Background(), logger))
 
-	iih, err := istio.NewIstioIntegrationHandler(&istio.IstioIntegrationHandlerConfig{
-		IstioCAConfigGetter: istio.IstioCAConfigGetterAuto,
-		UseTLS:              true,
-	}, logger)
+	istioHandlerConfig := istio.DefaultIstioIntegrationHandlerConfig
+
+	iih, err := istio.NewIstioIntegrationHandler(&istioHandlerConfig, logger)
 	if err != nil {
 		cancel()
 		panic(err)
