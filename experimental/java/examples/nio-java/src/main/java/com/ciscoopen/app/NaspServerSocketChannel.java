@@ -116,10 +116,8 @@ public class NaspServerSocketChannel extends ServerSocketChannel implements SelC
         }
 
         if (((ops & Net.POLLIN) != 0) &&
-                ((intOps & SelectionKey.OP_ACCEPT) != 0)) {
+                ((intOps & SelectionKey.OP_ACCEPT) != 0))
             newOps |= SelectionKey.OP_ACCEPT;
-            System.out.println("INSIDE NET POLLIN OP_ACCEPT");
-        }
 
         ski.nioReadyOps(newOps);
         return (newOps & ~oldOps) != 0;

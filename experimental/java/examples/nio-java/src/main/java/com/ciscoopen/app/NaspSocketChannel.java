@@ -102,7 +102,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     public boolean connect(SocketAddress remote) throws IOException {
         address = (InetSocketAddress) checkRemote(remote);
         socket.setAddress(address);
-        System.out.println("INSIDE CONNECT");
         if (selector != null) {
             naspTcpDialer.startAsyncDial(this.keyFor(selector).hashCode(), ((NaspSelector)selector).getSelector(),
                     address.getHostString(), address.getPort());
@@ -111,7 +110,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     }
 
     private SocketAddress checkRemote(SocketAddress sa) {
-        System.out.println("GOS CHECK REMOTE IS RUNNING!!!");
         String addr = "";
         try {
             addr = Nasp.checkAddress(
@@ -120,12 +118,8 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
             e.printStackTrace();
         }
         if (!addr.equals("")) {
-            InetSocketAddress almafa = new InetSocketAddress(addr, ((InetSocketAddress) sa).getPort());
-            System.out.println("HERE COMES THE ADDRESS");
-            System.out.println(almafa + " here we go");
-            return almafa;
+            return new InetSocketAddress(addr, ((InetSocketAddress) sa).getPort());
         }
-        System.out.println("JAVAS CHECK REMOTE IS RUNNING!!!");
         InetSocketAddress isa = Net.checkAddress(sa);
         InetAddress address = isa.getAddress();
         if (address.isAnyLocalAddress()) {
@@ -142,13 +136,10 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public boolean finishConnect() throws IOException {
-        System.out.println("INSIDE FINISHCONNECT!!!");
         connection = naspTcpDialer.asyncDial();
         if (connection == null) {
-            System.out.println("INSIDE FINISHCONNECT RETURNING WITH FALSE!!!");
             return false;
         }
-        System.out.println("INSIDE FINISHCONNECT RETURNING WITH TRUE!!!");
         if (socket.getConnection() == null) {
             socket.setConnection(connection);
         }
@@ -157,7 +148,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public SocketAddress getRemoteAddress() throws IOException {
-        System.out.println("CALLING GETREMOTE ADDRESS");
         return address;
     }
 
@@ -170,7 +160,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
                 return -1;
             }
             dst.put(buff, 0, num);
-//            System.out.println("NUMBER READ BYTES " + num);
             return num;
         } catch (Exception e) {
             throw new IOException(e);
@@ -202,7 +191,6 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
             if (writtenBytes < rem) {
                 src.position(srcBufPos + writtenBytes);
             }
-//            System.out.println("Written bytes are: "+ writtenBytes);
             return writtenBytes;
         } catch (Exception e) {
             throw new IOException(e);
