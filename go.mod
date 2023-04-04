@@ -13,6 +13,7 @@ require (
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3 v3.0.2-c1
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.8-c1
+	github.com/blend/go-sdk v1.20220411.3
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/cncf/xds/go v0.0.0-20220520190051-1e77728a1eaa
 	github.com/envoyproxy/go-control-plane v0.10.3-0.20220719090109-b024c36d9935
@@ -73,6 +74,7 @@ require (
 	github.com/go-playground/validator/v10 v10.10.0 // indirect
 	github.com/goccy/go-json v0.9.7 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/cel-go v0.11.4 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
