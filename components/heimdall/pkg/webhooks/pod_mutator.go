@@ -25,10 +25,10 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/cisco-open/nasp/components/heimdall/pkg/k8sutil"
+	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
 )
 
 type PodMutator struct {
@@ -84,27 +84,19 @@ func (m *PodMutator) Handle(ctx context.Context, request admission.Request) admi
 		pod.Namespace = request.Namespace
 	}
 
-	cms := &corev1.ConfigMapList{}
-	cmLabels := map[string]string{
-		"istio.io/config": "true",
-		"istio.io/rev":    m.config.IstioRevision,
+	istioCAConfigmap, _, err := istio_ca.GetIstioRootCAPEM(m.manager.GetClient(), m.config.IstioRevision)
+	if istioCAConfigmap == nil && err == nil {
+		err = errors.New("could not find istio ca configmap")
 	}
-	err = m.manager.GetClient().List(ctx, cms, client.InNamespace(pod.Namespace), client.MatchingLabels(cmLabels))
 	if err != nil {
-		m.logger.Error(err, "could not get configmaps", "namespace", pod.Namespace, "labels", cmLabels)
+		m.logger.Error(err, "could not get ca configmap", "namespace", pod.Namespace)
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	if len(cms.Items) == 0 {
-		err = errors.NewWithDetails("istio ca configmap is not found")
-		m.logger.Error(err, "", "namespace", pod.Namespace, "labels", cmLabels)
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-	istioCAConfigmap := cms.Items[0]
 
 	m.setAnnotations(pod)
 	m.setLabels(pod)
 	m.setEnvs(pod, request)
-	m.setVolumes(pod, istioCAConfigmap)
+	m.setVolumes(pod, *istioCAConfigmap)
 	m.setVolumeMounts(pod)
 
 	marshaledPod, err := json.Marshal(pod)
