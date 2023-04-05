@@ -21,8 +21,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
 	"github.com/cisco-open/nasp/pkg/istio/discovery"
+	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
 )
 
 type passthroughIstioIntegrationHandler struct {
