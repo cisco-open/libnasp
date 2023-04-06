@@ -564,9 +564,16 @@ func listenerNetworkFilters(listener *envoy_config_listener_v3.Listener, network
 			typeUrl = typedStruct.GetTypeUrl()
 		}
 
-		if len(opts.filterType) > 0 {
-			// skip if provided filter type doesn't match filter's type url
-			if !(opts.filterType == typeUrl || strings.HasSuffix(typeUrl, "/"+opts.filterType)) {
+		if len(opts.includeFiltersWithTypes) > 0 {
+			match := false
+			for _, filterType := range opts.includeFiltersWithTypes {
+				// skip if provided filter type doesn't match filter's type url
+				if filterType == typeUrl || strings.HasSuffix(typeUrl, "/"+filterType) {
+					match = true
+					break
+				}
+			}
+			if !match {
 				continue
 			}
 		}

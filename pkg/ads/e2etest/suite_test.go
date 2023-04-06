@@ -441,13 +441,23 @@ var _ = Describe("The management server is running", func() {
 				HaveField("Name()", "envoy.filters.network.tcp_proxy"),
 			))
 			// filters by type
-			Expect(tcpClientProps.NetworkFilters(ads.NetworkFiltersWithType("envoy.extensions.filters.network.wasm.v3.Wasm"))).
+			Expect(tcpClientProps.NetworkFilters(ads.IncludeNetworkFiltersWithTypes("envoy.extensions.filters.network.wasm.v3.Wasm"))).
 				Should(HaveExactElements(HaveField("Name()", "istio.stats")))
-			Expect(tcpClientProps.NetworkFilters(ads.NetworkFiltersWithType("type.googleapis.com/envoy.extensions.filters.network.wasm.v3.Wasm"))).
+			Expect(tcpClientProps.NetworkFilters(ads.IncludeNetworkFiltersWithTypes("type.googleapis.com/envoy.extensions.filters.network.wasm.v3.Wasm"))).
 				Should(HaveExactElements(HaveField("Name()", "istio.stats")))
-			Expect(tcpClientProps.NetworkFilters(ads.NetworkFiltersWithType("envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"))).
+			Expect(tcpClientProps.NetworkFilters(ads.IncludeNetworkFiltersWithTypes("envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"))).
 				Should(HaveExactElements(HaveField("Name()", "envoy.filters.network.tcp_proxy")))
-			Expect(tcpClientProps.NetworkFilters(ads.NetworkFiltersWithType("unknown"))).Should(BeEmpty())
+			Expect(tcpClientProps.NetworkFilters(ads.IncludeNetworkFiltersWithTypes("unknown"))).Should(BeEmpty())
+			Expect(tcpClientProps.NetworkFilters(
+				ads.IncludeNetworkFiltersWithTypes(
+					"envoy.extensions.filters.network.wasm.v3.Wasm",
+					"envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy"))).
+				Should(
+					HaveExactElements(
+						HaveField("Name()", "istio.stats"),
+						HaveField("Name()", "envoy.filters.network.tcp_proxy"),
+					),
+				)
 
 			By("verify that correct http client properties are returned for 10.10.42.110:80")
 			httpResp, err := adsClient.GetHTTPClientPropertiesByHost(ctx, "10.10.42.110:80")

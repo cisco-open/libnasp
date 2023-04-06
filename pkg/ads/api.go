@@ -113,8 +113,8 @@ type NetworkFilterSelectOptions struct {
 	// applicationProtocols is the list of application protocols (e.g. ALPN for TLS protocol) of the connection
 	applicationProtocols []string
 
-	// filterType is the type of network filter
-	filterType string
+	// includeFiltersWithTypes include network filters with these types
+	includeFiltersWithTypes []string
 }
 
 type NetworkFilterSelectOption func(*NetworkFilterSelectOptions)
@@ -154,10 +154,10 @@ func ConnectionWithApplicationProtocols(applicationProtocols []string) NetworkFi
 	}
 }
 
-// NetworkFiltersWithType specifies the given type as network filter type to filter by the network filters of the selected filter chain
-func NetworkFiltersWithType(filterType string) NetworkFilterSelectOption {
+// IncludeNetworkFiltersWithTypes specifies the network filter types  to filter by the network filters of the selected filter chain
+func IncludeNetworkFiltersWithTypes(filterTypes ...string) NetworkFilterSelectOption {
 	return func(o *NetworkFilterSelectOptions) {
-		o.filterType = filterType
+		o.includeFiltersWithTypes = filterTypes
 	}
 }
 
