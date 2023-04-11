@@ -17,7 +17,6 @@ package istio
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net"
 
 	"github.com/cisco-open/nasp/pkg/istio/discovery"
@@ -56,10 +55,9 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 
 	prop, err := d.discoveryClient.GetTCPClientPropertiesByHost(context.Background(), address)
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 
-	fmt.Printf("Prop: %#v\n", prop)
 	if prop != nil {
 		if !prop.UseTLS() {
 			tlsConfig = nil
@@ -70,13 +68,10 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 			return nil, err
 		} else {
 			address = endpointAddr.String()
-			fmt.Printf("address: %s\n", address)
 		}
 	}
 
 	useTLS := tlsConfig != nil
-
-	fmt.Printf("Use tls: %#v\n", useTLS)
 
 	opts := []network.DialerOption{
 		network.DialerWithWrappedConnectionOptions(network.WrappedConnectionWithCloserWrapper(d.discoveryClient.NewConnectionCloseWrapper())),

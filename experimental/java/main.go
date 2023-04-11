@@ -269,7 +269,7 @@ func newNaspIntegrationHandler() *naspIntegrationHandler {
 
 func CheckAddress(address string) (string, error) {
 	ips, err := integrationHandler.iih.GetDiscoveryClient().ResolveHost(address)
-	if err != nil && !errors.Is(err, &ads.HostNotFoundError{HostName: address}) {
+	if ads.IgnoreHostNotFound(err) != nil {
 		return "", err
 	}
 	if len(ips) != 0 {
