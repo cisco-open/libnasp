@@ -6,7 +6,7 @@ Nasp is an **open-source, lightweight library** to expand service mesh capabilit
 
 Nasp offers the most common functionality of a sidecar proxy, so it eases the developer burden for traffic management, observability, and security. Its range of capabilities includes:
 
-- Identity, and network traffic security using mutual TLS
+- Identity and network traffic security using mutual TLS
 - Automatic traffic management features, like HTTP, or gRPC load balancing
 - Transparent observability of network traffic, especially standard Istio metrics
 - Dynamic configuration through xDS support
@@ -16,11 +16,11 @@ To learn more about why we created Nasp, and where it could help, read our intro
 ## Architecture
 
 Nasp is primarily a library that can be included in application code to provide service mesh functionality without operating proxies.
-But Nasp is also hybrid model in the sense that it still communicates with a central Istio control plane, and configuration is still declarative and centrally managed. The service dicovery, certificate management and configuration logic isn't handed out to the applications like in a pure library model. These remain the same as with standard Istio - though somewhat limited in functionality.
+But Nasp is also a hybrid model in that it still communicates with a central Istio control plane, and configuration is still declarative and centrally managed. The service discovery, certificate management, and configuration logic aren't handed out to the applications like in a pure library model. These remain the same as with standard Istio - though somewhat limited in functionality.
 
 Therefore Nasp has a minimal component running in a Kubernetes cluster next to an existing Istio control plane. This component is called [Heimdall](./components/heimdall/), and it is the main entry point for a Nasp-enabled application to an existing service mesh. Heimdall automatically injects Istio configuration - like workload metadata, network and mesh settings, or where to receive certificates from - in applications that use Nasp.
 
-Nasp workloads can run in- or outside of the service mesh, or even the Kubernetes cluster.
+Nasp workloads can run in or outside the service mesh, or the Kubernetes cluster.
 
 ![Nasp architecture](./docs/img/nasp-architecture.png)
 
@@ -30,8 +30,8 @@ The quick start will guide you through a common Nasp setup, where an external, N
 
 ### Prerequisites
 
-First, we'll need to setup the Kubernetes environment with Istio and the necessary Nasp components.
-To make it easier, we wrote a script that creates a local [`kind`](https://github.com/kubernetes-sigs/kind) cluster and installs all the reqirements.
+First, we'll need to set up the Kubernetes environment with Istio and the necessary Nasp components.
+To make it easier, we wrote a script that creates a local [`kind`](https://github.com/kubernetes-sigs/kind) cluster and installs all the requirements.
 
 To get started, simply run the [`deploy-kind.sh`](test/deploy-kind.sh) script in the `test` directory:
 
@@ -61,7 +61,7 @@ heimdall-f97745497-jvzws      3/3     Running   2 (69m ago)   69m
 heimdall-gw-74c79d5c8-6r6qp   1/1     Running   0             69m
 ```
 
-3. An `echo` service that's running with an Istio sidecar proxy. It is a test deployment in our Kubernetes cluster that we'll send HTTP requests to from an external Nasp-enabled client.
+3. An `echo` service that's running with an Istio sidecar proxy. It is a test deployment in our Kubernetes cluster we'll send HTTP requests from an external Nasp-enabled client.
 
 ```
 > k get pods -n testing
@@ -78,7 +78,7 @@ To do that, simply go into the `examples/http` folder and run the following `mak
 make CLIENT_REQUEST_URL="http://echo.testing"  run-client
 ```
 
-You should see some logs containing the (empty) response and some interesting headers. They show that the request URI was the same service address that you would use inside the cluster, and that our client has sent a client certificate that was accepted by the Istio proxy inside the cluster:
+You should see logs containing the (empty) response and a few interesting headers. They show that the request URI was the same service address that you would use inside the cluster and that our client has sent a client certificate that was accepted by the Istio proxy inside the cluster:
 
 ```
 Hostname: echo-5d44b7fbd5-ldrcj
@@ -120,24 +120,24 @@ Let's see what's inside our Makefile and our Golang code to understand what happ
 1. Makefile
 
 The Makefile is very simple: it calls our Golang application with `go run` and passes it the `CLIENT_REQUEST_URL` we've specified above.
-The only interesting part is that it gets a Nasp authentication token from a Kubernetes secret and passes it to our application:
+The interesting part is that it gets a Nasp authentication token from a Kubernetes secret and passes it to our application:
 
 ```
 NASP_AUTH_TOKEN ?= $(shell kubectl -n external get secret -l nasp.k8s.cisco.com/workloadgroup=test-http -o jsonpath='{@.items[0].data.token}' | base64 -d)
 ```
 
-The secret is used by the Nasp library to get the necessary Istio configuration (what network, cluster or mesh to join, or where to get the required certificates from) for the application from Heimdall. 
+The secret is used by the Nasp library to get the necessary Istio configuration (what network, cluster, or mesh to join, or where to get the required certificates from) for the application from Heimdall. 
 But where is this secret coming from? If you take a look at the end of our init [script](./test/deploy-kind.sh), you'll see that we've created a few `WorkloadGroup` resources.
 These are standard [Istio resources](https://istio.io/latest/docs/reference/config/networking/workload-group/) used to describe a set of non-k8s workloads.
 [Heimdall](./components/heimdall/) watches these resources and creates corresponding access tokens in Kubernetes secrets for the related external workloads.
 
-For our example, Heimdall needs to be accessible from outside of the cluster. Usually that is achieved through a Heimdall gateway, whose address is configurable through Nasp. We haven't specified the address in the Makefile because we're using the default value to reach it.
+For our example, Heimdall needs to be accessible from outside of the cluster. Usually, that is achieved through a Heimdall gateway, whose address is configurable through Nasp. We haven't specified the address in the Makefile because we're using the default value to reach it.
 
 2. Golang code
 
 Now let's see what we did in our Golang code to make the HTTP requests we're sending go through Nasp.
 
-First we import the library:
+First, we import the library:
 
 ```go
 import (
@@ -189,16 +189,16 @@ if err != nil {
 
 ## Other examples
 
-In the [`examples`](./examples) directory we have similar examples on how to use Nasp with HTTP, gRPC, or TCP connections from Golang.
+In the [`examples`](./examples) directory we have similar examples of how to use Nasp with HTTP, gRPC, or TCP connections from Golang.
 All examples can be run either as servers or clients. Refer to the `Makefiles` on how to run these examples, and check out the Golang code to learn how to use Nasp for specific protocols. 
 
 ## Support for other languages
 
-The core code of Nasp is written in Golang, that's why the main examples are also written in Go.
-But Nasp could also be imported from other languages with the help of C bindings generated from the core codebase.
+The core code of Nasp is written in Golang, therefore the main examples are also written in Go.
+However, Nasp could also be imported from other languages with the help of C bindings generated from the core codebase.
 A thin shim layer still has to be written for specific platforms, but the core functionality is unchanged.
 
-Currently supported languages are:
+Currently, supported languages and frameworks are:
 
 - [Java frameworks](./experimental/java): Spring and Nio
 - [Mobile platforms](./experimental/mobile): iOS and Android
