@@ -201,10 +201,10 @@ class NaspSelector extends SelectorImpl {
                 if (address != null) {
                     naspSocketChannel.getNaspTcpDialer().startAsyncDial(selectedKeyId, selector,
                             address.getHostString(), address.getPort());
+                    runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
                 } else {
                     naspSocketChannel.setSelector(this);
                 }
-                runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
             }
         }
     }
