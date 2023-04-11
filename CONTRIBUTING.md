@@ -1,77 +1,47 @@
-# Contributing to Nasp
+# How to Contribute
 
-Thank you for taking the time to start contributing! We want to make contributing to this project as easy and transparent as possible, whether it's:
+Thanks for your interest in contributing to Nasp! Here are a few general guidelines on contributing and
+reporting bugs that we ask you to review. Following these guidelines helps to communicate that you respect the time of
+the contributors managing and developing this open source project. In return, they should reciprocate that respect in
+addressing your issue, assessing changes, and helping you finalize your pull requests. In that spirit of mutual respect,
+we endeavor to review incoming issues and pull requests within 10 days, and will close any lingering issues or pull
+requests after 60 days of inactivity.
 
-- Reporting a bug
-- Sending a PR to submit a fix
-- Proposing new features
-- Helping new users with issues they may encounter
-- Becoming a maintainer
+Please note that all of your interactions in the project are subject to our [Code of Conduct](/CODE_OF_CONDUCT.md). This
+includes creation of issues or pull requests, commenting on issues or pull requests, and extends to all interactions in
+any real-time space e.g., Slack, Discord, etc.
 
-To get started:
+## Reporting Issues
 
-- Support the development of this project and star this repo! :star:
-- If you use Nasp in a production environment, add yourself to the list of [adopters](ADOPTERS.md). :metal:
+Before reporting a new issue, please ensure that the issue was not already reported or fixed by searching through our
+[issues list](https://github.com/cisco-open/nasp/issues).
 
-## Contributing on GitHub
+When creating a new issue, please be sure to include a **title and clear description**, as much relevant information as
+possible, and, if possible, a test case.
 
-We use GitHub to host code, track issues or feature requests, and accept pull requests.
+**If you discover a security bug, please do not report it through GitHub. Instead, please see security procedures in
+[SECURITY.md](/SECURITY.md).**
 
-### Issues
+## Sending Pull Requests
 
-We use GitHub issues to track bugs and problems. Report a bug by [opening a new issue](https://github.com/cisco-open/nasp/issues).
+Before sending a new pull request, take a look at existing pull requests and issues to see if the proposed change or fix
+has been discussed in the past, or if the change was already implemented but not yet released.
 
-Please format your issues in such a way as to help others who might be facing similar challenges.
-Give your issues meaningful titles, that offer context and help us and the community to understand and quickly ramp up on it.
+We expect new pull requests to include tests for any affected behavior, and, as we follow semantic versioning, we may
+reserve breaking changes until the next major version release.
 
-Consider including the following in a bug report:
+## Other Ways to Contribute
 
-- A quick summary and/or background
-- Steps to reproduce
-  - Be specific!
-  - Provide sample code if you can.
-- What you expected would happen
-- What happened
-- Notes (possibly including why you think this might be happening, or things you tried that didn't work)
+We welcome anyone that wants to contribute to Nasp to triage and reply to open issues to help troubleshoot
+and fix existing bugs. Here is what you can do:
 
+- Help ensure that existing issues follows the recommendations from the _[Reporting Issues](#reporting-issues)_ section,
+  providing feedback to the issue's author on what might be missing.
+- Review and update the existing content of our [Wiki](https://github.com/cisco-open/nasp/wiki) with up-to-date
+  instructions and code samples.
+- Review existing pull requests, and testing patches against real existing applications that use Nasp.
+- Write a test, or add a missing test case to an existing test.
 
-We are grateful for any issues submitted.
-Questions, feature requests, or ideas are all welcomed.
-We will try to respond to your issues promptly, but please note that as the project is open-source, volunteers may offer help on a limited, goodwill basis.
-Please be respectful of any help offered, and accept that the person you are requesting help from may not reside in your time zone.
+Thanks again for your interest on contributing to Nasp!
 
-### Pull requests
-
-We are always happy to receive contributions via pull requests.
-
-Nasp follows the standard GitHub pull request process:
-
-Fork the repo, write your code, test your changes and submit a PR to the repo's `main` branch.
-Following the pull request template, describe the change(s) you're proposing, including context about why the change(s) are being made, and an explanation of any feature usage or behavior changes.
-The PR must pass the CI/CD checks (that include builds, tests, and linters - see below)
-We'll do our best to review the PR as soon as we can, but please accept if it takes time to respond.
-
-When working on a PR, consider these best practices:
-
-- Write clear and meaningful commit messages.
-- If you're fixing a bug or a smaller issue, squash your commits to help us maintain a clear git history.
-- We prefer if you rebase your commits before submitting the PR.
-- Explain the context of why you're making the changes to help reviewers.
-- Before starting to work on a larger feature, contact the maintainers to ensure the work is in line with the product roadmap.
-
-### Tests and linters
-
-A pull request must pass all tests and linters of the project.
-Running these on your local machine is as easy as running these two commands:
-
-`make test`
-
-and
-
-`make lint`
-
-## License
-
-By contributing, you agree that your contributions will be licensed under its Apache License, Version 2.
-
-
+:heart:
