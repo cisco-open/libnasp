@@ -64,7 +64,7 @@ function installIstioWithOperator() {
 
 if ! kind get kubeconfig --name nasp-test-cluster &> /dev/null; then
     log "creating kind cluster"
-    kind create cluster --wait 5m --config ${DIRECTORY}/kind.yaml
+    kind create cluster --wait 5m --config ${DIRECTORY}/kind.yaml --image kindest/node:v1.25.8
 else
     log "kind cluster already exists"
 fi
