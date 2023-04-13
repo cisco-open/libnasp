@@ -212,7 +212,7 @@ func (c *client) getTCPClientPropertiesByHost(input getTCPClientPropertiesByHost
 		return nil, nil
 	}
 
-	hostIPs, err := c.resolveHost(input.host)
+	hostIPs, err := c.ResolveHost(input.host)
 	if err != nil {
 		return nil, errors.WrapIff(err, "couldn't resolve host %q", input.host)
 	}

@@ -152,7 +152,7 @@ func (c *client) getHTTPClientPropertiesByHost(input getHTTPClientPropertiesByHo
 		return nil, nil
 	}
 
-	hostIPs, err := c.resolveHost(input.host)
+	hostIPs, err := c.ResolveHost(input.host)
 	if err != nil {
 		return nil, errors.WrapIff(err, "couldn't resolve host %q", input.host)
 	}

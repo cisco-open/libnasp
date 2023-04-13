@@ -20,6 +20,7 @@ import java.nio.channels.spi.AbstractSelector;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +46,10 @@ class NaspSelector extends SelectorImpl {
 
     protected NaspSelector(SelectorProvider sp) {
         super(sp);
+    }
+
+    public nasp.Selector getSelector() {
+        return selector;
     }
 
     @Override
@@ -193,9 +198,13 @@ class NaspSelector extends SelectorImpl {
             //This could happen if we are servers not clients
             if (naspSocketChannel.getNaspTcpDialer() != null) {
                 InetSocketAddress address = naspSocketChannel.getAddress();
-                naspSocketChannel.getNaspTcpDialer().startAsyncDial(selectedKeyId, selector,
-                        address.getHostString(), address.getPort());
-                runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
+                if (address != null) {
+                    naspSocketChannel.getNaspTcpDialer().startAsyncDial(selectedKeyId, selector,
+                            address.getHostString(), address.getPort());
+                    runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
+                } else {
+                    naspSocketChannel.setSelector(this);
+                }
             }
         }
     }
