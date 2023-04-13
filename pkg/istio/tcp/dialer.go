@@ -53,7 +53,11 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 
 	tlsConfig := d.tlsConfig.Clone()
 
-	prop, _ := d.discoveryClient.GetTCPClientPropertiesByHost(context.Background(), address)
+	prop, err := d.discoveryClient.GetTCPClientPropertiesByHost(context.Background(), address)
+	if err != nil {
+		return nil, err
+	}
+
 	if prop != nil {
 		if !prop.UseTLS() {
 			tlsConfig = nil
@@ -85,11 +89,7 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 		var conn net.Conn
 		var err error
 
-		if useTLS {
-			conn, err = connectionDialer.DialContext(ctx, _net, address)
-		} else {
-			conn, err = connectionDialer.DialTLSContext(ctx, _net, address)
-		}
+		conn, err = connectionDialer.DialContext(ctx, _net, address)
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +117,7 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 		d.connectionPoolRegistry.AddPool(address, p)
 	}
 
-	cp, err := d.connectionPoolRegistry.GetPool(address)
+	cp, err = d.connectionPoolRegistry.GetPool(address)
 	if err != nil {
 		return nil, err
 	}

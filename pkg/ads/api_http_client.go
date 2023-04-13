@@ -168,7 +168,7 @@ func (c *client) getHTTPClientPropertiesByHost(input getHTTPClientPropertiesByHo
 // getHttpClientTargetCluster returns the upstream cluster which HTTP traffic is directed to when
 // clients connect to host:port
 func (c *client) getHttpClientTargetCluster(host string, port int) (*envoy_config_cluster_v3.Cluster, *envoy_config_route_v3.Route, error) {
-	hostIPs, err := c.resolveHost(host)
+	hostIPs, err := c.ResolveHost(host)
 	if err != nil {
 		return nil, nil, errors.WrapIff(err, "couldn't resolve host %q", host)
 	}

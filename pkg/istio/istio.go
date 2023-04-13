@@ -181,6 +181,7 @@ type IstioIntegrationHandler interface {
 	GetHTTPTransport(transport http.RoundTripper) (http.RoundTripper, error)
 	GetTCPListener(l net.Listener) (net.Listener, error)
 	GetTCPDialer() (itcp.Dialer, error)
+	GetDiscoveryClient() discovery.DiscoveryClient
 }
 
 func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger logr.Logger) (IstioIntegrationHandler, error) {
@@ -277,6 +278,10 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 	}
 
 	return s, nil
+}
+
+func (h *istioIntegrationHandler) GetDiscoveryClient() discovery.DiscoveryClient {
+	return h.discoveryClient
 }
 
 func (h *istioIntegrationHandler) NewStreamHandler(filters ...api.WasmPluginConfig) (api.StreamHandler, error) {

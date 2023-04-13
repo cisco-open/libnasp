@@ -83,6 +83,8 @@ type Client interface {
 	// DecrementActiveRequestsCount decrements the active requests count for the endpoint given its address
 	// Should be invoked when the endpoint finished processing a request
 	DecrementActiveRequestsCount(address string)
+
+	ResolveHost(hostName string) ([]net.IP, error)
 }
 
 // ListenerPropertiesResponse contains the result for the API call

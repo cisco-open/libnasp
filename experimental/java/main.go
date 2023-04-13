@@ -38,6 +38,7 @@ import (
 
 	"github.com/pborman/uuid"
 
+	"github.com/cisco-open/nasp/pkg/ads"
 	"github.com/cisco-open/nasp/pkg/istio"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
 )
@@ -69,9 +70,8 @@ func Setup(logLevel int) {
 type TCPListener struct {
 	listener net.Listener
 
-	asyncConnectionsLock sync.Mutex
-	asyncConnections     []*Connection
-	terminated           atomic.Bool
+	asyncConnection chan *Connection
+	terminated      atomic.Bool
 
 	acceptInProgress atomic.Bool
 
@@ -267,6 +267,17 @@ func newNaspIntegrationHandler() *naspIntegrationHandler {
 	}
 }
 
+func CheckAddress(address string) (string, error) {
+	ips, err := integrationHandler.iih.GetDiscoveryClient().ResolveHost(address)
+	if ads.IgnoreHostNotFound(err) != nil {
+		return "", err
+	}
+	if len(ips) != 0 {
+		return ips[0].String(), nil
+	}
+	return "", nil
+}
+
 func Bind(address string, port int) (*TCPListener, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", address, port))
 	if err != nil {
@@ -279,8 +290,9 @@ func Bind(address string, port int) (*TCPListener, error) {
 	}
 
 	return &TCPListener{
-		listener: listener,
-		logger:   logger.WithName("TCPListener"),
+		listener:        listener,
+		logger:          logger.WithName("TCPListener"),
+		asyncConnection: make(chan *Connection, 1),
 	}, nil
 }
 
@@ -330,10 +342,7 @@ func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) 
 				println(err.Error())
 				continue
 			}
-
-			l.asyncConnectionsLock.Lock()
-			l.asyncConnections = append(l.asyncConnections, conn)
-			l.asyncConnectionsLock.Unlock()
+			l.asyncConnection <- conn
 
 			selector.queue <- NewSelectedKey(OP_ACCEPT, uint32(selectedKeyId))
 		}
@@ -341,16 +350,8 @@ func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) 
 }
 
 func (l *TCPListener) AsyncAccept() *Connection {
-	l.asyncConnectionsLock.Lock()
-	defer l.asyncConnectionsLock.Unlock()
-
-	if len(l.asyncConnections) > 0 {
-		conn := l.asyncConnections[0]
-		l.asyncConnections = l.asyncConnections[1:]
-		return conn
-	}
-
-	return nil
+	conn := <-l.asyncConnection
+	return conn
 }
 
 func (c *Connection) GetAddress() (*Address, error) {
@@ -395,7 +396,8 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		for {
 			num, err := c.Read(tempBuffer)
 			if err != nil {
-				if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.ECONNRESET) {
+				if errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) ||
+					errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) {
 					c.setEofReceived()
 					selector.readInProgress.Store(selectedKeyId, false)
 					break
