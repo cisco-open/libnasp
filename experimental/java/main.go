@@ -350,8 +350,12 @@ func (l *TCPListener) StartAsyncAccept(selectedKeyId int32, selector *Selector) 
 }
 
 func (l *TCPListener) AsyncAccept() *Connection {
-	conn := <-l.asyncConnection
-	return conn
+	select {
+	case conn := <-l.asyncConnection:
+		return conn
+	default:
+		return nil
+	}
 }
 
 func (c *Connection) GetAddress() (*Address, error) {
