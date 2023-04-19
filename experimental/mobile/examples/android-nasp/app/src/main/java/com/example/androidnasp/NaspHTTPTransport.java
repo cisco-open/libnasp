@@ -12,19 +12,18 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-package com.example.androidistio;
+package com.example.androidnasp;
 
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.os.AsyncTask;
-import android.provider.Settings;
 
 import java.util.function.Function;
 
-import istio.HTTPTransport;
-import istio.Istio;
+import nasp.HTTPTransport;
+import nasp.Nasp;
 
-public class IstioHTTPTransport {
+public class NaspHTTPTransport {
     private static HTTPTransport httpTransport;
 
     public static HTTPTransport get() {
@@ -32,19 +31,21 @@ public class IstioHTTPTransport {
     }
 
     public static void set(HTTPTransport httpTransport) {
-        IstioHTTPTransport.httpTransport = httpTransport;
+        NaspHTTPTransport.httpTransport = httpTransport;
     }
 }
 
-class IstioHTTPTransportCreationTask extends AsyncTask<Void, Void, Exception> {
+class NaspHTTPTransportCreationTask extends AsyncTask<Void, Void, Exception> {
     private ProgressDialog dialog;
     private String heimdallURL;
+    private String heimdallToken;
     private Runnable okAction;
     private Function<Exception, Void> errorAction;
 
-    public IstioHTTPTransportCreationTask(Context context, String heimdallURL, Runnable okAction, Function<Exception, Void> errorAction) {
+    public NaspHTTPTransportCreationTask(Context context, String heimdallURL, String heimdallToken, Runnable okAction, Function<Exception, Void> errorAction) {
         dialog = new ProgressDialog(context);
         this.heimdallURL = heimdallURL;
+        this.heimdallToken = heimdallToken;
         this.okAction = okAction;
         this.errorAction = errorAction;
     }
@@ -57,12 +58,11 @@ class IstioHTTPTransportCreationTask extends AsyncTask<Void, Void, Exception> {
 
     @Override
     protected Exception doInBackground(Void... args) {
-        String clientID = Settings.Secure.getString(dialog.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
-        String clientSecret = clientID;
+        String authorizationToken = "TODO";
 
         try {
-            HTTPTransport httpTransport = Istio.newHTTPTransport(heimdallURL, clientID, clientSecret);
-            IstioHTTPTransport.set(httpTransport);
+            HTTPTransport httpTransport = Nasp.newHTTPTransport(heimdallURL, heimdallToken);
+            NaspHTTPTransport.set(httpTransport);
         } catch (Exception e) {
             return e;
         }

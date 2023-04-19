@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-package com.example.androidistio;
+package com.example.androidnasp;
 
 import android.app.AlertDialog;
 import android.os.Bundle;
@@ -24,7 +24,7 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.fragment.NavHostFragment;
 
-import com.example.androidistio.databinding.FragmentFirstBinding;
+import com.example.androidnasp.databinding.FragmentFirstBinding;
 
 import java.util.function.Function;
 
@@ -49,6 +49,7 @@ public class FirstFragment extends Fragment {
             @Override
             public void onClick(View view) {
                 String heimdallURL = binding.textHeimdallURL.getText().toString();
+                String heimdallToken = binding.textHeimdallToken.getText().toString();
 
                 Runnable okAction = () -> {
                     NavHostFragment.findNavController(FirstFragment.this)
@@ -64,7 +65,7 @@ public class FirstFragment extends Fragment {
                     return null;
                 };
 
-                new IstioHTTPTransportCreationTask(getActivity(), heimdallURL, okAction, errorAction).execute();
+                new NaspHTTPTransportCreationTask(getActivity(), heimdallURL, heimdallToken, okAction, errorAction).execute();
             }
         });
     }

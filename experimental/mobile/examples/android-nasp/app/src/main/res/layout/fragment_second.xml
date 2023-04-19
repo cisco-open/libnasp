@@ -73,7 +73,7 @@
         android:saveEnabled="false"
         android:scrollHorizontally="true"
         android:selectAllOnFocus="true"
-        android:text="Press Send to connect to Istio"
+        android:text="Press Send to connect to Heimdall"
         android:textIsSelectable="true"
         app:layout_constraintBottom_toTopOf="@+id/sendRequest"
         app:layout_constraintTop_toBottomOf="@+id/httpBody"

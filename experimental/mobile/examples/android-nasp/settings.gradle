@@ -15,5 +15,5 @@ dependencyResolutionManagement {
         }
     }
 }
-rootProject.name = "Android Istio"
+rootProject.name = "Android Nasp"
 include ':app'

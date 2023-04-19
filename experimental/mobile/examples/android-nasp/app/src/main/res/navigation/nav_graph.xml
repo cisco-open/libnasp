@@ -21,7 +21,7 @@
 
     <fragment
         android:id="@+id/FirstFragment"
-        android:name="com.example.androidistio.FirstFragment"
+        android:name="com.example.androidnasp.FirstFragment"
         android:label="@string/first_fragment_label"
         tools:layout="@layout/fragment_first">
 
@@ -31,7 +31,7 @@
     </fragment>
     <fragment
         android:id="@+id/SecondFragment"
-        android:name="com.example.androidistio.SecondFragment"
+        android:name="com.example.androidnasp.SecondFragment"
         android:label="@string/second_fragment_label"
         tools:layout="@layout/fragment_second">
 

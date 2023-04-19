@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-package com.example.androidistio;
+package com.example.androidnasp;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -23,12 +23,12 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.fragment.NavHostFragment;
 
-import com.example.androidistio.databinding.FragmentSecondBinding;
+import com.example.androidnasp.databinding.FragmentSecondBinding;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
-import istio.HTTPResponse;
+import nasp.HTTPResponse;
 
 public class SecondFragment extends Fragment {
 
@@ -55,7 +55,7 @@ public class SecondFragment extends Fragment {
                 String url = binding.httpURL.getText().toString();
                 String body = binding.httpBody.getText().toString();
                 try {
-                    HTTPResponse response = IstioHTTPTransport.get().request(method, url, body);
+                    HTTPResponse response = NaspHTTPTransport.get().request(method, url, body);
                     String responseBody = new String(response.getBody(), StandardCharsets.UTF_8);
                     binding.httpResult.setText(
                             String.format(Locale.ENGLISH, "HTTP %d\n%s",
@@ -70,7 +70,7 @@ public class SecondFragment extends Fragment {
         binding.backButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                IstioHTTPTransport.get().close();
+                NaspHTTPTransport.get().close();
 
                 NavHostFragment.findNavController(SecondFragment.this)
                         .navigate(R.id.action_SecondFragment_to_FirstFragment);

@@ -12,7 +12,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-package com.example.androidistio;
+package com.example.androidnasp;
 
 import android.content.Context;
 
@@ -35,6 +35,6 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.example.androidistio", appContext.getPackageName());
+        assertEquals("com.example.androidnasp", appContext.getPackageName());
     }
 }
