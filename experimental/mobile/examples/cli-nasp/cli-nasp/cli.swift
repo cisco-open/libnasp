@@ -12,24 +12,21 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-import Istio
+import Nasp
 import ArgumentParser
 
 @main
-struct CliIstio: ParsableCommand {
+struct CliNasp: ParsableCommand {
     @Option
     var heimdallURL = "https://a2ee965a005324185b398968d6cc7fae-859cb095d9ee0179.elb.eu-central-1.amazonaws.com/config"
     
     @Option
-    var clientID = "9dcfb5194711f057"
-    
-    @Option
-    var clientSecret = "af001efbdd27f4badba8b5e791d7417c"
+    var heimdallToken = ""
     
     mutating func run() throws {
         var error: NSError?
         
-        let transport = IstioNewHTTPTransport(heimdallURL, clientID, clientSecret, &error)
+        let transport = NaspNewHTTPTransport(heimdallURL, heimdallToken, &error)
         if let e = error {
             throw e
         }

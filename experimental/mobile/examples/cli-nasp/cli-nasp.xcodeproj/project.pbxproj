@@ -8,9 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		F84585B629015DDD00B78565 /* cli.swift in Sources */ = {isa = PBXBuildFile; fileRef = F84585B529015DDD00B78565 /* cli.swift */; };
-		F8A8B05A29016BD600FD1CD8 /* Istio.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8C55701290166B100189A26 /* Istio.xcframework */; };
-		F8A8B05B29016BD600FD1CD8 /* Istio.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F8C55701290166B100189A26 /* Istio.xcframework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F85446CF29EFE386005C05E9 /* libresolv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = F85446CE29EFE371005C05E9 /* libresolv.tbd */; };
 		F8A8B05F2901853800FD1CD8 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = F8A8B05E2901853800FD1CD8 /* ArgumentParser */; };
+		F8C09E8B29EFE200004C8243 /* nasp.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8C09E8A29EFE200004C8243 /* nasp.xcframework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -23,13 +23,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
-		F8A8B05C29016BD600FD1CD8 /* Embed Frameworks */ = {
+		F8C09E8D29EFE200004C8243 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				F8A8B05B29016BD600FD1CD8 /* Istio.xcframework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -37,9 +36,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		F84585B229015DDD00B78565 /* cli-istio */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "cli-istio"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F84585B229015DDD00B78565 /* cli-nasp */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "cli-nasp"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F84585B529015DDD00B78565 /* cli.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = cli.swift; sourceTree = "<group>"; };
-		F8C55701290166B100189A26 /* Istio.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = Istio.xcframework; sourceTree = SOURCE_ROOT; };
+		F85446CE29EFE371005C05E9 /* libresolv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.tbd; path = usr/lib/libresolv.tbd; sourceTree = SDKROOT; };
+		F8C09E8A29EFE200004C8243 /* nasp.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = nasp.xcframework; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,7 +48,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				F8A8B05F2901853800FD1CD8 /* ArgumentParser in Frameworks */,
-				F8A8B05A29016BD600FD1CD8 /* Istio.xcframework in Frameworks */,
+				F8C09E8B29EFE200004C8243 /* nasp.xcframework in Frameworks */,
+				F85446CF29EFE386005C05E9 /* libresolv.tbd in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -59,7 +60,7 @@
 			isa = PBXGroup;
 			children = (
 				F84585BC2901660F00B78565 /* Frameworks */,
-				F84585B429015DDD00B78565 /* cli-istio */,
+				F84585B429015DDD00B78565 /* cli-nasp */,
 				F84585B329015DDD00B78565 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -67,23 +68,24 @@
 		F84585B329015DDD00B78565 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F84585B229015DDD00B78565 /* cli-istio */,
+				F84585B229015DDD00B78565 /* cli-nasp */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		F84585B429015DDD00B78565 /* cli-istio */ = {
+		F84585B429015DDD00B78565 /* cli-nasp */ = {
 			isa = PBXGroup;
 			children = (
 				F84585B529015DDD00B78565 /* cli.swift */,
 			);
-			path = "cli-istio";
+			path = "cli-nasp";
 			sourceTree = "<group>";
 		};
 		F84585BC2901660F00B78565 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				F8C55701290166B100189A26 /* Istio.xcframework */,
+				F85446CE29EFE371005C05E9 /* libresolv.tbd */,
+				F8C09E8A29EFE200004C8243 /* nasp.xcframework */,
 			);
 			path = Frameworks;
 			sourceTree = "<group>";
@@ -91,25 +93,25 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		F84585B129015DDD00B78565 /* cli-istio */ = {
+		F84585B129015DDD00B78565 /* cli-nasp */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F84585B929015DDD00B78565 /* Build configuration list for PBXNativeTarget "cli-istio" */;
+			buildConfigurationList = F84585B929015DDD00B78565 /* Build configuration list for PBXNativeTarget "cli-nasp" */;
 			buildPhases = (
 				F84585AE29015DDD00B78565 /* Sources */,
 				F84585AF29015DDD00B78565 /* Frameworks */,
 				F84585B029015DDD00B78565 /* CopyFiles */,
-				F8A8B05C29016BD600FD1CD8 /* Embed Frameworks */,
+				F8C09E8D29EFE200004C8243 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = "cli-istio";
+			name = "cli-nasp";
 			packageProductDependencies = (
 				F8A8B05E2901853800FD1CD8 /* ArgumentParser */,
 			);
-			productName = "cli-istio";
-			productReference = F84585B229015DDD00B78565 /* cli-istio */;
+			productName = "cli-nasp";
+			productReference = F84585B229015DDD00B78565 /* cli-nasp */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -127,7 +129,7 @@
 					};
 				};
 			};
-			buildConfigurationList = F84585AD29015DDD00B78565 /* Build configuration list for PBXProject "cli-istio" */;
+			buildConfigurationList = F84585AD29015DDD00B78565 /* Build configuration list for PBXProject "cli-nasp" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -143,7 +145,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				F84585B129015DDD00B78565 /* cli-istio */,
+				F84585B129015DDD00B78565 /* cli-nasp */,
 			);
 		};
 /* End PBXProject section */
@@ -298,7 +300,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		F84585AD29015DDD00B78565 /* Build configuration list for PBXProject "cli-istio" */ = {
+		F84585AD29015DDD00B78565 /* Build configuration list for PBXProject "cli-nasp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F84585B729015DDD00B78565 /* Debug */,
@@ -307,7 +309,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F84585B929015DDD00B78565 /* Build configuration list for PBXNativeTarget "cli-istio" */ = {
+		F84585B929015DDD00B78565 /* Build configuration list for PBXNativeTarget "cli-nasp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F84585BA29015DDD00B78565 /* Debug */,
