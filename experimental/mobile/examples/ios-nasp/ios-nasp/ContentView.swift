@@ -13,33 +13,32 @@
 //  limitations under the License.
 
 import SwiftUI
-import Istio
+import Nasp
 
 enum Method: String, CaseIterable, Identifiable {
     case GET, POST, DELETE
     var id: Self { self }
 }
 
-let defaultConnectText = "Press Connect for Istio HTTP request"
+let defaultConnectText = "Press Connect for a Nasp HTTP request"
 
 struct ContentView: View {
     @State var configURL = "https://localhost:16443/config"
+    @State var configToken = "Paste a Heimdall token"
     @State var url = "https://echo.testing"
     @State var method = Method.GET
     @State var requestBody = ""
     @State var response = defaultConnectText
-    @State var transport: IstioHTTPTransport?
+    @State var transport: NaspHTTPTransport?
     @State var selection : String?
     @State var showError = false
     @State var errorMessage = ""
     @State var bombard = false
 
-    func newTransport() throws -> IstioHTTPTransport {
+    func newTransport() throws -> NaspHTTPTransport {
         var error: NSError?
-        let clientID = UIDevice.current.identifierForVendor?.uuidString
-        let clientSecret = UIDevice.current.identifierForVendor?.uuidString
 
-        let transport = IstioNewHTTPTransport(configURL, clientID, clientSecret, &error)
+        let transport = NaspNewHTTPTransport(configURL, configToken, &error)
         if let e = error {
             throw e
         }
@@ -57,6 +56,9 @@ struct ContentView: View {
             TextField("Heimdall URL",
                       text: $configURL,
                       prompt: Text("Heimdall URL")).padding()
+            TextField("Heimdall Token",
+                      text: $configToken,
+                      prompt: Text("Heimdall Token")).padding()
             Button("Connect", action: {
                 selection = "progress"
             })

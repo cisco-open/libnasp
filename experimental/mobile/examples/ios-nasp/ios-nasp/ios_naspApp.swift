@@ -15,7 +15,7 @@
 import SwiftUI
 
 @main
-struct ios_istioApp: App {
+struct ios_naspApp: App {
 
     var body: some Scene {
         WindowGroup {

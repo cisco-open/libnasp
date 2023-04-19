@@ -14,7 +14,7 @@
 
 import XCTest
 
-class ios_istioUITestsLaunchTests: XCTestCase {
+class ios_naspUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
