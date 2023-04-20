@@ -53,7 +53,18 @@ jobs:
         run: |
           make android
 
+      - name: Build android example
+        working-directory: experimental/mobile/examples/android-nasp
+        run: |
+          export JAVA_HOME="$(brew --prefix)/opt/openjdk/"
+          ./gradlew build
+
       - name: Build ios framework
         working-directory: experimental/mobile
         run: |
           make ios
+
+      - name: Build ios example
+        working-directory: experimental/mobile/examples/ios-nasp
+        run: |
+          xcodebuild
