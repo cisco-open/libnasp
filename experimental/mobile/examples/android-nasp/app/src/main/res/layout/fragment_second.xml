@@ -27,15 +27,17 @@
         android:layout_height="wrap_content"
         android:text="Send"
         app:layout_constraintBottom_toBottomOf="parent"
-        tools:layout_editor_absoluteX="0dp" />
+        app:layout_constraintStart_toStartOf="parent" />
 
     <Spinner
         android:id="@+id/httpMethod"
-        android:layout_width="409dp"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="7dp"
         android:entries="@array/http_methods"
-        tools:layout_editor_absoluteX="3dp"
-        tools:layout_editor_absoluteY="7dp" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <EditText
         android:id="@+id/httpURL"
@@ -44,6 +46,7 @@
         android:ems="10"
         android:inputType="textPersonName"
         android:text="https://echo.demo:8080"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/httpMethod" />
 
     <Button
@@ -56,19 +59,24 @@
 
     <EditText
         android:id="@+id/httpBody"
-        android:layout_width="407dp"
+        android:layout_width="0dp"
         android:layout_height="140dp"
+        android:layout_marginStart="1dp"
+        android:layout_marginEnd="1dp"
         android:ems="10"
         android:gravity="start|top"
         android:hint="Request body"
         android:inputType="textMultiLine"
-        app:layout_constraintTop_toBottomOf="@+id/httpURL"
-        tools:layout_editor_absoluteX="3dp" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/httpURL" />
 
     <TextView
         android:id="@+id/httpResult"
-        android:layout_width="402dp"
+        android:layout_width="0dp"
         android:layout_height="401dp"
+        android:layout_marginStart="3dp"
+        android:layout_marginEnd="3dp"
         android:layout_marginBottom="4dp"
         android:saveEnabled="false"
         android:scrollHorizontally="true"
@@ -76,6 +84,7 @@
         android:text="Press Send to connect to Heimdall"
         android:textIsSelectable="true"
         app:layout_constraintBottom_toTopOf="@+id/sendRequest"
-        app:layout_constraintTop_toBottomOf="@+id/httpBody"
-        tools:layout_editor_absoluteX="3dp" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/httpBody" />
 </androidx.constraintlayout.widget.ConstraintLayout>
