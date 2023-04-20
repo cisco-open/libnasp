@@ -67,4 +67,4 @@ jobs:
       - name: Build ios example
         working-directory: experimental/mobile/examples/ios-nasp
         run: |
-          xcodebuild
+          xcodebuild -allowProvisioningUpdates
