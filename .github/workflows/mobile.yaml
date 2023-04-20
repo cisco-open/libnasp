@@ -67,4 +67,4 @@ jobs:
       - name: Build ios example
         working-directory: experimental/mobile/examples/ios-nasp
         run: |
-          xcodebuild -allowProvisioningUpdates
+          xcodebuild clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
