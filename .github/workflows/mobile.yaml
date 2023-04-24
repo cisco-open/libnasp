@@ -29,6 +29,9 @@ jobs:
           go install ./cmd/gomobile
           go install ./cmd/gobind
 
+      - name: Gradle wrapper validation
+        uses: gradle/wrapper-validation-action@v1
+
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
       #   with:
