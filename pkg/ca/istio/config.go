@@ -146,7 +146,7 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 		}
 	}
 
-	pem, err := GetIstioRootCAPEM(cl, istioRevision)
+	_, pem, err := GetIstioRootCAPEM(cl, istioRevision)
 	if err != nil {
 		return IstioCAClientConfig{}, errors.WrapIf(err, "could not get istio root ca pem")
 	}
@@ -297,7 +297,7 @@ func GetIMGWAddress(cl client.Client, istioRevision string) (string, error) {
 	return address, nil
 }
 
-func GetIstioRootCAPEM(cl client.Client, istioRevision string) ([]byte, error) {
+func GetIstioRootCAPEM(cl client.Client, istioRevision string) (*corev1.ConfigMap, []byte, error) {
 	cms := &corev1.ConfigMapList{}
 
 	labelSets := []map[string]string{
@@ -313,7 +313,7 @@ func GetIstioRootCAPEM(cl client.Client, istioRevision string) ([]byte, error) {
 	for _, labels := range labelSets {
 		err := cl.List(context.Background(), cms, client.InNamespace(istioNamespace), client.MatchingLabels(labels))
 		if err != nil {
-			return nil, errors.WrapIf(err, "could not get configmaps")
+			return nil, nil, errors.WrapIf(err, "could not get configmaps")
 		}
 		if len(cms.Items) > 0 {
 			break
@@ -321,15 +321,15 @@ func GetIstioRootCAPEM(cl client.Client, istioRevision string) ([]byte, error) {
 	}
 
 	if len(cms.Items) == 0 {
-		return nil, errors.New("root ca configmap is not found")
+		return nil, nil, errors.New("root ca configmap is not found")
 	}
 
 	configmap := &corev1.ConfigMap{}
 	if err := cl.Get(context.Background(), client.ObjectKeyFromObject(&cms.Items[0]), configmap); err != nil {
-		return nil, errors.WrapIf(err, "could not get istio root ca configmap")
+		return nil, nil, errors.WrapIf(err, "could not get istio root ca configmap")
 	}
 
-	return []byte(configmap.Data["root-cert.pem"]), nil
+	return configmap, []byte(configmap.Data["root-cert.pem"]), nil
 }
 
 func GetMeshConfig(cl client.Client, istioRevision string) (*meshv1alpha1.MeshConfig, error) {

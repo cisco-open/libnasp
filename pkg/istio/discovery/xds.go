@@ -73,6 +73,10 @@ func NewXDSDiscoveryClient(environment *environment.IstioEnvironment, caClient c
 	}
 }
 
+func (d *xdsDiscoveryClient) ResolveHost(hostName string) ([]net.IP, error) {
+	return d.xdsClient.ResolveHost(hostName)
+}
+
 func (d *xdsDiscoveryClient) Connect(ctx context.Context) error {
 	ctx = logr.NewContext(ctx, d.logger)
 

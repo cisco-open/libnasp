@@ -19,6 +19,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/blend/go-sdk/envoyutil"
+
 	"github.com/cisco-open/nasp/pkg/network"
 	"github.com/cisco-open/nasp/pkg/proxywasm"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
@@ -70,10 +72,33 @@ func (m *envoyHttpHandlerMiddleware) AfterResponse(resp api.HTTPResponse, stream
 
 // INBOUND
 
+func (m *envoyHttpHandlerMiddleware) setXForwardedHeaders(req api.HTTPRequest, stream api.Stream) {
+	getStringProperty := func(p api.PropertyHolder, key string) string {
+		if raw, ok := p.Get(key); ok {
+			if str, ok := raw.(string); ok {
+				return str
+			}
+		}
+
+		return ""
+	}
+
+	xfccHeader := envoyutil.XFCCElement{
+		By:      getStringProperty(stream, "connection.uri_san_local_certificate"),
+		Hash:    getStringProperty(stream, "connection.sha256_peer_certificate_digest"),
+		Subject: getStringProperty(stream, "connection.uri_san_peer_certificate"),
+		DNS:     []string{getStringProperty(stream, "dns_san_peer_certificate")},
+	}
+
+	req.Header().Add(envoyutil.HeaderXFCC, xfccHeader.String())
+	req.Header().Add("X-Forwarded-Proto", "https")
+}
+
 func (m *envoyHttpHandlerMiddleware) beforeInboundRequest(req api.HTTPRequest, stream api.Stream) {
 	if connection := req.Connection(); connection != nil {
 		m.setRequestProperties(req, stream, connection.GetTimeToFirstByte())
 		SetEnvoyConnectionInfo(connection, stream)
+		m.setXForwardedHeaders(req, stream)
 	}
 }
 

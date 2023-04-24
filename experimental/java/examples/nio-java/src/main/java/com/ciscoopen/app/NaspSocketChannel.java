@@ -16,6 +16,7 @@ import java.net.SocketAddress;
 import java.net.SocketOption;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.spi.SelectorProvider;
 import java.util.Objects;
@@ -27,15 +28,26 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     private Connection connection;
     private NaspSocket socket;
     private InetSocketAddress address;
+    private Selector selector;
 
     public NaspSocketChannel(SelectorProvider provider) {
         super(provider);
+        try {
+            naspTcpDialer = Nasp.newTCPDialer();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     protected NaspSocketChannel(SelectorProvider provider, Connection connection, NaspSocket socket) {
         super(provider);
         this.connection = connection;
         this.socket = socket;
+        try {
+            naspTcpDialer = Nasp.newTCPDialer();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -88,17 +100,26 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public boolean connect(SocketAddress remote) throws IOException {
-        try {
-            naspTcpDialer = Nasp.newTCPDialer();
-        } catch (Exception e) {
-            throw new IOException("could not get nasp tcp dialer", e);
-        }
         address = (InetSocketAddress) checkRemote(remote);
         socket.setAddress(address);
+        if (selector != null) {
+            naspTcpDialer.startAsyncDial(this.keyFor(selector).hashCode(), ((NaspSelector)selector).getSelector(),
+                    address.getHostString(), address.getPort());
+        }
         return false;
     }
 
     private SocketAddress checkRemote(SocketAddress sa) {
+        String addr = "";
+        try {
+            addr = Nasp.checkAddress(
+                    ((InetSocketAddress) sa).getHostString() );
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        if (!addr.equals("")) {
+            return new InetSocketAddress(addr, ((InetSocketAddress) sa).getPort());
+        }
         InetSocketAddress isa = Net.checkAddress(sa);
         InetAddress address = isa.getAddress();
         if (address.isAnyLocalAddress()) {
@@ -118,6 +139,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         connection = naspTcpDialer.asyncDial();
         if (connection == null) {
             return false;
+        }
+        if (socket.getConnection() == null) {
+            socket.setConnection(connection);
         }
         return true;
     }
@@ -294,5 +318,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     public InetSocketAddress getAddress() {
         return address;
+    }
+
+    public void setSelector(Selector selector) {
+        this.selector = selector;
     }
 }

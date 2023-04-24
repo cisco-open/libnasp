@@ -47,6 +47,10 @@ class NaspSelector extends SelectorImpl {
         super(sp);
     }
 
+    public nasp.Selector getSelector() {
+        return selector;
+    }
+
     @Override
     protected int doSelect(Consumer<SelectionKey> action, long timeout) throws IOException {
         int to = (int) Math.min(timeout, Integer.MAX_VALUE); // max poll timeout
@@ -193,9 +197,13 @@ class NaspSelector extends SelectorImpl {
             //This could happen if we are servers not clients
             if (naspSocketChannel.getNaspTcpDialer() != null) {
                 InetSocketAddress address = naspSocketChannel.getAddress();
-                naspSocketChannel.getNaspTcpDialer().startAsyncDial(selectedKeyId, selector,
-                        address.getHostString(), address.getPort());
-                runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
+                if (address != null) {
+                    naspSocketChannel.getNaspTcpDialer().startAsyncDial(selectedKeyId, selector,
+                            address.getHostString(), address.getPort());
+                    runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
+                } else {
+                    naspSocketChannel.setSelector(this);
+                }
             }
         }
     }
