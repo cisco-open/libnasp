@@ -85,11 +85,12 @@ type naspIntegrationHandler struct {
 }
 
 type Connection struct {
-	id           string
-	conn         net.Conn
-	readBuffer   *bytes.Buffer
-	readLock     sync.RWMutex
-	writeChannel chan []byte
+	id            string
+	conn          net.Conn
+	readBuffer    *bytes.Buffer
+	readBufferLen atomic.Int32
+	readLock      sync.RWMutex
+	writeChannel  chan []byte
 
 	terminated atomic.Bool
 
@@ -122,7 +123,6 @@ func (k SelectedKey) SelectedKeyId() uint32 {
 
 type Selector struct {
 	queue        chan SelectedKey
-	writableKeys sync.Map
 	readableKeys sync.Map
 
 	readInProgress  sync.Map
@@ -135,7 +135,6 @@ func NewSelector() *Selector {
 
 func (s *Selector) Close() {
 	close(s.queue)
-	s.writableKeys = sync.Map{}
 	s.readableKeys = sync.Map{}
 	s.readInProgress = sync.Map{}
 	s.writeInProgress = sync.Map{}
@@ -147,19 +146,6 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	}
 	defer cancel()
-
-	//nolint:forcetypeassert
-	s.writableKeys.Range(func(key, value any) bool {
-		check := value.(func() bool)
-		if check() {
-			select {
-			case s.queue <- NewSelectedKey(OP_WRITE, uint32(key.(int32))):
-			default:
-				// best effort non-blocking write
-			}
-		}
-		return true
-	})
 
 	//nolint:forcetypeassert
 	s.readableKeys.Range(func(key, value any) bool {
@@ -222,12 +208,7 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 	}
 }
 
-func (s *Selector) registerWriter(selectedKeyId int32, check func() bool) {
-	s.writableKeys.Store(selectedKeyId, check)
-}
-
 func (s *Selector) unregisterWriter(selectedKeyId int32) {
-	s.writableKeys.Delete(selectedKeyId)
 	s.writeInProgress.Delete(selectedKeyId)
 }
 
@@ -395,6 +376,10 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		return
 	}
 
+	selector.registerReader(selectedKeyId, func() bool {
+		return c.readBufferLen.Load() > 0
+	})
+
 	go func() {
 		tempBuffer := make([]byte, 1024)
 		for {
@@ -420,6 +405,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if num > 0 {
 				c.readLock.Lock()
 				n, err := c.readBuffer.Write(tempBuffer[:num])
+				c.readBufferLen.Add(int32(n))
 				c.readLock.Unlock()
 				if err != nil {
 					logger.Error(err, "couldn't write data to read buffer")
@@ -430,12 +416,6 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			} else {
 				logger.V(1).Info("received 0 bytes on connection")
 			}
-
-			selector.registerReader(selectedKeyId, func() bool {
-				c.readLock.RLock()
-				defer c.readLock.RUnlock()
-				return c.readBuffer.Len() > 0
-			})
 		}
 
 		logger.V(1).Info("StartAsyncRead finished")
@@ -449,6 +429,7 @@ func (c *Connection) AsyncRead(b []byte) (int32, error) {
 	defer c.readLock.Unlock()
 	max := int(math.Min(float64(c.readBuffer.Len()), float64(len(b))))
 	n, err := c.readBuffer.Read(b[:max])
+	c.readBufferLen.Add(int32(-n))
 	return int32(n), err
 }
 
@@ -465,20 +446,16 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		return
 	}
 
-	selector.registerWriter(selectedKeyId, func() bool {
-		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
-		if !b {
-			logger.V(1).Info("write channel is full!")
-		}
-		return b
-	})
-
 	go func() {
 	out:
 		for buff := range c.writeChannel {
 			for {
 				num, err := c.Write(buff)
 				if err != nil {
+					if num > 0 {
+						selector.queue <- NewSelectedKey(OP_WRITE, uint32(selectedKeyId))
+					}
+
 					if c.isTerminated() {
 						selector.writeInProgress.Store(selectedKeyId, false)
 						break out
