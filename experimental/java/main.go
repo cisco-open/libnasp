@@ -123,6 +123,7 @@ func (k SelectedKey) SelectedKeyId() uint32 {
 
 type Selector struct {
 	queue        chan SelectedKey
+	writableKeys sync.Map
 	readableKeys sync.Map
 
 	readInProgress  sync.Map
@@ -135,6 +136,7 @@ func NewSelector() *Selector {
 
 func (s *Selector) Close() {
 	close(s.queue)
+	s.writableKeys = sync.Map{}
 	s.readableKeys = sync.Map{}
 	s.readInProgress = sync.Map{}
 	s.writeInProgress = sync.Map{}
@@ -158,6 +160,19 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 			}
 		} else if v, _ := s.readInProgress.Load(key.(int32)); v != nil && !v.(bool) {
 			s.unregisterReader(key.(int32))
+		}
+		return true
+	})
+
+	//nolint:forcetypeassert
+	s.writableKeys.Range(func(key, value any) bool {
+		check := value.(func() bool)
+		if check() {
+			select {
+			case s.queue <- NewSelectedKey(OP_WRITE, uint32(key.(int32))):
+			default:
+				// best effort non-blocking write
+			}
 		}
 		return true
 	})
@@ -208,7 +223,12 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 	}
 }
 
+func (s *Selector) registerWriter(selectedKeyId int32, check func() bool) {
+	s.writableKeys.Store(selectedKeyId, check)
+}
+
 func (s *Selector) unregisterWriter(selectedKeyId int32) {
+	s.writableKeys.Delete(selectedKeyId)
 	s.writeInProgress.Delete(selectedKeyId)
 }
 
@@ -421,6 +441,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		logger.V(1).Info("StartAsyncRead finished")
 	}()
 }
+
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
 	if c.eofReceived() {
 		return -1, nil
@@ -446,16 +467,20 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 		return
 	}
 
+	selector.registerWriter(selectedKeyId, func() bool {
+		b := len(c.writeChannel) < MAX_WRITE_BUFFERS
+		if !b {
+			logger.V(1).Info("write channel is full!")
+		}
+		return b
+	})
+
 	go func() {
 	out:
 		for buff := range c.writeChannel {
 			for {
 				num, err := c.Write(buff)
 				if err != nil {
-					if num > 0 {
-						selector.queue <- NewSelectedKey(OP_WRITE, uint32(selectedKeyId))
-					}
-
 					if c.isTerminated() {
 						selector.writeInProgress.Store(selectedKeyId, false)
 						break out
