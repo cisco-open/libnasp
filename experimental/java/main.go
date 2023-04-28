@@ -149,15 +149,14 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 	}
 	defer cancel()
 
+	selected := make(map[uint32]SelectedKey)
+	fmt.Println("INSIDE THE SELECT")
+
 	//nolint:forcetypeassert
 	s.readableKeys.Range(func(key, value any) bool {
 		check := value.(func() bool)
 		if check() {
-			select {
-			case s.queue <- NewSelectedKey(OP_READ, uint32(key.(int32))):
-			default:
-				// best effort non-blocking read
-			}
+			selected[uint32(key.(int32))] |= NewSelectedKey(OP_READ, uint32(key.(int32)))
 		} else if v, _ := s.readInProgress.Load(key.(int32)); v != nil && !v.(bool) {
 			s.unregisterReader(key.(int32))
 		}
@@ -168,22 +167,40 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 	s.writableKeys.Range(func(key, value any) bool {
 		check := value.(func() bool)
 		if check() {
-			select {
-			case s.queue <- NewSelectedKey(OP_WRITE, uint32(key.(int32))):
-			default:
-				// best effort non-blocking write
-			}
+			selected[uint32(key.(int32))] |= NewSelectedKey(OP_WRITE, uint32(key.(int32)))
 		}
 		return true
 	})
 
-	if (timeoutMs == 0) && len(s.queue) == 0 {
+	if (timeoutMs == 0) && len(s.queue) == 0 && len(selected) == 0 {
 		return nil
+	}
+	if len(s.queue) == 0 && len(selected) != 0 {
+		b := make([]byte, len(selected)*8)
+		i := 0
+		for k, v := range selected {
+			// add current running ops to selected key
+			var runningOps uint64
+			readInProgress, _ := s.readInProgress.Load(int32(k))
+			//nolint:forcetypeassert
+			if readInProgress != nil && readInProgress.(bool) {
+				runningOps |= uint64(OP_READ)
+			}
+			writeInProgress, _ := s.writeInProgress.Load(int32(k))
+			//nolint:forcetypeassert
+			if writeInProgress != nil && writeInProgress.(bool) {
+				runningOps |= uint64(OP_WRITE)
+			}
+
+			binary.BigEndian.PutUint64(b[i*8:], uint64(v)|(runningOps<<40))
+			i++
+		}
+		fmt.Println("READWRITE OP")
+		return b
 	}
 
 	select {
 	case e := <-s.queue:
-		selected := make(map[uint32]SelectedKey)
 		if e.Operation() != OP_WAKEUP {
 			selected[e.SelectedKeyId()] |= e
 		}
@@ -216,7 +233,7 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 			binary.BigEndian.PutUint64(b[i*8:], uint64(v)|(runningOps<<40))
 			i++
 		}
-
+		fmt.Println("ACCEPT/CONNECT OP")
 		return b
 	case <-ctx.Done():
 		return nil

@@ -92,7 +92,10 @@ class NaspSelector extends SelectorImpl {
 
     private void updateRunningAsyncOps(int selectedKeyId, int updateOps) {
         int runningOps = 0;
-        runningOps = runningAsyncOps.get(selectedKeyId);
+        Integer temp = runningAsyncOps.get(selectedKeyId);
+        if (temp != null) {
+            runningOps = temp;
+        }
         if ((updateOps & SelectionKey.OP_READ) != 0) {
             if ((runningOps & SelectionKey.OP_READ) == 0) {
                 runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
