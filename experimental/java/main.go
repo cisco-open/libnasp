@@ -150,7 +150,6 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 	defer cancel()
 
 	selected := make(map[uint32]SelectedKey)
-	fmt.Println("INSIDE THE SELECT")
 
 	//nolint:forcetypeassert
 	s.readableKeys.Range(func(key, value any) bool {
@@ -195,7 +194,6 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 			binary.BigEndian.PutUint64(b[i*8:], uint64(v)|(runningOps<<40))
 			i++
 		}
-		fmt.Println("READWRITE OP")
 		return b
 	}
 
@@ -233,7 +231,6 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 			binary.BigEndian.PutUint64(b[i*8:], uint64(v)|(runningOps<<40))
 			i++
 		}
-		fmt.Println("ACCEPT/CONNECT OP")
 		return b
 	case <-ctx.Done():
 		return nil
