@@ -85,11 +85,12 @@ type naspIntegrationHandler struct {
 }
 
 type Connection struct {
-	id           string
-	conn         net.Conn
-	readBuffer   *bytes.Buffer
-	readLock     sync.RWMutex
-	writeChannel chan []byte
+	id            string
+	conn          net.Conn
+	readBuffer    *bytes.Buffer
+	readBufferLen atomic.Int32
+	readLock      sync.RWMutex
+	writeChannel  chan []byte
 
 	terminated atomic.Bool
 
@@ -148,41 +149,56 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 	}
 	defer cancel()
 
-	//nolint:forcetypeassert
-	s.writableKeys.Range(func(key, value any) bool {
-		check := value.(func() bool)
-		if check() {
-			select {
-			case s.queue <- NewSelectedKey(OP_WRITE, uint32(key.(int32))):
-			default:
-				// best effort non-blocking write
-			}
-		}
-		return true
-	})
+	selected := make(map[uint32]SelectedKey)
 
 	//nolint:forcetypeassert
 	s.readableKeys.Range(func(key, value any) bool {
 		check := value.(func() bool)
 		if check() {
-			select {
-			case s.queue <- NewSelectedKey(OP_READ, uint32(key.(int32))):
-			default:
-				// best effort non-blocking read
-			}
+			selected[uint32(key.(int32))] |= NewSelectedKey(OP_READ, uint32(key.(int32)))
 		} else if v, _ := s.readInProgress.Load(key.(int32)); v != nil && !v.(bool) {
 			s.unregisterReader(key.(int32))
 		}
 		return true
 	})
 
-	if (timeoutMs == 0) && len(s.queue) == 0 {
+	//nolint:forcetypeassert
+	s.writableKeys.Range(func(key, value any) bool {
+		check := value.(func() bool)
+		if check() {
+			selected[uint32(key.(int32))] |= NewSelectedKey(OP_WRITE, uint32(key.(int32)))
+		}
+		return true
+	})
+
+	if (timeoutMs == 0) && len(s.queue) == 0 && len(selected) == 0 {
 		return nil
+	}
+	if len(s.queue) == 0 && len(selected) != 0 {
+		b := make([]byte, len(selected)*8)
+		i := 0
+		for k, v := range selected {
+			// add current running ops to selected key
+			var runningOps uint64
+			readInProgress, _ := s.readInProgress.Load(int32(k))
+			//nolint:forcetypeassert
+			if readInProgress != nil && readInProgress.(bool) {
+				runningOps |= uint64(OP_READ)
+			}
+			writeInProgress, _ := s.writeInProgress.Load(int32(k))
+			//nolint:forcetypeassert
+			if writeInProgress != nil && writeInProgress.(bool) {
+				runningOps |= uint64(OP_WRITE)
+			}
+
+			binary.BigEndian.PutUint64(b[i*8:], uint64(v)|(runningOps<<40))
+			i++
+		}
+		return b
 	}
 
 	select {
 	case e := <-s.queue:
-		selected := make(map[uint32]SelectedKey)
 		if e.Operation() != OP_WAKEUP {
 			selected[e.SelectedKeyId()] |= e
 		}
@@ -215,7 +231,6 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 			binary.BigEndian.PutUint64(b[i*8:], uint64(v)|(runningOps<<40))
 			i++
 		}
-
 		return b
 	case <-ctx.Done():
 		return nil
@@ -395,6 +410,10 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 		return
 	}
 
+	selector.registerReader(selectedKeyId, func() bool {
+		return c.readBufferLen.Load() > 0
+	})
+
 	go func() {
 		tempBuffer := make([]byte, 1024)
 		for {
@@ -420,6 +439,7 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			if num > 0 {
 				c.readLock.Lock()
 				n, err := c.readBuffer.Write(tempBuffer[:num])
+				c.readBufferLen.Add(int32(n))
 				c.readLock.Unlock()
 				if err != nil {
 					logger.Error(err, "couldn't write data to read buffer")
@@ -430,17 +450,12 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 			} else {
 				logger.V(1).Info("received 0 bytes on connection")
 			}
-
-			selector.registerReader(selectedKeyId, func() bool {
-				c.readLock.RLock()
-				defer c.readLock.RUnlock()
-				return c.readBuffer.Len() > 0
-			})
 		}
 
 		logger.V(1).Info("StartAsyncRead finished")
 	}()
 }
+
 func (c *Connection) AsyncRead(b []byte) (int32, error) {
 	if c.eofReceived() {
 		return -1, nil
@@ -449,6 +464,7 @@ func (c *Connection) AsyncRead(b []byte) (int32, error) {
 	defer c.readLock.Unlock()
 	max := int(math.Min(float64(c.readBuffer.Len()), float64(len(b))))
 	n, err := c.readBuffer.Read(b[:max])
+	c.readBufferLen.Add(int32(-n))
 	return int32(n), err
 }
 

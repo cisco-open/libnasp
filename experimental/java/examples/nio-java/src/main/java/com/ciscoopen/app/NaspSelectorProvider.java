@@ -92,18 +92,27 @@ class NaspSelector extends SelectorImpl {
 
     private void updateRunningAsyncOps(int selectedKeyId, int updateOps) {
         int runningOps = 0;
-        if (runningAsyncOps.containsKey(selectedKeyId)) {
-            runningOps = runningAsyncOps.get(selectedKeyId);
+        Integer temp = runningAsyncOps.get(selectedKeyId);
+        if (temp != null) {
+            runningOps = temp;
         }
         if ((updateOps & SelectionKey.OP_READ) != 0) {
-            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
+            if ((runningOps & SelectionKey.OP_READ) == 0) {
+                runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
+            }
         } else {
-            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_READ);
+            if ((runningOps & SelectionKey.OP_READ) != 0) {
+                runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_READ);
+            }
         }
         if ((updateOps & SelectionKey.OP_WRITE) != 0) {
-            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_WRITE);
+            if ((runningOps & SelectionKey.OP_WRITE) == 0) {
+                runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_WRITE);
+            }
         } else {
-            runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_WRITE);
+            if ((runningOps & SelectionKey.OP_WRITE) != 0) {
+                runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_WRITE);
+            }
         }
     }
 
