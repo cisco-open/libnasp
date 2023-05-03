@@ -1,3 +1,2 @@
-optConfig:
-  ignorePaths:
-    - experimental/mobile/examples/android-nasp/gradle/wrapper/gradle-wrapper.jar
+ignorePaths:
+  - experimental/mobile/examples/android-nasp/gradle/wrapper/gradle-wrapper.jar
