@@ -26,6 +26,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     private TCPDialer naspTcpDialer;
     private Connection connection;
+    private boolean connected;
     private NaspSocket socket;
     private InetSocketAddress address;
     private Selector selector;
@@ -42,6 +43,9 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
     protected NaspSocketChannel(SelectorProvider provider, Connection connection, NaspSocket socket) {
         super(provider);
         this.connection = connection;
+        if (connection != null) {
+            connected = true;
+        }
         this.socket = socket;
         try {
             naspTcpDialer = Nasp.newTCPDialer();
@@ -90,12 +94,12 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
 
     @Override
     public boolean isConnected() {
-        return connection != null;
+        return connected;
     }
 
     @Override
     public boolean isConnectionPending() {
-        return connection == null;
+        return !connected;
     }
 
     @Override
@@ -142,6 +146,7 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         }
         if (socket.getConnection() == null) {
             socket.setConnection(connection);
+            connected = true;
         }
         return true;
     }
