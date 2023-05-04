@@ -159,6 +159,7 @@ func getstream(runtime string, prefix string) api.StreamHandler {
 		prefix + "_NASP_WORKLOAD_NAME=alpine",
 		prefix + "_NASP_INSTANCE_IP=10.20.4.75",
 		prefix + "_NASP_ISTIO_VERSION=1.13.5",
+		prefix + "_NASP_ZIPKIN_ADDRESS=smm-zipkin.smm-system.svc.cluster.local:59411",
 	} {
 		p := strings.Split(env, "=")
 		if len(p) != 2 {

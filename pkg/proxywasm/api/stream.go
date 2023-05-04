@@ -68,6 +68,7 @@ type HTTPResponse interface {
 	ConnectionState() network.ConnectionState
 }
 
+//nolint:interfacebloat
 type HTTPRequest interface {
 	URL() *url.URL
 	Header() HeaderMap
@@ -81,6 +82,7 @@ type HTTPRequest interface {
 	HTTPProtocol() string
 	Host() string
 	Method() string
+	RemoteAddr() string
 
 	ConnectionState() network.ConnectionState
 }

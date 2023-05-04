@@ -15,6 +15,7 @@
 package istio
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/cisco-open/nasp/pkg/istio/fb"
@@ -34,9 +35,9 @@ func NewIstioHTTPHandlerMiddleware() pwhttp.HandleMiddleware {
 	return &istioHttpHandlerMiddleware{}
 }
 
-func (m *istioHttpHandlerMiddleware) BeforeRequest(req api.HTTPRequest, stream api.Stream) {
+func (m *istioHttpHandlerMiddleware) BeforeRequest(req api.HTTPRequest, stream api.Stream) (api.HTTPRequest, api.Stream) {
 	if stream.Direction() != api.ListenerDirectionInbound {
-		return
+		return req, stream
 	}
 
 	if serviceName, found := stream.Get("node.metadata.LABELS.service\\.istio\\.io/canonical-name"); found {
@@ -48,11 +49,13 @@ func (m *istioHttpHandlerMiddleware) BeforeRequest(req api.HTTPRequest, stream a
 			stream.Set(FilterMetadataServiceHost, fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, workloadNamespace))
 		}
 	}
+
+	return req, stream
 }
 
-func (m *istioHttpHandlerMiddleware) AfterResponse(resp api.HTTPResponse, stream api.Stream) {
+func (m *istioHttpHandlerMiddleware) AfterResponse(ctx context.Context, resp api.HTTPResponse, stream api.Stream) (api.HTTPResponse, api.Stream) {
 	if stream.Direction() != api.ListenerDirectionOutbound {
-		return
+		return resp, stream
 	}
 
 	if v, ok := stream.Get("upstream_peer"); ok {
@@ -71,9 +74,13 @@ func (m *istioHttpHandlerMiddleware) AfterResponse(resp api.HTTPResponse, stream
 			stream.Set(FilterMetadataServiceHost, fmt.Sprintf("%s.%s.svc.cluster.local", labels["service.istio.io/canonical-name"], node.Namespace()))
 		}
 	}
+
+	return resp, stream
 }
 
-func (m *istioHttpHandlerMiddleware) AfterRequest(req api.HTTPRequest, stream api.Stream) {
+func (m *istioHttpHandlerMiddleware) AfterRequest(req api.HTTPRequest, stream api.Stream) (api.HTTPRequest, api.Stream) {
+	return req, stream
 }
-func (m *istioHttpHandlerMiddleware) BeforeResponse(resp api.HTTPResponse, stream api.Stream) {
+func (m *istioHttpHandlerMiddleware) BeforeResponse(ctx context.Context, resp api.HTTPResponse, stream api.Stream) (api.HTTPResponse, api.Stream) {
+	return resp, stream
 }

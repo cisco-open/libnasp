@@ -97,6 +97,10 @@ func (r *HTTPRequest) ConnectionState() network.ConnectionState {
 	return nil
 }
 
+func (r *HTTPRequest) RemoteAddr() string {
+	return r.Request.RemoteAddr
+}
+
 func (r *HTTPResponse) GetHTTPResponse() *http.Response {
 	return r.Response
 }

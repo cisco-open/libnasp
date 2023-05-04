@@ -47,6 +47,8 @@ type IstioEnvironment struct {
 	IstioCAAddress string `env:"ISTIO_CA_ADDR"`
 	IstioVersion   string `env:"ISTIO_VERSION"`
 	IstioRevision  string `env:"ISTIO_REVISION"`
+
+	ZipkinAddress string `env:"ZIPKIN_ADDRESS"`
 }
 
 func GetIstioEnvironment(prefix string) (*IstioEnvironment, error) {
@@ -114,6 +116,8 @@ func (e *IstioEnvironment) Override(otherEnv IstioEnvironment) {
 	e.IstioCAAddress = otherEnv.IstioCAAddress
 	e.IstioRevision = otherEnv.IstioRevision
 	e.IstioVersion = otherEnv.IstioVersion
+
+	e.ZipkinAddress = otherEnv.ZipkinAddress
 }
 
 func (e *IstioEnvironment) GetNodePropertiesFromEnvironment() map[string]interface{} {
