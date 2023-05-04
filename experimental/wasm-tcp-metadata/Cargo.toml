@@ -8,6 +8,16 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
+[profile.release]
+# do not include debug symbols
+debug = false
+# link-time optimalization
+lto = true
+# optimize for binary size for wasm s is better than z
+opt-level = "s"
+# do not unwind the stack when panicking
+panic = "abort"
+
 [dependencies]
 proxy-wasm = "0.2.1"
 log = "0.4"
