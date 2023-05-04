@@ -38,6 +38,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	zipkinhttp "github.com/openzipkin/zipkin-go/middleware/http"
+
 	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero"
 	"github.com/cisco-open/nasp/pkg/ca"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
@@ -213,6 +215,11 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 
 	s.environment = e
 
+	s.zipkinTracer, err = tracing.SetupZipkinTracing(s.environment)
+	if err != nil {
+		return nil, err
+	}
+
 	registry := prometheus.NewRegistry()
 	s.metricHandler = proxywasm.NewPrometheusMetricHandler(registry, logger)
 	baseContext := proxywasm.GetBaseContext("root")
@@ -283,8 +290,6 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 		s.metricsPusher = createMetricsPusher(config.PushgatewayConfig, jobName, httpClient, registry)
 	}
 
-	s.zipkinTracer = tracing.SetupZipkinTracing()
-
 	return s, nil
 }
 
@@ -305,6 +310,16 @@ func (h *istioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) 
 	logger := h.logger.WithName("http-transport")
 	tp := NewIstioHTTPRequestTransport(transport, h.caClient, h.discoveryClient, logger)
 	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, logger)
+	zipkinWrappedTransport, err := zipkinhttp.NewTransport(h.zipkinTracer, zipkinhttp.RoundTripper(transport))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get zipkin tracer")
+	}
+
+	tp := NewIstioHTTPRequestTransport(zipkinWrappedTransport, h.caClient, h.discoveryClient, h.logger.WithName("http-transport"), h.zipkinTracer)
+
+	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, h.logger)
+
+	httpTransport.AddMiddleware(tracing.NewZipkinHTTPClientTracingMiddleware(h.zipkinTracer))
 
 	httpTransport.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
 	httpTransport.AddMiddleware(NewIstioHTTPHandlerMiddleware())
@@ -344,6 +359,7 @@ func (h *istioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 	httpHandler := pwhttp.NewHandler(handler, streamHandler, api.ListenerDirectionInbound)
 
 	httpHandler.AddMiddleware(tracing.NewZipkinHTTPTracingMiddleware(h.zipkinTracer))
+
 	httpHandler.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
 	httpHandler.AddMiddleware(NewIstioHTTPHandlerMiddleware())
 

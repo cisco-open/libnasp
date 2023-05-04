@@ -60,7 +60,7 @@ func (t *HTTPTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	wrappedRequest := WrapHTTPRequest(req)
 
-	t.BeforeRequest(wrappedRequest, stream)
+	wrappedRequest, stream = t.BeforeRequest(wrappedRequest, stream)
 
 	if err := stream.HandleHTTPRequest(wrappedRequest); err != nil {
 		t.logger.Error(err, "could not handle request")
@@ -77,14 +77,14 @@ func (t *HTTPTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	wrappedResponse := WrapHTTPResponse(resp)
 
-	t.BeforeResponse(wrappedResponse, stream)
+	wrappedResponse, stream = t.BeforeResponse(req.Context(), wrappedResponse, stream)
 
 	if err := stream.HandleHTTPResponse(wrappedResponse); err != nil {
 		t.logger.Error(err, "could not handle response")
 		return nil, err
 	}
 
-	t.AfterResponse(wrappedResponse, stream)
+	t.AfterResponse(req.Context(), wrappedResponse, stream)
 
 	t.logger.V(2).Info("response received", "url", origURL)
 

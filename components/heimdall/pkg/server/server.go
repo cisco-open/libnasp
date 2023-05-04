@@ -174,6 +174,7 @@ func (s *server) run() *http.Server {
 			IstioCAAddress:   r.CAClientConfig.CAEndpoint,
 			IstioVersion:     istioVersion,
 			IstioRevision:    istioRevision,
+			ZipkinAddress:    r.CAClientConfig.ZipkinAddress,
 		}
 
 		c.JSON(http.StatusOK, r)

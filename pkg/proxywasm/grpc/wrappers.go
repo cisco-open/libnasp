@@ -169,6 +169,10 @@ func (r *GRPCRequest) Context() context.Context {
 	return nil
 }
 
+func (r *GRPCRequest) RemoteAddr() string {
+	return r.connection.RemoteAddr().String()
+}
+
 func (r *GRPCRequest) WithContext(ctx context.Context) api.HTTPRequest {
 	return nil
 }

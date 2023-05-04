@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openzipkin/zipkin-go"
+
 	"github.com/go-logr/logr"
 
 	"github.com/cisco-open/nasp/pkg/ca"
@@ -33,14 +35,16 @@ type istioHTTPRequestTransport struct {
 	caClient        ca.Client
 	discoveryClient discovery.DiscoveryClient
 	logger          logr.Logger
+	zipkinTracer    *zipkin.Tracer
 }
 
-func NewIstioHTTPRequestTransport(transport http.RoundTripper, caClient ca.Client, discoveryClient discovery.DiscoveryClient, logger logr.Logger) http.RoundTripper {
+func NewIstioHTTPRequestTransport(transport http.RoundTripper, caClient ca.Client, discoveryClient discovery.DiscoveryClient, logger logr.Logger, tracer *zipkin.Tracer) http.RoundTripper {
 	return &istioHTTPRequestTransport{
 		transport:       transport,
 		caClient:        caClient,
 		discoveryClient: discoveryClient,
 		logger:          logger,
+		zipkinTracer:    tracer,
 	}
 }
 

@@ -120,7 +120,7 @@ func (g *GRPCDialer) RequestInterceptor(ctx context.Context, method string, req,
 
 	wrappedRequest := WrapGRPCRequest(fmt.Sprintf("https://%s/%s", cc.Target(), strings.TrimLeft(method, "/")), headers, g.connectionState)
 
-	g.BeforeRequest(wrappedRequest, stream)
+	wrappedRequest, stream = g.BeforeRequest(wrappedRequest, stream)
 
 	if err = stream.HandleHTTPRequest(wrappedRequest); err != nil {
 		return err
@@ -142,13 +142,13 @@ func (g *GRPCDialer) RequestInterceptor(ctx context.Context, method string, req,
 	wrappedResponse := WrapGRPCResponse(status.Code(err), responseHeaders, responseTrailers, g.connectionState)
 	stream.Set("grpc.status", status.Code(err))
 
-	g.BeforeResponse(wrappedResponse, stream)
+	wrappedResponse, stream = g.BeforeResponse(ctx, wrappedResponse, stream)
 
 	if err = stream.HandleHTTPResponse(wrappedResponse); err != nil {
 		return err
 	}
 
-	g.AfterResponse(wrappedResponse, stream)
+	g.AfterResponse(ctx, wrappedResponse, stream)
 
 	g.logger.Info("intercepted reply", "method", method, "reply", reply)
 

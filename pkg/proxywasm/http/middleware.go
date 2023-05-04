@@ -15,16 +15,17 @@
 package http
 
 import (
+	"context"
 	"sync"
 
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 )
 
 type HandleMiddleware interface {
-	BeforeRequest(req api.HTTPRequest, stream api.Stream)
-	AfterRequest(req api.HTTPRequest, stream api.Stream)
-	BeforeResponse(resp api.HTTPResponse, stream api.Stream)
-	AfterResponse(resp api.HTTPResponse, stream api.Stream)
+	BeforeRequest(req api.HTTPRequest, stream api.Stream) (api.HTTPRequest, api.Stream)
+	AfterRequest(req api.HTTPRequest, stream api.Stream) (api.HTTPRequest, api.Stream)
+	BeforeResponse(requestContext context.Context, resp api.HTTPResponse, stream api.Stream) (api.HTTPResponse, api.Stream)
+	AfterResponse(requestContext context.Context, resp api.HTTPResponse, stream api.Stream) (api.HTTPResponse, api.Stream)
 }
 
 type Middlewares map[HandleMiddleware]struct{}
@@ -69,26 +70,30 @@ func (h *middlewareHandler) GetMiddlewares() Middlewares {
 	return h.middlewares
 }
 
-func (h *middlewareHandler) BeforeResponse(resp api.HTTPResponse, stream api.Stream) {
+func (h *middlewareHandler) BeforeResponse(requestContext context.Context, resp api.HTTPResponse, stream api.Stream) (api.HTTPResponse, api.Stream) {
 	for mw := range h.GetMiddlewares() {
-		mw.BeforeResponse(resp, stream)
+		resp, stream = mw.BeforeResponse(requestContext, resp, stream)
 	}
+	return resp, stream
 }
 
-func (h *middlewareHandler) AfterResponse(resp api.HTTPResponse, stream api.Stream) {
+func (h *middlewareHandler) AfterResponse(requestContext context.Context, resp api.HTTPResponse, stream api.Stream) (api.HTTPResponse, api.Stream) {
 	for mw := range h.GetMiddlewares() {
-		mw.AfterResponse(resp, stream)
+		resp, stream = mw.AfterResponse(requestContext, resp, stream)
 	}
+	return resp, stream
 }
 
-func (h *middlewareHandler) BeforeRequest(req api.HTTPRequest, stream api.Stream) {
+func (h *middlewareHandler) BeforeRequest(req api.HTTPRequest, stream api.Stream) (api.HTTPRequest, api.Stream) {
 	for mw := range h.GetMiddlewares() {
-		mw.BeforeRequest(req, stream)
+		req, stream = mw.BeforeRequest(req, stream)
 	}
+	return req, stream
 }
 
-func (h *middlewareHandler) AfterRequest(req api.HTTPRequest, stream api.Stream) {
+func (h *middlewareHandler) AfterRequest(req api.HTTPRequest, stream api.Stream) (api.HTTPRequest, api.Stream) {
 	for mw := range h.GetMiddlewares() {
-		mw.AfterRequest(req, stream)
+		req, stream = mw.AfterRequest(req, stream)
 	}
+	return req, stream
 }

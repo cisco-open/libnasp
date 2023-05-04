@@ -71,7 +71,7 @@ type ManagementServerCapabilities struct {
 	// EndpointDiscoveryServiceProvided returns true if management server provides EDS
 	EndpointDiscoveryServiceProvided bool
 
-	// ListenerDiscoveryServiceProvided returns true if management server provides LSD
+	// ListenerDiscoveryServiceProvided returns true if management server provides LDS
 	ListenerDiscoveryServiceProvided bool
 
 	// RouteConfigurationDiscoveryServiceProvided returns true if management server provides RDS
