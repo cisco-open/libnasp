@@ -60,6 +60,10 @@ func (r *HTTPRequest) Body() io.ReadCloser {
 	return r.Request.Body
 }
 
+func (r *HTTPResponse) Error() error {
+	return nil
+}
+
 func (r *HTTPRequest) SetBody(body io.ReadCloser) {
 	r.Request.Body = body
 }

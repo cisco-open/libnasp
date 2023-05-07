@@ -64,6 +64,7 @@ type HTTPResponse interface {
 
 	ContentLength() int64
 	StatusCode() int
+	Error() error
 
 	ConnectionState() network.ConnectionState
 }

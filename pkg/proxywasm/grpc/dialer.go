@@ -18,9 +18,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -118,7 +116,7 @@ func (g *GRPCDialer) RequestInterceptor(ctx context.Context, method string, req,
 	var responseHeaders, responseTrailers metadata.MD
 	opts = append(opts, grpc.Header(&responseHeaders), grpc.Trailer(&responseTrailers))
 
-	wrappedRequest := WrapGRPCRequest(fmt.Sprintf("https://%s/%s", cc.Target(), strings.TrimLeft(method, "/")), headers, g.connectionState)
+	wrappedRequest := WrapGRPCRequest(cc.Target(), method, headers, g.connectionState)
 
 	wrappedRequest, stream = g.BeforeRequest(wrappedRequest, stream)
 
@@ -139,7 +137,7 @@ func (g *GRPCDialer) RequestInterceptor(ctx context.Context, method string, req,
 		h.Set(g.connectionState)
 	}
 
-	wrappedResponse := WrapGRPCResponse(status.Code(err), responseHeaders, responseTrailers, g.connectionState)
+	wrappedResponse := WrapGRPCResponse(status.Code(err), responseHeaders, responseTrailers, g.connectionState, err)
 	stream.Set("grpc.status", status.Code(err))
 
 	wrappedResponse, stream = g.BeforeResponse(ctx, wrappedResponse, stream)
