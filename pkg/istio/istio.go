@@ -307,17 +307,14 @@ func (h *istioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) 
 		return nil, errors.Wrap(err, "could not get stream handler")
 	}
 
-	logger := h.logger.WithName("http-transport")
-	tp := NewIstioHTTPRequestTransport(transport, h.caClient, h.discoveryClient, logger)
-	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, logger)
 	zipkinWrappedTransport, err := zipkinhttp.NewTransport(h.zipkinTracer, zipkinhttp.RoundTripper(transport))
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get zipkin tracer")
 	}
 
-	tp := NewIstioHTTPRequestTransport(zipkinWrappedTransport, h.caClient, h.discoveryClient, h.logger.WithName("http-transport"), h.zipkinTracer)
-
-	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, h.logger)
+	logger := h.logger.WithName("http-transport")
+	tp := NewIstioHTTPRequestTransport(zipkinWrappedTransport, h.caClient, h.discoveryClient, logger, h.zipkinTracer)
+	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, logger)
 
 	httpTransport.AddMiddleware(tracing.NewZipkinHTTPClientTracingMiddleware(h.zipkinTracer))
 

@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 
+	"google.golang.org/grpc/metadata"
+
 	"github.com/openzipkin/zipkin-go"
 	"github.com/openzipkin/zipkin-go/model"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
@@ -19,7 +21,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	wrapper "github.com/cisco-open/nasp/pkg/proxywasm/http"
+	grpcwrapper "github.com/cisco-open/nasp/pkg/proxywasm/grpc"
+	httpwrapper "github.com/cisco-open/nasp/pkg/proxywasm/http"
 )
 
 func TestZipkin(t *testing.T) {
@@ -28,9 +31,22 @@ func TestZipkin(t *testing.T) {
 	RunSpecs(t, "Zipkin Suite")
 }
 
-func newMockRequestWithHeaders(headers map[string]string) api.HTTPRequest {
+func newMockHTTPRequestWithHeaders(headers map[string]string) api.HTTPRequest {
 	request := &http.Request{Header: map[string][]string{}}
-	mockRequest := wrapper.WrapHTTPRequest(request)
+	mockRequest := httpwrapper.WrapHTTPRequest(request)
+
+	for key, value := range headers {
+		mockRequest.Header().Set(key, value)
+	}
+
+	return mockRequest
+}
+
+func newMockGRPCRequestWithHeaders(headers map[string]string) api.HTTPRequest {
+	h := metadata.New(map[string]string{
+		"content-type": "application/grpc",
+	})
+	mockRequest := grpcwrapper.WrapGRPCRequest("", "", h, nil)
 
 	for key, value := range headers {
 		mockRequest.Header().Set(key, value)
@@ -80,7 +96,7 @@ var _ = Describe("Propagation", func() {
 				b3.SpanID:  span.Context().ID.String(),
 				b3.Sampled: "1",
 			}
-			mockRequest := newMockRequestWithHeaders(headers)
+			mockRequest := newMockHTTPRequestWithHeaders(headers)
 
 			extractor := ExtractHTTPHeaders(mockRequest)
 			sc, err := extractor()
@@ -97,7 +113,7 @@ var _ = Describe("Propagation", func() {
 				b3.SpanID:  span.Context().ID.String(),
 				b3.Flags:   "1",
 			}
-			mockRequest := newMockRequestWithHeaders(headers)
+			mockRequest := newMockHTTPRequestWithHeaders(headers)
 
 			extractor := ExtractHTTPHeaders(mockRequest)
 			sc, err := extractor()
@@ -109,9 +125,45 @@ var _ = Describe("Propagation", func() {
 		})
 	})
 
+	Context("ExtractGRPCHeaders", func() {
+		It("should extract a span context from the GRPC Request", func() {
+			headers := map[string]string{
+				b3.TraceID: span.Context().TraceID.String(),
+				b3.SpanID:  span.Context().ID.String(),
+				b3.Sampled: "1",
+			}
+			mockRequest := newMockGRPCRequestWithHeaders(headers)
+
+			extractor := ExtractGRPCHeaders(mockRequest)
+			sc, err := extractor()
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(sc.TraceID.String()).To(Equal(headers[b3.TraceID]))
+			Expect(sc.ID.String()).To(Equal(headers[b3.SpanID]))
+			Expect(*sc.Sampled).To(BeTrue())
+		})
+
+		It("should return a span context with debug flag when B3 debug header is present", func() {
+			headers := map[string]string{
+				b3.TraceID: span.Context().TraceID.String(),
+				b3.SpanID:  span.Context().ID.String(),
+				b3.Flags:   "1",
+			}
+			mockRequest := newMockGRPCRequestWithHeaders(headers)
+
+			extractor := ExtractGRPCHeaders(mockRequest)
+			sc, err := extractor()
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(sc.TraceID.String()).To(Equal(headers[b3.TraceID]))
+			Expect(sc.ID.String()).To(Equal(headers[b3.SpanID]))
+			Expect(sc.Debug).To(BeTrue())
+		})
+	})
+
 	Context("InjectHTTPHeaders", func() {
 		It("should inject a span context into a HTTP Request", func() {
-			mockRequest := newMockRequestWithHeaders(nil)
+			mockRequest := newMockHTTPRequestWithHeaders(nil)
 			traceIDHex := "80f198ee56343ba864fe8b2a57d3eff7"
 			spanIDHex := "e457b5a2e4d86bd1"
 			sampled := true
@@ -137,11 +189,62 @@ var _ = Describe("Propagation", func() {
 		})
 
 		It("should not inject headers when span context is empty", func() {
-			mockRequest := newMockRequestWithHeaders(nil)
+			mockRequest := newMockHTTPRequestWithHeaders(nil)
 
 			sc := model.SpanContext{}
 
 			injector := InjectHTTPHeaders(mockRequest)
+			err := injector(sc)
+
+			Expect(err.Error()).To(Equal("empty request context"))
+
+			value, ok := mockRequest.Header().Get(b3.TraceID)
+			Expect(value).To(BeEmpty())
+			Expect(ok).To(BeFalse())
+
+			value, ok = mockRequest.Header().Get(b3.SpanID)
+			Expect(value).To(BeEmpty())
+			Expect(ok).To(BeFalse())
+
+			value, ok = mockRequest.Header().Get(b3.Sampled)
+			Expect(value).To(BeEmpty())
+			Expect(ok).To(BeFalse())
+		})
+	})
+
+	Context("InjectGRPCHeaders", func() {
+		It("should inject a span context into a GRPC Request", func() {
+			mockRequest := newMockGRPCRequestWithHeaders(nil)
+			traceIDHex := "80f198ee56343ba864fe8b2a57d3eff7"
+			spanIDHex := "e457b5a2e4d86bd1"
+			sampled := true
+
+			sc, err := createSpanContext(traceIDHex, spanIDHex, sampled)
+			Expect(err).ToNot(HaveOccurred())
+
+			injector := InjectGRPCHeaders(mockRequest)
+			err = injector(sc)
+
+			Expect(err).ToNot(HaveOccurred())
+			value, ok := mockRequest.Header().Get(b3.TraceID)
+			Expect(value).To(Equal(traceIDHex))
+			Expect(ok).To(BeTrue())
+
+			value, ok = mockRequest.Header().Get(b3.SpanID)
+			Expect(value).To(Equal(spanIDHex))
+			Expect(ok).To(BeTrue())
+
+			value, ok = mockRequest.Header().Get(b3.Sampled)
+			Expect(value).To(Equal("1"))
+			Expect(ok).To(BeTrue())
+		})
+
+		It("should not inject headers when span context is empty", func() {
+			mockRequest := newMockGRPCRequestWithHeaders(nil)
+
+			sc := model.SpanContext{}
+
+			injector := InjectGRPCHeaders(mockRequest)
 			err := injector(sc)
 
 			Expect(err.Error()).To(Equal("empty request context"))
@@ -165,7 +268,7 @@ var _ = Describe("ExtractRemoteEndpoint", func() {
 	It("should correctly extract the remote endpoint information", func() {
 		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 		req.RemoteAddr = "192.168.1.10:12345"
-		wrappedReq := wrapper.WrapHTTPRequest(req)
+		wrappedReq := httpwrapper.WrapHTTPRequest(req)
 
 		remoteEndpoint, err := ExtractRemoteEndpoint(wrappedReq)
 
@@ -180,7 +283,7 @@ var _ = Describe("ExtractRemoteEndpoint", func() {
 	It("should return an error if the remote address is invalid", func() {
 		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 		req.RemoteAddr = "invalid:address"
-		wrappedReq := wrapper.WrapHTTPRequest(req)
+		wrappedReq := httpwrapper.WrapHTTPRequest(req)
 
 		_, err := ExtractRemoteEndpoint(wrappedReq)
 
