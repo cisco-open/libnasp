@@ -49,15 +49,9 @@ func NewTCPDialer(streamHandler api.StreamHandler, tlsConfig *tls.Config, discov
 }
 
 func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string) (net.Conn, error) {
-	ctx = network.NewConnectionToContext(ctx)
-
 	tlsConfig := d.tlsConfig.Clone()
 
-	prop, err := d.discoveryClient.GetTCPClientPropertiesByHost(context.Background(), address)
-	if err != nil {
-		return nil, err
-	}
-
+	prop, _ := d.discoveryClient.GetTCPClientPropertiesByHost(context.Background(), address)
 	if prop != nil {
 		if !prop.UseTLS() {
 			tlsConfig = nil
@@ -74,7 +68,7 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 	useTLS := tlsConfig != nil
 
 	opts := []network.DialerOption{
-		network.DialerWithWrappedConnectionOptions(network.WrappedConnectionWithCloserWrapper(d.discoveryClient.NewConnectionCloseWrapper())),
+		network.DialerWithConnectionOptions(network.ConnectionWithCloserWrapper(d.discoveryClient.NewConnectionCloseWrapper())),
 		network.DialerWithDialerWrapper(d.discoveryClient.NewDialWrapper()),
 	}
 
@@ -117,7 +111,7 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 		d.connectionPoolRegistry.AddPool(address, p)
 	}
 
-	cp, err = d.connectionPoolRegistry.GetPool(address)
+	cp, err := d.connectionPoolRegistry.GetPool(address)
 	if err != nil {
 		return nil, err
 	}

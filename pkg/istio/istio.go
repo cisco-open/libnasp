@@ -43,13 +43,13 @@ import (
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
 	k8slabels "github.com/cisco-open/nasp/pkg/k8s/labels"
 	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/nasp/pkg/network/listener"
 	"github.com/cisco-open/nasp/pkg/proxywasm"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 	pwgrpc "github.com/cisco-open/nasp/pkg/proxywasm/grpc"
 	pwhttp "github.com/cisco-open/nasp/pkg/proxywasm/http"
 	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
 	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
-	unifiedtls "github.com/cisco-open/nasp/pkg/tls"
 )
 
 var DefaultIstioIntegrationHandlerConfig = IstioIntegrationHandlerConfig{
@@ -294,8 +294,9 @@ func (h *istioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) 
 		return nil, errors.Wrap(err, "could not get stream handler")
 	}
 
-	tp := NewIstioHTTPRequestTransport(transport, h.caClient, h.discoveryClient, h.logger.WithName("http-transport"))
-	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, h.logger)
+	logger := h.logger.WithName("http-transport")
+	tp := NewIstioHTTPRequestTransport(transport, h.caClient, h.discoveryClient, logger)
+	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, logger)
 
 	httpTransport.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
 	httpTransport.AddMiddleware(NewIstioHTTPHandlerMiddleware())
@@ -375,12 +376,12 @@ func (h *istioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 
 			if lp.UseTLS() {
 				if lp.Permissive() {
-					ul.SetTLSMode(unifiedtls.TLSModePermissive)
+					ul.SetTLSMode(listener.TLSModePermissive)
 				} else {
-					ul.SetTLSMode(unifiedtls.TLSModeStrict)
+					ul.SetTLSMode(listener.TLSModeStrict)
 				}
 			} else {
-				ul.SetTLSMode(unifiedtls.TLSModeDisabled)
+				ul.SetTLSMode(listener.TLSModeDisabled)
 			}
 			if lp.IsClientCertificateRequired() {
 				ul.SetTLSClientAuthMode(tls.RequireAnyClientCert)
@@ -551,7 +552,11 @@ func (h *istioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, 
 		},
 	}
 
-	l = unifiedtls.NewUnifiedListener(network.NewWrappedListener(l), network.WrapTLSConfig(tlsConfig), unifiedtls.TLSModeStrict)
+	l = listener.NewUnifiedListener(l, network.WrapTLSConfig(tlsConfig), listener.TLSModePermissive,
+		listener.UnifiedListenerWithTLSConnectionCreator(network.CreateTLSServerConn),
+		listener.UnifiedListenerWithConnectionWrapper(func(c net.Conn) net.Conn {
+			return network.WrapConnection(c)
+		}))
 
 	return tcp.WrapListener(l, streamHandler), nil
 }

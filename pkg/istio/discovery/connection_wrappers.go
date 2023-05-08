@@ -17,6 +17,7 @@ package discovery
 import (
 	"context"
 	"net"
+	"sync"
 
 	"github.com/cisco-open/nasp/pkg/network"
 )
@@ -61,11 +62,15 @@ type ConnectionCloseWrapper = network.ConnectionCloseWrapper
 type discoveryClientCloser struct {
 	discoveryClient    DiscoveryClient
 	parentCloseWrapper ConnectionCloseWrapper
+
+	once sync.Once
 }
 
 func (d *xdsDiscoveryClient) NewConnectionCloseWrapper() ConnectionCloseWrapper {
 	return &discoveryClientCloser{
 		discoveryClient: d,
+
+		once: sync.Once{},
 	}
 }
 
@@ -82,14 +87,16 @@ func (c *discoveryClientCloser) AfterClose(conn net.Conn) error {
 }
 
 func (c *discoveryClientCloser) BeforeClose(conn net.Conn) error {
-	address := conn.RemoteAddr().String()
-	if res, ok := conn.(interface {
-		GetOriginalAddress() string
-	}); ok {
-		address = res.GetOriginalAddress()
-	}
+	c.once.Do(func() {
+		address := conn.RemoteAddr().String()
+		if res, ok := conn.(interface {
+			GetOriginalAddress() string
+		}); ok {
+			address = res.GetOriginalAddress()
+		}
 
-	c.discoveryClient.DecrementActiveRequestsCount(address)
+		c.discoveryClient.DecrementActiveRequestsCount(address)
+	})
 
 	if c.parentCloseWrapper != nil {
 		return c.parentCloseWrapper.BeforeClose(conn)

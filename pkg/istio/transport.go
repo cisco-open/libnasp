@@ -15,7 +15,6 @@
 package istio
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"net/http"
@@ -48,7 +47,7 @@ func NewIstioHTTPRequestTransport(transport http.RoundTripper, caClient ca.Clien
 func (t *istioHTTPRequestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var tlsConfig *tls.Config
 
-	if prop, _ := t.discoveryClient.GetHTTPClientPropertiesByHost(context.Background(), req.URL.Host); prop != nil { //nolint:nestif
+	if prop, _ := t.discoveryClient.GetHTTPClientPropertiesByHost(req.Context(), req.URL.Host); prop != nil { //nolint:nestif
 		t.logger.V(3).Info("discovered overrides", "overrides", prop)
 		if endpointAddr, err := prop.Address(); err != nil {
 			return nil, err
@@ -73,7 +72,7 @@ func (t *istioHTTPRequestTransport) RoundTrip(req *http.Request) (*http.Response
 	}
 
 	opts := []network.DialerOption{
-		network.DialerWithWrappedConnectionOptions(network.WrappedConnectionWithCloserWrapper(t.discoveryClient.NewConnectionCloseWrapper())),
+		network.DialerWithConnectionOptions(network.ConnectionWithCloserWrapper(t.discoveryClient.NewConnectionCloseWrapper())),
 		network.DialerWithDialerWrapper(t.discoveryClient.NewDialWrapper()),
 	}
 

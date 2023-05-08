@@ -64,7 +64,7 @@ func MultiListenerWithLogger(logger logr.Logger) MultiListenerOption {
 	}
 }
 
-func NewListener(l net.Listener, options ...MultiListenerOption) MultiListener {
+func NewMultiListener(l net.Listener, options ...MultiListenerOption) MultiListener {
 	lstn := &multipleListeners{
 		listeners: sync.Map{},
 

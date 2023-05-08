@@ -20,14 +20,16 @@ import (
 	"crypto/x509"
 	"net"
 	"reflect"
+
+	"github.com/google/uuid"
 )
 
 type dialer struct {
 	netDialer *net.Dialer
 	tlsConfig *tls.Config
 
-	dialWrapper              DialWrapper
-	wrappedConnectionOptions []WrappedConnectionOption
+	dialWrapper       DialWrapper
+	connectionOptions []ConnectionOption
 }
 
 type ConnectionDialer interface {
@@ -52,9 +54,9 @@ func DialerWithDialerWrapper(w DialWrapper) DialerOption {
 	}
 }
 
-func DialerWithWrappedConnectionOptions(opts ...WrappedConnectionOption) DialerOption {
+func DialerWithConnectionOptions(opts ...ConnectionOption) DialerOption {
 	return func(d *dialer) {
-		d.wrappedConnectionOptions = opts
+		d.connectionOptions = opts
 	}
 }
 
@@ -129,26 +131,27 @@ func (d *dialer) dialContext(dialer connectionDialer, ctx context.Context, netwo
 		}
 	}
 
-	c, err := dialer.DialContext(ctx, network, addr)
+	var state ConnectionState
+	if s, ok := ConnectionStateFromContext(ctx); ok {
+		state = s
+	} else {
+		state = NewConnectionStateWithID("connection-" + uuid.NewString())
+	}
+
+	innerCtx := ConnectionStateToContext(ctx, state)
+	c, err := dialer.DialContext(innerCtx, network, addr)
 	if err != nil {
 		return nil, err
 	}
 
-	wrapConnection := func() net.Conn {
-		opts := d.wrappedConnectionOptions
-		opts = append(opts, WrappedConnectionWithOriginalAddress(addr))
-
-		if wc, ok := WrappedConnectionFromContext(ctx); ok {
-			wc.SetNetConn(c)
-			wc.SetOptions(opts...)
-
-			return wc
-		}
-
-		return NewWrappedConnection(c, opts...)
+	if s, ok := ConnectionStateHolderFromContext(ctx); ok && s.Get() == nil {
+		s.Set(state)
 	}
 
-	wc := wrapConnection()
+	opts := d.connectionOptions
+	opts = append(opts, ConnectionWithOriginalAddress(addr), ConnectionWithState(state))
+
+	wc := WrapConnection(c, opts...)
 
 	if d.dialWrapper != nil {
 		if err := d.dialWrapper.AfterDial(ctx, wc, network, addr); err != nil {

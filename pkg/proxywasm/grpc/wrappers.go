@@ -26,24 +26,24 @@ import (
 )
 
 type GRPCRequest struct {
-	url        *url.URL
-	header     metadata.MD
-	connection network.Connection
+	url             *url.URL
+	header          metadata.MD
+	connectionState network.ConnectionState
 }
 
 type GRPCResponse struct {
-	statusCode codes.Code
-	header     metadata.MD
-	trailer    metadata.MD
-	connection network.Connection
+	statusCode      codes.Code
+	header          metadata.MD
+	trailer         metadata.MD
+	connectionState network.ConnectionState
 }
 
-func WrapGRPCResponse(statusCode codes.Code, header metadata.MD, trailer metadata.MD, connection network.Connection) api.HTTPResponse {
+func WrapGRPCResponse(statusCode codes.Code, header metadata.MD, trailer metadata.MD, connectionState network.ConnectionState) api.HTTPResponse {
 	return &GRPCResponse{
-		statusCode: statusCode,
-		header:     header,
-		trailer:    trailer,
-		connection: connection,
+		statusCode:      statusCode,
+		header:          header,
+		trailer:         trailer,
+		connectionState: connectionState,
 	}
 }
 
@@ -66,8 +66,8 @@ func (r *GRPCResponse) ContentLength() int64 {
 	return 0
 }
 
-func (r *GRPCResponse) Connection() network.Connection {
-	return r.connection
+func (r *GRPCResponse) ConnectionState() network.ConnectionState {
+	return r.connectionState
 }
 
 func (r *GRPCResponse) StatusCode() int {
@@ -111,11 +111,11 @@ func (r *GRPCResponse) StatusCode() int {
 	}
 }
 
-func WrapGRPCRequest(rawURL string, header metadata.MD, conn network.Connection) api.HTTPRequest {
+func WrapGRPCRequest(rawURL string, header metadata.MD, connectionState network.ConnectionState) api.HTTPRequest {
 	r := &GRPCRequest{
-		url:        &url.URL{},
-		header:     header,
-		connection: conn,
+		url:             &url.URL{},
+		header:          header,
+		connectionState: connectionState,
 	}
 
 	if u, err := url.Parse(rawURL); err != nil {
@@ -156,8 +156,8 @@ func (r *GRPCRequest) Method() string {
 	return ""
 }
 
-func (r *GRPCRequest) Connection() network.Connection {
-	return r.connection
+func (r *GRPCRequest) ConnectionState() network.ConnectionState {
+	return r.connectionState
 }
 
 type grpcHeaderMap struct {
