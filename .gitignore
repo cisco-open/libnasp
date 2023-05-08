@@ -43,5 +43,7 @@ testbin/*
 experimental/wasm-tcp-metadata/target
 experimental/wasm-tcp-metadata/Cargo.lock
 experimental/wasm-tcp-metadata/debug
+target/
+Cargo.lock
 
 .java-version
