@@ -42,6 +42,10 @@ func (c *poolConnection) Close() error {
 	return c.pool.Put(c.Conn)
 }
 
+func (c *poolConnection) NetConn() net.Conn {
+	return c.Conn
+}
+
 func (c *poolConnection) Read(b []byte) (n int, err error) {
 	n, err = c.Conn.Read(b)
 	if err != nil {

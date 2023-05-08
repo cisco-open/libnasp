@@ -43,7 +43,7 @@ type GRPCDialer struct {
 	discoveryClient discovery.DiscoveryClient
 	logger          logr.Logger
 
-	connection network.Connection
+	connectionState network.ConnectionState
 }
 
 func NewGRPCDialer(caClient ca.Client, streamHandler api.StreamHandler, discoveryClient discovery.DiscoveryClient, logger logr.Logger) *GRPCDialer {
@@ -73,18 +73,20 @@ func (g *GRPCDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
 		tlsConfig.ServerName = prop.ServerName()
 	}
 
-	ctx = network.NewConnectionToContext(ctx)
+	ctx = network.NewConnectionStateHolderToContext(ctx)
+
 	opts := []network.DialerOption{
-		network.DialerWithWrappedConnectionOptions(network.WrappedConnectionWithCloserWrapper(g.discoveryClient.NewConnectionCloseWrapper())),
+		network.DialerWithConnectionOptions(network.ConnectionWithCloserWrapper(g.discoveryClient.NewConnectionCloseWrapper())),
 		network.DialerWithDialerWrapper(g.discoveryClient.NewDialWrapper()),
 	}
+
 	conn, err := network.NewDialerWithTLSConfig(tlsConfig, opts...).DialTLSContext(ctx, "tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 
-	if connection, ok := network.WrappedConnectionFromContext(ctx); ok {
-		g.connection = connection
+	if state, ok := network.ConnectionStateFromContext(ctx); ok {
+		g.connectionState = state
 	}
 
 	return conn, nil
@@ -93,9 +95,9 @@ func (g *GRPCDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
 func (g *GRPCDialer) RequestInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 	g.logger.Info("intercepted request", "target", cc.Target(), "method", method, "req", req)
 
-	if g.connection != nil {
-		g.discoveryClient.IncrementActiveRequestsCount(g.connection.GetOriginalAddress())
-		defer g.discoveryClient.DecrementActiveRequestsCount(g.connection.GetOriginalAddress())
+	if g.discoveryClient != nil {
+		g.discoveryClient.IncrementActiveRequestsCount(cc.Target())
+		defer g.discoveryClient.DecrementActiveRequestsCount(cc.Target())
 	}
 
 	stream, err := g.streamHandler.NewStream(api.ListenerDirectionOutbound)
@@ -116,7 +118,7 @@ func (g *GRPCDialer) RequestInterceptor(ctx context.Context, method string, req,
 	var responseHeaders, responseTrailers metadata.MD
 	opts = append(opts, grpc.Header(&responseHeaders), grpc.Trailer(&responseTrailers))
 
-	wrappedRequest := WrapGRPCRequest(fmt.Sprintf("https://%s/%s", cc.Target(), strings.TrimLeft(method, "/")), headers, g.connection)
+	wrappedRequest := WrapGRPCRequest(fmt.Sprintf("https://%s/%s", cc.Target(), strings.TrimLeft(method, "/")), headers, g.connectionState)
 
 	g.BeforeRequest(wrappedRequest, stream)
 
@@ -133,7 +135,11 @@ func (g *GRPCDialer) RequestInterceptor(ctx context.Context, method string, req,
 		return err
 	}
 
-	wrappedResponse := WrapGRPCResponse(status.Code(err), responseHeaders, responseTrailers, g.connection)
+	if h, ok := network.ConnectionStateHolderFromContext(ctx); ok {
+		h.Set(g.connectionState)
+	}
+
+	wrappedResponse := WrapGRPCResponse(status.Code(err), responseHeaders, responseTrailers, g.connectionState)
 	stream.Set("grpc.status", status.Code(err))
 
 	g.BeforeResponse(wrappedResponse, stream)

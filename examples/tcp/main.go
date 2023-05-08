@@ -27,6 +27,8 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/cisco-open/nasp/pkg/istio"
+	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/nasp/pkg/util"
 )
 
 var mode string
@@ -96,11 +98,16 @@ func server() {
 			panic(err)
 		}
 		go func(conn net.Conn) {
-			defer conn.Close()
+			defer func() {
+				if s, ok := network.ConnectionStateFromNetConn(conn); ok {
+					util.PrintConnectionState(s, klog.Background())
+				}
+				conn.Close()
+			}()
 			reader := bufio.NewReader(conn)
 			for {
 				// read client request data
-				bytes, err := reader.ReadBytes(byte('!'))
+				bytes, err := reader.ReadBytes(byte('\n'))
 				if err != nil {
 					if err != io.EOF {
 						fmt.Println("failed to read data, err:", err)
@@ -138,7 +145,12 @@ func client() {
 		panic(err)
 	}
 
-	defer conn.Close()
+	defer func() {
+		if s, ok := network.ConnectionStateFromNetConn(conn); ok {
+			util.PrintConnectionState(s, klog.Background())
+		}
+		conn.Close()
+	}()
 
 	for i := 0; i < 5; i++ {
 		if err := sendReceive(conn, fmt.Sprintf("name %d", i)); err != nil {

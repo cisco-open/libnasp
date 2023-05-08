@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -32,6 +31,7 @@ import (
 
 	"github.com/cisco-open/nasp/pkg/istio"
 	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/nasp/pkg/util"
 )
 
 var mode string
@@ -75,30 +75,14 @@ func sendHTTPRequest(url string, transport http.RoundTripper, logger logr.Logger
 
 	if dumpClientResponse {
 		buff, _ := ioutil.ReadAll(response.Body)
-		fmt.Printf("%s\n", string(buff))
+		os.Stdout.Write(buff)
 	}
 
-	if conn, ok := network.WrappedConnectionFromContext(response.Request.Context()); ok {
-		printConnectionInfo(conn, logger)
+	if state, ok := network.ConnectionStateFromContext(response.Request.Context()); ok {
+		util.PrintConnectionState(state, logger)
 	}
 
 	return nil
-}
-
-func printConnectionInfo(connection network.Connection, logger logr.Logger) {
-	localAddr := connection.LocalAddr().String()
-	remoteAddr := connection.RemoteAddr().String()
-	var localSpiffeID, remoteSpiffeID string
-
-	if cert := connection.GetLocalCertificate(); cert != nil {
-		localSpiffeID = cert.GetFirstURI()
-	}
-
-	if cert := connection.GetPeerCertificate(); cert != nil {
-		remoteSpiffeID = cert.GetFirstURI()
-	}
-
-	logger.Info("connection info", "localAddr", localAddr, "localSpiffeID", localSpiffeID, "remoteAddr", remoteAddr, "remoteSpiffeID", remoteSpiffeID, "ttfb", connection.GetTimeToFirstByte().Format(time.RFC3339Nano))
 }
 
 func main() {
@@ -130,7 +114,10 @@ func main() {
 
 	// make idle timeout minimal to test least request increment/decrement
 	t := http.DefaultTransport.(*http.Transport)
-	t.IdleConnTimeout = time.Nanosecond * 1
+	t.MaxIdleConns = 50
+	t.MaxConnsPerHost = 50
+	t.MaxIdleConnsPerHost = 50
+	// t.IdleConnTimeout = time.Nanosecond * 1
 
 	transport, err := iih.GetHTTPTransport(t)
 	if err != nil {
@@ -153,9 +140,9 @@ func main() {
 			i++
 		}
 
-		time.Sleep(sleepBeforeClientExit)
-
 		wg.Wait()
+
+		time.Sleep(sleepBeforeClientExit)
 
 		if len(clientErrors) > 0 {
 			os.Exit(2)
@@ -174,6 +161,11 @@ func main() {
 				logger.Error(err, "could not send http request")
 			}
 		}
+
+		if state, ok := network.ConnectionStateFromContext(c.Request.Context()); ok {
+			util.PrintConnectionState(state, logger)
+		}
+
 		c.Data(http.StatusOK, "text/html", []byte("Hello world!"))
 	})
 	err = iih.ListenAndServe(context.Background(), ":8080", r.Handler())

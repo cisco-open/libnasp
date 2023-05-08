@@ -21,13 +21,14 @@ import (
 	"log"
 	"os"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"k8s.io/klog/v2"
 
 	"github.com/cisco-open/nasp/examples/grpc/pb"
 	"github.com/cisco-open/nasp/pkg/istio"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
+	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/nasp/pkg/util"
 )
 
 var heimdallURL string
@@ -43,7 +44,12 @@ type greeterServer struct {
 }
 
 func (gs *greeterServer) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
+	if s, ok := network.ConnectionStateFromContext(ctx); ok {
+		util.PrintConnectionState(s, klog.Background())
+	}
+
 	log.Printf("Received: %v", in.GetName())
+
 	return &pb.HelloReply{Message: "Hello " + in.GetName()}, nil
 }
 
@@ -64,7 +70,9 @@ func main() {
 		panic(err)
 	}
 
-	iih.Run(ctx)
+	if err := iih.Run(ctx); err != nil {
+		panic(err)
+	}
 
 	grpcServer := grpc.NewServer()
 	reflection.Register(grpcServer)
@@ -72,7 +80,7 @@ func main() {
 
 	//////// standard HTTP library version with TLS
 
-	err = iih.ListenAndServe(context.Background(), ":8082", grpcServer)
+	err = iih.ListenAndServe(ctx, ":8082", grpcServer)
 	if err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

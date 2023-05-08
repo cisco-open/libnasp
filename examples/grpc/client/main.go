@@ -20,6 +20,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -27,6 +28,8 @@ import (
 
 	"github.com/cisco-open/nasp/examples/grpc/pb"
 	"github.com/cisco-open/nasp/pkg/istio"
+	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/nasp/pkg/util"
 )
 
 var heimdallURL string
@@ -38,6 +41,8 @@ func init() {
 }
 
 func main() {
+	logger := klog.Background()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -51,36 +56,50 @@ func main() {
 
 	iih, err := istio.NewIstioIntegrationHandler(&istioHandlerConfig, klog.TODO())
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	grpcDialOptions, err := iih.GetGRPCDialOptions()
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
-	client, err := grpc.Dial(
+	client, err := grpc.DialContext(
+		ctx,
 		"localhost:8082",
 		grpcDialOptions...,
 	)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
-	iih.Run(ctx)
+	if err := iih.Run(ctx); err != nil {
+		panic(err)
+	}
 
 	func() {
 		defer cancel()
 		defer client.Close()
 
+		wg := sync.WaitGroup{}
 		for i := 0; i < 10; i++ {
-			reply, err := pb.NewGreeterClient(client).SayHello(ctx, &pb.HelloRequest{Name: "world"})
-			if err != nil {
-				log.Fatal(err)
-			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ctx = network.NewConnectionStateHolderToContext(ctx)
+				reply, err := pb.NewGreeterClient(client).SayHello(ctx, &pb.HelloRequest{Name: "world"})
+				if err != nil {
+					log.Fatal(err)
+				}
 
-			log.Println(reply.Message)
+				if s, ok := network.ConnectionStateFromContext(ctx); ok {
+					util.PrintConnectionState(s, logger)
+				}
+
+				logger.Info(reply.Message)
+			}()
 		}
+		wg.Wait()
 	}()
 
 	time.Sleep(time.Millisecond * 100)

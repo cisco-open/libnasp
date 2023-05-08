@@ -61,10 +61,10 @@ type HTTPResponse interface {
 	Body() io.ReadCloser
 	SetBody(io.ReadCloser)
 
-	Connection() network.Connection
-
 	ContentLength() int64
 	StatusCode() int
+
+	ConnectionState() network.ConnectionState
 }
 
 type HTTPRequest interface {
@@ -78,5 +78,5 @@ type HTTPRequest interface {
 	Host() string
 	Method() string
 
-	Connection() network.Connection
+	ConnectionState() network.ConnectionState
 }

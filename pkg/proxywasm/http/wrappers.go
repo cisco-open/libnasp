@@ -75,9 +75,9 @@ func (r *HTTPRequest) Method() string {
 	return r.Request.Method
 }
 
-func (r *HTTPRequest) Connection() network.Connection {
-	if connection, ok := network.WrappedConnectionFromContext(r.Request.Context()); ok {
-		return connection
+func (r *HTTPRequest) ConnectionState() network.ConnectionState {
+	if connectionState, ok := network.ConnectionStateFromContext(r.Request.Context()); ok {
+		return connectionState
 	}
 
 	return nil
@@ -111,9 +111,9 @@ func (r *HTTPResponse) StatusCode() int {
 	return r.Response.StatusCode
 }
 
-func (r *HTTPResponse) Connection() network.Connection {
-	if connection, ok := network.WrappedConnectionFromContext(r.Response.Request.Context()); ok {
-		return connection
+func (r *HTTPResponse) ConnectionState() network.ConnectionState {
+	if connectionState, ok := network.ConnectionStateFromContext(r.Response.Request.Context()); ok {
+		return connectionState
 	}
 
 	return nil

@@ -176,8 +176,8 @@ func (c *wrappedConn) Write(b []byte) (int, error) {
 	}
 
 	if !c.connectionInfoSet {
-		if connection, ok := network.WrappedConnectionFromNetConn(c); ok {
-			middleware.SetEnvoyConnectionInfo(connection, c.stream)
+		if connectionState, ok := network.ConnectionStateFromNetConn(c); ok {
+			middleware.SetEnvoyConnectionInfo(connectionState, c.stream)
 			c.connectionInfoSet = true
 		}
 	}

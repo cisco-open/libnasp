@@ -26,6 +26,8 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/textproto"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,7 +36,8 @@ import (
 	"github.com/cisco-open/nasp/pkg/ca"
 	"github.com/cisco-open/nasp/pkg/ca/selfsigned"
 	"github.com/cisco-open/nasp/pkg/network"
-	ltls "github.com/cisco-open/nasp/pkg/tls"
+	"github.com/cisco-open/nasp/pkg/network/listener"
+	"github.com/cisco-open/nasp/pkg/network/pool"
 )
 
 type NetworkTestSuite struct {
@@ -140,7 +143,7 @@ func (s *NetworkTestSuite) wrappedTCPServer(ctx context.Context, handler func(ne
 		return err
 	}
 
-	l = network.NewWrappedListener(l)
+	l = network.WrappedConnectionListener(l)
 
 	s.wrappedTCPServerRunning = true
 
@@ -192,7 +195,12 @@ func (s *NetworkTestSuite) wrappedTLSServer(ctx context.Context, handler func(ne
 		InsecureSkipVerify: true,
 	}
 
-	l = ltls.NewUnifiedListener(network.NewWrappedListener(l), network.WrapTLSConfig(tlsConfig), ltls.TLSModeStrict)
+	l = listener.NewUnifiedListener(l, network.WrapTLSConfig(tlsConfig), listener.TLSModePermissive,
+		listener.UnifiedListenerWithTLSConnectionCreator(network.CreateTLSServerConn),
+		listener.UnifiedListenerWithConnectionWrapper(func(c net.Conn) net.Conn {
+			return network.WrapConnection(c)
+		}),
+	)
 
 	s.wrappedTLSServerRunning = true
 
@@ -332,14 +340,21 @@ func (s *NetworkTestSuite) TestWrappedHTTPServerWithSimpleClient() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if connection, ok := network.WrappedConnectionFromContext(r.Context()); ok {
-			s.Require().True(ok)
-			s.Require().NotNil(connection)
-			s.Equal(s.wrappedHTTPServerAddr, connection.LocalAddr().String())
-			s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
-		}
+		startTime := time.Now()
+
+		connectionState, ok := network.ConnectionStateFromContext(r.Context())
+		s.Require().True(ok)
+		s.Require().NotNil(connectionState)
+		s.Equal(s.wrappedHTTPServerAddr, connectionState.LocalAddr().String())
+		connectionState.ResetTimeToFirstByte()
+
 		_, err := w.Write(body)
 		s.Require().Nil(err)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+
+		s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
 	})
 
 	go func() {
@@ -353,15 +368,23 @@ func (s *NetworkTestSuite) TestWrappedHTTPServerWithSimpleClient() {
 
 	c := http.Client{}
 
-	resp, err := c.Get("http://" + s.wrappedHTTPServerAddr)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-	s.Require().NotNil(resp)
-	s.Equal(resp.StatusCode, 200)
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resp, err := c.Get("http://" + s.wrappedHTTPServerAddr)
+			s.Require().Nil(err)
+			defer resp.Body.Close()
+			s.Require().NotNil(resp)
+			s.Equal(resp.StatusCode, 200)
 
-	b, err := io.ReadAll(resp.Body)
-	s.Require().Nil(err)
-	s.Equal(b, body)
+			b, err := io.ReadAll(resp.Body)
+			s.Require().Nil(err)
+			s.Equal(b, body)
+		}()
+	}
+	wg.Wait()
 }
 
 func (s *NetworkTestSuite) TestWrappedHTTPServerWithWrappedClient() {
@@ -372,14 +395,21 @@ func (s *NetworkTestSuite) TestWrappedHTTPServerWithWrappedClient() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		startTime := time.Now()
+
+		connectionState, ok := network.ConnectionStateFromContext(r.Context())
+		s.Require().True(ok)
+		s.Require().NotNil(connectionState)
+		s.Equal(s.wrappedHTTPServerAddr, connectionState.LocalAddr().String())
+		connectionState.ResetTimeToFirstByte()
+
 		_, err := w.Write(body)
 		s.Require().Nil(err)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 
-		connection, ok := network.WrappedConnectionFromContext(r.Context())
-		s.Require().True(ok)
-		s.Require().NotNil(connection)
-		s.Equal(s.wrappedHTTPServerAddr, connection.LocalAddr().String())
-		s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+		s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
 	})
 
 	go func() {
@@ -395,21 +425,31 @@ func (s *NetworkTestSuite) TestWrappedHTTPServerWithWrappedClient() {
 		Transport: network.WrapHTTPTransport(http.DefaultTransport.(*http.Transport).Clone(), network.NewDialer()),
 	}
 
-	resp, err := c.Get("http://" + s.wrappedHTTPServerAddr)
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-	s.Require().NotNil(resp)
-	s.Equal(resp.StatusCode, 200)
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			startTime := time.Now()
 
-	b, err := io.ReadAll(resp.Body)
-	s.Require().Nil(err)
-	s.Equal(b, body)
+			defer wg.Done()
+			resp, err := c.Get("http://" + s.wrappedHTTPServerAddr)
+			s.Require().Nil(err)
+			defer resp.Body.Close()
+			s.Require().NotNil(resp)
+			s.Equal(resp.StatusCode, 200)
 
-	connection, ok := network.WrappedConnectionFromContext(resp.Request.Context())
-	s.Require().True(ok)
-	s.Require().NotNil(connection)
-	s.Equal(s.wrappedHTTPServerAddr, connection.RemoteAddr().String())
-	s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+			b, err := io.ReadAll(resp.Body)
+			s.Require().Nil(err)
+			s.Equal(b, body)
+
+			connectionState, ok := network.ConnectionStateFromContext(resp.Request.Context())
+			s.Require().True(ok)
+			s.Require().NotNil(connectionState)
+			s.Equal(s.wrappedHTTPServerAddr, connectionState.RemoteAddr().String())
+			s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
+		}()
+	}
+	wg.Wait()
 }
 
 func (s *NetworkTestSuite) TestWrappedHTTPSServerWithWrappedClient() {
@@ -419,22 +459,48 @@ func (s *NetworkTestSuite) TestWrappedHTTPSServerWithWrappedClient() {
 	body := []byte("hello world")
 	uri := "spiffe://acme.corp/https-wrapped-client"
 
+	type Stats struct {
+		Count                  int
+		HandshakeCompleteCount int
+		Addresses              map[string]int
+	}
+
+	serverStats := &Stats{
+		Addresses: make(map[string]int),
+	}
+	clientStats := &Stats{
+		Addresses: make(map[string]int),
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		startTime := time.Now()
+
+		connectionState, ok := network.ConnectionStateFromContext(r.Context())
+		s.Require().True(ok)
+		s.Require().NotNil(connectionState)
+		s.Equal(s.wrappedHTTPSServerAddr, connectionState.LocalAddr().String())
+		connectionState.ResetTimeToFirstByte()
+
 		_, err := w.Write(body)
 		s.Require().Nil(err)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 
-		connection, ok := network.WrappedConnectionFromContext(r.Context())
-		s.Require().True(ok)
-		s.Require().NotNil(connection)
-		s.Equal(s.wrappedHTTPSServerAddr, connection.LocalAddr().String())
-		s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+		s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
 
-		s.Require().NotNil(connection.GetPeerCertificate())
-		s.Equal(uri, connection.GetPeerCertificate().GetFirstURI())
+		s.Require().NotNil(connectionState.GetPeerCertificate())
+		s.Equal(uri, connectionState.GetPeerCertificate().GetFirstURI())
 
-		s.Require().NotNil(connection.GetLocalCertificate())
-		s.Equal(s.wrappedHTTPSServerCertURI, connection.GetLocalCertificate().GetFirstURI())
+		s.Require().NotNil(connectionState.GetLocalCertificate())
+		s.Equal(s.wrappedHTTPSServerCertURI, connectionState.GetLocalCertificate().GetFirstURI())
+
+		serverStats.Count++
+		if connectionState.GetTLSConnectionState().HandshakeComplete {
+			serverStats.HandshakeCompleteCount++
+		}
+		serverStats.Addresses[connectionState.RemoteAddr().String()]++
 	})
 
 	go func() {
@@ -459,58 +525,117 @@ func (s *NetworkTestSuite) TestWrappedHTTPSServerWithWrappedClient() {
 		InsecureSkipVerify: true,
 	})
 
-	c := http.Client{ //nolint:forcetypeassert
-		Transport: network.WrapHTTPTransport(http.DefaultTransport.(*http.Transport).Clone(), d),
+	var t *http.Transport
+	if tp, ok := http.DefaultTransport.(*http.Transport); ok {
+		t = tp.Clone()
+	}
+	s.Require().NotNil(t)
+	t.MaxIdleConns = 10
+	t.MaxConnsPerHost = 10
+	t.MaxIdleConnsPerHost = 10
+
+	c := http.Client{
+		Transport: network.WrapHTTPTransport(t, d),
 	}
 
-	resp, err := c.Get("https://" + s.wrappedHTTPSServerAddr + "/")
-	s.Require().Nil(err)
-	defer resp.Body.Close()
-	s.Require().NotNil(resp)
-	s.Equal(200, resp.StatusCode)
+	wg := sync.WaitGroup{}
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			startTime := time.Now()
 
-	b, err := io.ReadAll(resp.Body)
-	s.Require().Nil(err)
-	s.Equal(body, b)
+			defer wg.Done()
+			resp, err := c.Get("https://" + s.wrappedHTTPSServerAddr + "/")
+			s.Require().Nil(err)
+			defer resp.Body.Close()
+			s.Require().NotNil(resp)
+			s.Equal(200, resp.StatusCode)
 
-	connection, ok := network.WrappedConnectionFromContext(resp.Request.Context())
-	s.Require().True(ok)
-	s.Require().NotNil(connection)
-	s.Equal(s.wrappedHTTPSServerAddr, connection.RemoteAddr().String())
-	s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+			b, err := io.ReadAll(resp.Body)
+			s.Require().Nil(err)
+			s.Equal(body, b)
 
-	s.Require().NotNil(connection.GetLocalCertificate())
-	s.Equal(uri, connection.GetLocalCertificate().GetFirstURI())
+			connectionState, ok := network.ConnectionStateFromContext(resp.Request.Context())
+			s.Require().True(ok)
+			s.Require().NotNil(connectionState)
+			s.Equal(s.wrappedHTTPSServerAddr, connectionState.RemoteAddr().String())
+			s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
 
-	s.Require().NotNil(connection.GetPeerCertificate())
-	s.Equal(s.wrappedHTTPSServerCertURI, connection.GetPeerCertificate().GetFirstURI())
+			s.Require().NotNil(connectionState.GetLocalCertificate())
+			s.Equal(uri, connectionState.GetLocalCertificate().GetFirstURI())
+
+			s.Require().NotNil(connectionState.GetPeerCertificate())
+			s.Equal(s.wrappedHTTPSServerCertURI, connectionState.GetPeerCertificate().GetFirstURI())
+
+			clientStats.Count++
+			if connectionState.GetTLSConnectionState().HandshakeComplete {
+				clientStats.HandshakeCompleteCount++
+			}
+			clientStats.Addresses[connectionState.LocalAddr().String()]++
+		}()
+	}
+	wg.Wait()
+
+	s.Require().Equal(serverStats.Count, clientStats.Count)
+	s.Require().Equal(serverStats.HandshakeCompleteCount, clientStats.HandshakeCompleteCount)
+	s.Require().Equal(serverStats.Addresses, clientStats.Addresses)
 }
 
-func (s *NetworkTestSuite) TestWrappedTLSServer() {
+func (s *NetworkTestSuite) TestWrappedTLSServer() { //nolint:funlen
 	ctx, cancelContext := context.WithCancel(context.Background())
 
 	uri := "spiffe://acme.corp/tls-client"
 
+	type Stats struct {
+		Count                  int
+		HandshakeCompleteCount int
+		Addresses              map[string]int
+	}
+
+	serverMux := sync.Mutex{}
+	clientMux := sync.Mutex{}
+
+	serverStats := &Stats{
+		Addresses: make(map[string]int),
+	}
+	clientStats := &Stats{
+		Addresses: make(map[string]int),
+	}
+
 	go func() {
 		err := s.wrappedTLSServer(ctx, func(conn net.Conn) {
-			b := make([]byte, 1)
-			n, err := conn.Read(b)
-			s.Require().Nil(err)
-			s.Equal(1, n)
+			for {
+				startTime := time.Now()
 
-			connection, ok := network.WrappedConnectionFromNetConn(conn)
-			s.Require().True(ok)
-			s.Require().NotNil(connection)
+				connectionState, ok := network.ConnectionStateFromNetConn(conn)
+				s.Require().True(ok)
+				s.Require().NotNil(connectionState)
+				connectionState.ResetTimeToFirstByte()
 
-			s.Equal(s.wrappedTLSServerAddr, connection.LocalAddr().String())
-			s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+				r := textproto.NewReader(bufio.NewReader(conn))
+				str, err := r.ReadLine()
+				s.Require().Nil(err)
+				s.Equal("hello", str)
 
-			s.Require().NotNil(connection.GetPeerCertificate())
-			s.Equal(uri, connection.GetPeerCertificate().GetFirstURI())
+				s.Equal(s.wrappedTLSServerAddr, connectionState.LocalAddr().String())
+				s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
 
-			s.Require().NotNil(connection.GetLocalCertificate())
-			s.Equal(s.wrappedTLServerCertURI, connection.GetLocalCertificate().GetFirstURI())
+				s.Require().NotNil(connectionState.GetPeerCertificate())
+				s.Equal(uri, connectionState.GetPeerCertificate().GetFirstURI())
+
+				s.Require().NotNil(connectionState.GetLocalCertificate())
+				s.Equal(s.wrappedTLServerCertURI, connectionState.GetLocalCertificate().GetFirstURI())
+
+				serverStats.Count++
+				if connectionState.GetTLSConnectionState().HandshakeComplete {
+					serverStats.HandshakeCompleteCount++
+				}
+				serverMux.Lock()
+				serverStats.Addresses[connectionState.RemoteAddr().String()]++
+				serverMux.Unlock()
+			}
 		})
+
 		s.Require().Nil(err)
 	}()
 
@@ -531,32 +656,71 @@ func (s *NetworkTestSuite) TestWrappedTLSServer() {
 		InsecureSkipVerify: true,
 	})
 
-	ctx = network.NewConnectionToContext(ctx)
-	conn, err := d.DialTLSContext(ctx, "tcp", s.wrappedTLSServerAddr)
+	p, err := pool.NewChannelPool(func() (net.Conn, error) {
+		conn, err := d.DialContext(ctx, "tcp", s.wrappedTLSServerAddr)
+		if connectionState, ok := network.ConnectionStateFromNetConn(conn); ok {
+			connectionState.ResetTimeToFirstByte()
+		}
+
+		return conn, err
+	}, pool.ChannelPoolWithInitialCap(5), pool.ChannelPoolWithMaxCap(5))
 	s.Require().Nil(err)
 
-	_, err = conn.Write([]byte("hello\n"))
-	s.Require().Nil(err)
+	wg := sync.WaitGroup{}
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			startTime := time.Now()
+			defer wg.Done()
 
-	connection, ok := network.WrappedConnectionFromNetConn(conn)
-	s.Require().True(ok)
-	s.Require().NotNil(connection)
+			conn, err := p.Get()
+			defer func() {
+				_ = conn.Close()
+			}()
+			s.Require().Nil(err)
 
-	s.Equal(s.wrappedTLSServerAddr, connection.RemoteAddr().String())
-	s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+			connectionState, ok := network.ConnectionStateFromNetConn(conn)
+			s.Require().True(ok)
+			s.Require().NotNil(connectionState)
+			connectionState.ResetTimeToFirstByte()
 
-	s.Require().NotNil(connection.GetPeerCertificate())
-	s.Equal(s.wrappedTLServerCertURI, connection.GetPeerCertificate().GetFirstURI())
+			_, err = conn.Write([]byte("hello\n"))
+			s.Require().Nil(err)
 
-	s.Require().NotNil(connection.GetLocalCertificate())
-	s.Equal(uri, connection.GetLocalCertificate().GetFirstURI())
+			s.Equal(s.wrappedTLSServerAddr, connectionState.RemoteAddr().String())
+			s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
+
+			s.Require().NotNil(connectionState.GetPeerCertificate())
+			s.Equal(s.wrappedTLServerCertURI, connectionState.GetPeerCertificate().GetFirstURI())
+
+			s.Require().NotNil(connectionState.GetLocalCertificate())
+			s.Equal(uri, connectionState.GetLocalCertificate().GetFirstURI())
+
+			clientStats.Count++
+			if connectionState.GetTLSConnectionState().HandshakeComplete {
+				clientStats.HandshakeCompleteCount++
+			}
+			clientMux.Lock()
+			clientStats.Addresses[connectionState.LocalAddr().String()]++
+			clientMux.Unlock()
+		}()
+
+		if i%5 == 0 {
+			time.Sleep(time.Millisecond * 100)
+		}
+	}
+	wg.Wait()
 
 	cancelContext()
 
-	// wait for tls server to shut down to give time to server connection handler to act
+	// wait for tls server to shut down to give time to server connectionState handler to act
 	s.Eventually(func() bool {
 		return !s.wrappedTLSServerRunning
 	}, time.Second*5, time.Millisecond*10, "wrapped tls server didn't shut down")
+
+	s.Require().Equal(serverStats.Count, clientStats.Count)
+	s.Require().Equal(serverStats.HandshakeCompleteCount, clientStats.HandshakeCompleteCount)
+	s.Require().Equal(serverStats.Addresses, clientStats.Addresses)
 }
 
 func (s *NetworkTestSuite) TestWrappedTCPServer() {
@@ -564,18 +728,20 @@ func (s *NetworkTestSuite) TestWrappedTCPServer() {
 
 	go func() {
 		err := s.wrappedTCPServer(ctx, func(conn net.Conn) {
+			startTime := time.Now()
+
 			b := make([]byte, 1)
 			n, err := conn.Read(b)
 			s.Require().Nil(err)
 
 			s.Equal(1, n)
 
-			connection, ok := network.WrappedConnectionFromNetConn(conn)
+			connectionState, ok := network.ConnectionStateFromNetConn(conn)
 			s.Require().True(ok)
-			s.Require().NotNil(connection)
+			s.Require().NotNil(connectionState)
 
-			s.Equal(s.wrappedTCPServerAddr, connection.LocalAddr().String())
-			s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+			s.Equal(s.wrappedTCPServerAddr, connectionState.LocalAddr().String())
+			s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
 		})
 		s.Require().Nil(err)
 	}()
@@ -584,23 +750,33 @@ func (s *NetworkTestSuite) TestWrappedTCPServer() {
 		return s.wrappedTCPServerRunning
 	}, time.Second*5, time.Millisecond*10, "wrapped tcp server didn't come up")
 
-	ctx = network.NewConnectionToContext(ctx)
-	conn, err := network.NewDialer().DialContext(ctx, "tcp", s.wrappedTCPServerAddr)
-	s.Require().Nil(err)
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			startTime := time.Now()
 
-	_, err = conn.Write([]byte("hello\n"))
-	s.Require().Nil(err)
+			defer wg.Done()
 
-	connection, ok := network.WrappedConnectionFromNetConn(conn)
-	s.Require().True(ok)
-	s.Require().NotNil(connection)
+			conn, err := network.NewDialer().DialContext(ctx, "tcp", s.wrappedTCPServerAddr)
+			s.Require().Nil(err)
 
-	s.Equal(s.wrappedTCPServerAddr, connection.RemoteAddr().String())
-	s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+			_, err = conn.Write([]byte("hello\n"))
+			s.Require().Nil(err)
+
+			connectionState, ok := network.ConnectionStateFromNetConn(conn)
+			s.Require().True(ok)
+			s.Require().NotNil(connectionState)
+
+			s.Equal(s.wrappedTCPServerAddr, connectionState.RemoteAddr().String())
+			s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
+		}()
+	}
+	wg.Wait()
 
 	cancelContext()
 
-	// wait for tcp server to shut down to give time to server connection handler to act
+	// wait for tcp server to shut down to give time to server connectionState handler to act
 	s.Eventually(func() bool {
 		return !s.wrappedTCPServerRunning
 	}, time.Second*5, time.Millisecond*10, "wrapped tcp server didn't shut down")
@@ -619,25 +795,35 @@ func (s *NetworkTestSuite) TestSimpleTCPClient() {
 		return s.simpleTCPServerRunning
 	}, time.Second*5, time.Millisecond*10, "simple tcp server didn't come up")
 
-	ctx = network.NewConnectionToContext(ctx)
-	conn, err := network.NewDialer().DialContext(ctx, "tcp", s.simpleTCPServerAddr)
-	s.Require().Nil(err)
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			startTime := time.Now()
 
-	_, err = conn.Write([]byte("hello\n"))
-	s.Require().Nil(err)
+			defer wg.Done()
 
-	reply := make([]byte, 1024)
-	n, err := conn.Read(reply)
-	s.Require().Nil(err)
+			conn, err := network.NewDialer().DialContext(ctx, "tcp", s.simpleTCPServerAddr)
+			s.Require().Nil(err)
 
-	s.Greater(n, 0)
+			_, err = conn.Write([]byte("hello\n"))
+			s.Require().Nil(err)
 
-	connection, ok := network.WrappedConnectionFromNetConn(conn)
-	s.Require().True(ok)
-	s.Require().NotNil(connection)
+			reply := make([]byte, 1024)
+			n, err := conn.Read(reply)
+			s.Require().Nil(err)
 
-	s.Equal(s.simpleTCPServerAddr, connection.RemoteAddr().String())
-	s.WithinRange(connection.GetTimeToFirstByte(), time.Now().Add(-time.Second), time.Now().Add(time.Second))
+			s.Greater(n, 0)
+
+			connectionState, ok := network.ConnectionStateFromNetConn(conn)
+			s.Require().True(ok)
+			s.Require().NotNil(connectionState)
+
+			s.Equal(s.simpleTCPServerAddr, connectionState.RemoteAddr().String())
+			s.WithinRange(connectionState.GetTimeToFirstByte(), startTime, time.Now().Add(time.Second))
+		}()
+	}
+	wg.Wait()
 }
 
 func TestNetworkTestSuite(t *testing.T) {
