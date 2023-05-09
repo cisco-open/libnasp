@@ -112,12 +112,11 @@ func main() {
 
 	iih.Run(ctx)
 
-	// make idle timeout minimal to test least request increment/decrement
+	// use client side connection pooling
 	t := http.DefaultTransport.(*http.Transport)
 	t.MaxIdleConns = 50
 	t.MaxConnsPerHost = 50
 	t.MaxIdleConnsPerHost = 50
-	// t.IdleConnTimeout = time.Nanosecond * 1
 
 	transport, err := iih.GetHTTPTransport(t)
 	if err != nil {
