@@ -215,9 +215,11 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 
 	s.environment = e
 
-	s.zipkinTracer, err = tracing.SetupZipkinTracing(s.environment)
-	if err != nil {
-		return nil, err
+	if s.environment.ZipkinAddress != "" {
+		s.zipkinTracer, err = tracing.SetupZipkinTracing(s.environment)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	registry := prometheus.NewRegistry()
@@ -307,16 +309,21 @@ func (h *istioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) 
 		return nil, errors.Wrap(err, "could not get stream handler")
 	}
 
-	zipkinWrappedTransport, err := zipkinhttp.NewTransport(h.zipkinTracer, zipkinhttp.RoundTripper(transport))
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get zipkin tracer")
+	if h.zipkinTracer != nil {
+		transport, err = zipkinhttp.NewTransport(h.zipkinTracer, zipkinhttp.RoundTripper(transport))
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get zipkin tracer")
+		}
+
 	}
 
 	logger := h.logger.WithName("http-transport")
-	tp := NewIstioHTTPRequestTransport(zipkinWrappedTransport, h.caClient, h.discoveryClient, logger, h.zipkinTracer)
+	tp := NewIstioHTTPRequestTransport(transport, h.caClient, h.discoveryClient, logger, h.zipkinTracer)
 	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, logger)
 
-	httpTransport.AddMiddleware(tracing.NewZipkinHTTPClientTracingMiddleware(h.zipkinTracer))
+	if h.zipkinTracer != nil {
+		httpTransport.AddMiddleware(tracing.NewZipkinHTTPClientTracingMiddleware(h.zipkinTracer))
+	}
 
 	httpTransport.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
 	httpTransport.AddMiddleware(NewIstioHTTPHandlerMiddleware())
@@ -331,6 +338,10 @@ func (h *istioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOption, error
 	}
 
 	grpcDialer := pwgrpc.NewGRPCDialer(h.caClient, streamHandler, h.discoveryClient, h.logger)
+
+	if h.zipkinTracer != nil {
+		grpcDialer.AddMiddleware(tracing.NewZipkinGRPCTracingMiddleware(h.zipkinTracer))
+	}
 
 	grpcDialer.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
 	grpcDialer.AddMiddleware(NewIstioHTTPHandlerMiddleware())
@@ -355,7 +366,13 @@ func (h *istioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 
 	httpHandler := pwhttp.NewHandler(handler, streamHandler, api.ListenerDirectionInbound)
 
-	httpHandler.AddMiddleware(tracing.NewZipkinHTTPTracingMiddleware(h.zipkinTracer))
+	if h.zipkinTracer != nil {
+		httpHandler.AddMiddleware(tracing.NewZipkinHTTPTracingMiddleware(h.zipkinTracer))
+
+		// TODO(bertab) should it be merged with the http middleware?
+		// if including both will it duplicate spans?
+		// httpHandler.AddMiddleware(tracing.NewZipkinGRPCTracingMiddleware(h.zipkinTracer))
+	}
 
 	httpHandler.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
 	httpHandler.AddMiddleware(NewIstioHTTPHandlerMiddleware())

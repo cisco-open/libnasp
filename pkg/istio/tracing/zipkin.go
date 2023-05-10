@@ -156,11 +156,11 @@ func InjectHTTPHeaders(r api.HTTPRequest, opts ...InjectOption) propagation.Inje
 func ExtractGRPCHeaders(req api.HTTPRequest) propagation.Extractor {
 	return func() (*model.SpanContext, error) {
 		var (
-			traceIDHeader      = GetGRPCHeader(req.Header(), b3.TraceID)
-			spanIDHeader       = GetGRPCHeader(req.Header(), b3.SpanID)
-			parentSpanIDHeader = GetGRPCHeader(req.Header(), b3.ParentSpanID)
-			sampledHeader      = GetGRPCHeader(req.Header(), b3.Sampled)
-			flagsHeader        = GetGRPCHeader(req.Header(), b3.Flags)
+			traceIDHeader, _      = req.Header().Get(b3.TraceID)
+			spanIDHeader, _       = req.Header().Get(b3.SpanID)
+			parentSpanIDHeader, _ = req.Header().Get(b3.ParentSpanID)
+			sampledHeader, _      = req.Header().Get(b3.Sampled)
+			flagsHeader, _        = req.Header().Get(b3.Flags)
 		)
 
 		return b3.ParseHeaders(
@@ -177,33 +177,24 @@ func InjectGRPCHeaders(req api.HTTPRequest) propagation.Injector {
 		}
 
 		if sc.Debug {
-			setGRPCHeader(req.Header(), b3.Flags, "1")
+			req.Header().Set(b3.Flags, "1")
 		} else if sc.Sampled != nil {
 			if *sc.Sampled {
-				setGRPCHeader(req.Header(), b3.Sampled, "1")
+				req.Header().Set(b3.Sampled, "1")
 			} else {
-				setGRPCHeader(req.Header(), b3.Sampled, "0")
+				req.Header().Set(b3.Sampled, "0")
 			}
 		}
 
 		if !sc.TraceID.Empty() && sc.ID > 0 {
 			// set identifiers
-			setGRPCHeader(req.Header(), b3.TraceID, sc.TraceID.String())
-			setGRPCHeader(req.Header(), b3.SpanID, sc.ID.String())
+			req.Header().Set(b3.TraceID, sc.TraceID.String())
+			req.Header().Set(b3.SpanID, sc.ID.String())
 			if sc.ParentID != nil {
-				setGRPCHeader(req.Header(), b3.ParentSpanID, sc.ParentID.String())
+				req.Header().Set(b3.ParentSpanID, sc.ParentID.String())
 			}
 		}
 
 		return nil
 	}
-}
-
-func GetGRPCHeader(header api.HeaderMap, key string) string {
-	v, _ := header.Get(key)
-	return v
-}
-
-func setGRPCHeader(header api.HeaderMap, key, value string) {
-	header.Set(key, value)
 }
