@@ -314,7 +314,6 @@ func (h *istioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) 
 		if err != nil {
 			return nil, errors.Wrap(err, "could not get zipkin tracer")
 		}
-
 	}
 
 	logger := h.logger.WithName("http-transport")
