@@ -2,3 +2,13 @@
 members = [
     "./experimental/wasm-tcp-metadata",
 ]
+
+[profile.release]
+# do not include debug symbols
+debug = false
+# link-time optimalization
+lto = 'thin' # this works much better for wasm3 than 'true'
+# optimize for binary size for wasm s is better than z
+opt-level = "s"
+# do not unwind the stack when panicking
+#panic = "abort"
