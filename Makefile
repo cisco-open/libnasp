@@ -52,3 +52,9 @@ lint-fix-all: ${REPO_ROOT}/bin/golangci-lint ## lint --fix the whole repo
 .PHONY: mod-download-all
 mod-download-all:	## go mod download all go modules
 	./scripts/for_all_go_modules.sh -- go mod download all
+
+.PHONY: tcp-metadata-exchange-filter
+tcp-metadata-exchange-filter:	## build the tcp-metadata-exchange-filter
+	rustup target add wasm32-unknown-unknown
+	cargo build --target wasm32-unknown-unknown --release
+	cp target/wasm32-unknown-unknown/release/wasm_tcp_metadata.wasm pkg/istio/filters/tcp-metadata-exchange-filter.wasm

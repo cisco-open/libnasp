@@ -44,6 +44,10 @@ jobs:
           restore-keys: |
             build-deps-v2
 
+      - name: Build TCP metadata exchange filter
+        run: |
+          make tcp-metadata-exchange-filter
+
       - name: Run unit tests
         run: make test
 

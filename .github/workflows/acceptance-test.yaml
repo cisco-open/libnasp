@@ -45,6 +45,10 @@ jobs:
         id: set-git-refname
         run: echo "git_refname=$(echo "${{ github.ref }}" | sed -r 's@refs/(heads|pull|tags)/@@g')" >> $GITHUB_OUTPUT
 
+      - name: Build TCP metadata exchange filter
+        run: |
+          make tcp-metadata-exchange-filter
+
       - name: Deploy to kind cluster (istio-operator)
         run: |
           test/deploy-kind.sh
