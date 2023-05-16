@@ -16,7 +16,7 @@ import (
 )
 
 // SetupZipkinTracing initializes and returns a zipkin tracer to be used for tracing middlewares and clients
-func SetupZipkinTracing(istioEnvironment *environment.IstioEnvironment) (*zipkin.Tracer, error) {
+func SetupZipkinTracing(istioEnvironment *environment.IstioEnvironment, httpClient httpreporter.HTTPDoer) (*zipkin.Tracer, error) {
 	localIP := ""
 	if len(istioEnvironment.InstanceIPs) > 0 {
 		localIP = istioEnvironment.InstanceIPs[0]
@@ -27,7 +27,7 @@ func SetupZipkinTracing(istioEnvironment *environment.IstioEnvironment) (*zipkin
 		return nil, err
 	}
 
-	reporter := httpreporter.NewReporter(istioEnvironment.ZipkinAddress)
+	reporter := httpreporter.NewReporter(istioEnvironment.ZipkinAddress, httpreporter.Client(httpClient))
 
 	tracer, err := zipkin.NewTracer(reporter, zipkin.WithLocalEndpoint(localEndpoint), zipkin.WithSharedSpans(false))
 	if err != nil {

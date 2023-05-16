@@ -215,13 +215,6 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 
 	s.environment = e
 
-	if s.environment.ZipkinAddress != "" {
-		s.zipkinTracer, err = tracing.SetupZipkinTracing(s.environment)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	registry := prometheus.NewRegistry()
 	s.metricHandler = proxywasm.NewPrometheusMetricHandler(registry, logger)
 	baseContext := proxywasm.GetBaseContext("root")
@@ -292,6 +285,20 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 		s.metricsPusher = createMetricsPusher(config.PushgatewayConfig, jobName, httpClient, registry)
 	}
 
+	if s.environment.ZipkinAddress != "" {
+		transport, err := s.GetHTTPTransport(http.DefaultTransport)
+		if err != nil {
+			return nil, err
+		}
+
+		s.zipkinTracer, err = tracing.SetupZipkinTracing(s.environment, &http.Client{
+			Transport: transport,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return s, nil
 }
 
@@ -309,15 +316,16 @@ func (h *istioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) 
 		return nil, errors.Wrap(err, "could not get stream handler")
 	}
 
+	logger := h.logger.WithName("http-transport")
+	tp := NewIstioHTTPRequestTransport(transport, h.caClient, h.discoveryClient, logger, h.zipkinTracer)
+
 	if h.zipkinTracer != nil {
-		transport, err = zipkinhttp.NewTransport(h.zipkinTracer, zipkinhttp.RoundTripper(transport))
+		tp, err = zipkinhttp.NewTransport(h.zipkinTracer, zipkinhttp.RoundTripper(tp))
 		if err != nil {
 			return nil, errors.Wrap(err, "could not get zipkin tracer")
 		}
 	}
 
-	logger := h.logger.WithName("http-transport")
-	tp := NewIstioHTTPRequestTransport(transport, h.caClient, h.discoveryClient, logger, h.zipkinTracer)
 	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, logger)
 
 	if h.zipkinTracer != nil {
