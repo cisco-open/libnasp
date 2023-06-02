@@ -329,7 +329,7 @@ func (h *istioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) 
 	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, logger)
 
 	if h.zipkinTracer != nil {
-		httpTransport.AddMiddleware(tracing.NewZipkinHTTPClientTracingMiddleware(h.zipkinTracer))
+		httpTransport.AddMiddleware(tracing.NewZipkinHTTPClientTracingMiddleware(h.zipkinTracer, h.environment))
 	}
 
 	httpTransport.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
@@ -347,7 +347,7 @@ func (h *istioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOption, error
 	grpcDialer := pwgrpc.NewGRPCDialer(h.caClient, streamHandler, h.discoveryClient, h.logger)
 
 	if h.zipkinTracer != nil {
-		grpcDialer.AddMiddleware(tracing.NewZipkinGRPCTracingMiddleware(h.zipkinTracer))
+		grpcDialer.AddMiddleware(tracing.NewZipkinGRPCClientTracingMiddleware(h.zipkinTracer, h.environment))
 	}
 
 	grpcDialer.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
@@ -374,11 +374,7 @@ func (h *istioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 	httpHandler := pwhttp.NewHandler(handler, streamHandler, api.ListenerDirectionInbound)
 
 	if h.zipkinTracer != nil {
-		httpHandler.AddMiddleware(tracing.NewZipkinHTTPTracingMiddleware(h.zipkinTracer))
-
-		// TODO(bertab) should it be merged with the http middleware?
-		// if including both will it duplicate spans?
-		// httpHandler.AddMiddleware(tracing.NewZipkinGRPCTracingMiddleware(h.zipkinTracer))
+		httpHandler.AddMiddleware(tracing.NewZipkinHTTPTracingMiddleware(h.zipkinTracer, h.environment))
 	}
 
 	httpHandler.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())

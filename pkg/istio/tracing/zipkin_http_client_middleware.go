@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/cisco-open/nasp/pkg/environment"
+
 	"github.com/openzipkin/zipkin-go"
 	"github.com/openzipkin/zipkin-go/model"
 
@@ -12,14 +14,16 @@ import (
 )
 
 type zipkinHTTPClientTracingMiddleware struct {
-	tracer *zipkin.Tracer
+	tracer      *zipkin.Tracer
+	environment *environment.IstioEnvironment
 }
 
 var _ lhttp.HandleMiddleware = &zipkinHTTPClientTracingMiddleware{}
 
-func NewZipkinHTTPClientTracingMiddleware(tracer *zipkin.Tracer) lhttp.HandleMiddleware {
+func NewZipkinHTTPClientTracingMiddleware(tracer *zipkin.Tracer, meshConfig *environment.IstioEnvironment) lhttp.HandleMiddleware {
 	h := &zipkinHTTPClientTracingMiddleware{
-		tracer: tracer,
+		tracer:      tracer,
+		environment: meshConfig,
 	}
 	return h
 }
@@ -41,7 +45,7 @@ func (z zipkinHTTPClientTracingMiddleware) AfterRequest(req api.HTTPRequest, str
 		parentContext = z.tracer.Extract(ExtractHTTPHeaders(req))
 	}
 
-	spanName := req.URL().Scheme + "/" + req.Method()
+	spanName := req.URL().String()
 	remoteEndpoint, _ := ExtractRemoteEndpoint(req)
 
 	span := z.tracer.StartSpan(
@@ -53,6 +57,7 @@ func (z zipkinHTTPClientTracingMiddleware) AfterRequest(req api.HTTPRequest, str
 	zipkin.TagHTTPMethod.Set(span, req.Method())
 	zipkin.TagHTTPPath.Set(span, req.URL().Path)
 	zipkin.TagHTTPUrl.Set(span, req.URL().String())
+	AddCommonZipkinTags(req, span, z.environment)
 
 	_ = InjectHTTPHeaders(req)(span.Context())
 

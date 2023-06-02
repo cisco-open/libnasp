@@ -22,7 +22,8 @@ func SetupZipkinTracing(istioEnvironment *environment.IstioEnvironment, httpClie
 		localIP = istioEnvironment.InstanceIPs[0]
 	}
 
-	localEndpoint, err := zipkin.NewEndpoint("nasp", localIP)
+	serviceName := istioEnvironment.Labels["service.istio.io/canonical-name"] + "." + istioEnvironment.PodNamespace
+	localEndpoint, err := zipkin.NewEndpoint(serviceName, localIP)
 	if err != nil {
 		return nil, err
 	}

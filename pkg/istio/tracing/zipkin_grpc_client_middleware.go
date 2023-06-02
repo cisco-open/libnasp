@@ -3,6 +3,8 @@ package tracing
 import (
 	"context"
 
+	"github.com/cisco-open/nasp/pkg/environment"
+
 	"github.com/openzipkin/zipkin-go"
 	"github.com/openzipkin/zipkin-go/model"
 
@@ -11,14 +13,16 @@ import (
 )
 
 type zipkinGRPCClientTracingMiddleware struct {
-	tracer *zipkin.Tracer
+	tracer      *zipkin.Tracer
+	environment *environment.IstioEnvironment
 }
 
 var _ lhttp.HandleMiddleware = &zipkinGRPCClientTracingMiddleware{}
 
-func NewZipkinGRPCClientTracingMiddleware(tracer *zipkin.Tracer) lhttp.HandleMiddleware {
+func NewZipkinGRPCClientTracingMiddleware(tracer *zipkin.Tracer, meshConfig *environment.IstioEnvironment) lhttp.HandleMiddleware {
 	h := &zipkinGRPCClientTracingMiddleware{
-		tracer: tracer,
+		tracer:      tracer,
+		environment: meshConfig,
 	}
 	return h
 }
@@ -48,6 +52,11 @@ func (z zipkinGRPCClientTracingMiddleware) AfterRequest(req api.HTTPRequest, str
 		zipkin.Parent(parentContext),
 		zipkin.RemoteEndpoint(remoteEndpoint),
 	)
+
+	zipkin.TagHTTPMethod.Set(span, req.Method())
+	zipkin.TagHTTPPath.Set(span, req.URL().Path)
+	zipkin.TagHTTPUrl.Set(span, req.URL().String())
+	AddCommonZipkinTags(req, span, z.environment)
 
 	_ = InjectGRPCHeaders(req)(span.Context())
 
