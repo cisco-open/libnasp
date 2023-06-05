@@ -153,7 +153,6 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 
 	//nolint:forcetypeassert
 	s.readableKeys.Range(func(key, value any) bool {
-
 		check := value.(func() bool)
 		if check() {
 			select {
@@ -425,7 +424,6 @@ func (c *Connection) StartAsyncRead(selectedKeyId int32, selector *Selector) {
 					logger.Info("wrote less data into read buffer than the received amount of data!")
 				}
 			} else {
-
 				logger.V(1).Info("received 0 bytes on connection")
 			}
 		}
@@ -466,7 +464,6 @@ func (c *Connection) StartAsyncWrite(selectedKeyId int32, selector *Selector) {
 	if v, _ := selector.writeInProgress.Swap(selectedKeyId, true); v != nil && v.(bool) {
 		return
 	}
-
 
 	go func() {
 	out:
