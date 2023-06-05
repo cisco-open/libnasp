@@ -105,8 +105,8 @@ type Address struct {
 }
 
 // SelectedKey holds the data of a Selected Key formatted on 64 bits as follows:
-// |----16bits---|-----------------------------8bits------------|---------8bits--------|----32bits-----|
-// |    unused   |read/write running ops status for selected key|selected key ready ops|selected key id|
+// |----24bits---|---------8bits--------|----32bits-----|
+// |    unused   |selected key ready ops|selected key id|
 type SelectedKey uint64
 
 func NewSelectedKey(operation ReadyOps, id uint32) SelectedKey {
@@ -199,21 +199,8 @@ func (s *Selector) Select(timeoutMs int64) []byte {
 
 		b := make([]byte, len(selected)*8)
 		i := 0
-		for k, v := range selected {
-			// add current running ops to selected key
-			var runningOps uint64
-			readInProgress, _ := s.readInProgress.Load(int32(k))
-			//nolint:forcetypeassert
-			if readInProgress != nil && readInProgress.(bool) {
-				runningOps |= uint64(OP_READ)
-			}
-			writeInProgress, _ := s.writeInProgress.Load(int32(k))
-			//nolint:forcetypeassert
-			if writeInProgress != nil && writeInProgress.(bool) {
-				runningOps |= uint64(OP_WRITE)
-			}
-
-			binary.BigEndian.PutUint64(b[i*8:], uint64(v)|(runningOps<<40))
+		for _, v := range selected {
+			binary.BigEndian.PutUint64(b[i*8:], uint64(v))
 			i++
 		}
 		return b
