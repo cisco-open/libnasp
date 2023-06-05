@@ -255,6 +255,11 @@ public class NaspSocketChannel extends SocketChannel implements SelChImpl {
         throw new UnsupportedOperationException();
     }
 
+    //POLLNVAL:32
+    //POLLERR:8
+    //POLLHUP:16
+    //POLLIN:1
+    //POLLOUT:4
     public boolean translateReadyOps(int ops, int initialOps, SelectionKeyImpl ski) {
         int intOps = ski.nioInterestOps();
         int oldOps = ski.nioReadyOps();
