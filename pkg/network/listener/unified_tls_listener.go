@@ -12,12 +12,14 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-package tls
+package listener
 
 import (
 	"bufio"
 	"crypto/tls"
 	"encoding/binary"
+	"errors"
+	"io"
 	"net"
 )
 
@@ -58,6 +60,14 @@ func (c *unifiedConn) NetConn() net.Conn {
 	return c.Conn
 }
 
+func (c *unifiedConn) SetTLSConn(conn *tls.Conn) {
+	if c, ok := c.Conn.(interface {
+		SetTLSConn(conn *tls.Conn)
+	}); ok {
+		c.SetTLSConn(conn)
+	}
+}
+
 type UnifiedListener interface {
 	net.Listener
 
@@ -70,15 +80,42 @@ type unifiedListener struct {
 
 	tlsConfig *tls.Config
 	mode      TLSMode
+
+	tlsConnCreator    func(net.Conn, *tls.Config) *tls.Conn
+	connectionWrapper ConnectionWrapper
 }
 
-func NewUnifiedListener(listener net.Listener, tlsConfig *tls.Config, mode TLSMode) UnifiedListener {
-	return &unifiedListener{
+type UnifiedListenerOption func(*unifiedListener)
+
+func UnifiedListenerWithTLSConnectionCreator(f func(net.Conn, *tls.Config) *tls.Conn) UnifiedListenerOption {
+	return func(l *unifiedListener) {
+		l.tlsConnCreator = f
+	}
+}
+
+func UnifiedListenerWithConnectionWrapper(wrapper ConnectionWrapper) UnifiedListenerOption {
+	return func(l *unifiedListener) {
+		l.connectionWrapper = wrapper
+	}
+}
+
+func NewUnifiedListener(listener net.Listener, tlsConfig *tls.Config, mode TLSMode, opts ...UnifiedListenerOption) UnifiedListener {
+	l := &unifiedListener{
 		Listener: listener,
 
 		tlsConfig: tlsConfig,
 		mode:      mode,
 	}
+
+	for _, o := range opts {
+		o(l)
+	}
+
+	if l.tlsConnCreator == nil {
+		l.tlsConnCreator = tls.Server
+	}
+
+	return l
 }
 
 func (l *unifiedListener) SetTLSMode(mode TLSMode) {
@@ -95,30 +132,44 @@ func (l *unifiedListener) Accept() (net.Conn, error) {
 		return nil, err
 	}
 
+	if l.mode == TLSModePermissive {
+		// buffer reads on our conn
+		var conn net.Conn
+		conn = &unifiedConn{
+			Conn: c,
+			buf:  bufio.NewReader(c),
+		}
+
+		// inspect the first few bytes
+		hdr, err := conn.(*unifiedConn).buf.Peek(3)
+		// close connection in case of EOF without reporting error
+		if errors.Is(err, io.EOF) {
+			conn.Close()
+			return conn, nil
+		}
+		if err != nil {
+			conn.Close()
+			return nil, err
+		}
+
+		if l.connectionWrapper != nil {
+			conn = l.connectionWrapper(conn)
+		}
+
+		if isTLSHandhsake(hdr) {
+			return l.tlsConnCreator(conn, l.tlsConfig), nil
+		}
+
+		return conn, nil
+	}
+
+	if l.connectionWrapper != nil {
+		c = l.connectionWrapper(c)
+	}
+
 	if l.mode == TLSModeDisabled {
 		return c, nil
 	}
 
-	if l.mode == TLSModeStrict {
-		return tls.Server(c, l.tlsConfig), nil
-	}
-
-	// buffer reads on our conn
-	conn := &unifiedConn{
-		Conn: c,
-		buf:  bufio.NewReader(c),
-	}
-
-	// inspect the first few bytes
-	hdr, err := conn.buf.Peek(3)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-
-	if isTLSHandhsake(hdr) {
-		return tls.Server(conn, l.tlsConfig), nil
-	}
-
-	return conn, nil
+	return l.tlsConnCreator(c, l.tlsConfig), nil
 }

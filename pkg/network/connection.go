@@ -15,111 +15,187 @@
 package network
 
 import (
-	"context"
-	"fmt"
+	"crypto/tls"
 	"net"
+	"reflect"
+	"sync"
+	"time"
 
-	"github.com/go-logr/logr"
+	"github.com/google/uuid"
+
+	"github.com/cisco-open/nasp/pkg/network/listener"
 )
 
-type contextKey struct {
-	name string
-}
-
-var connectionContextKey = contextKey{"network.connection"}
-var ConnectionTrackerLogger logr.Logger = logr.Discard()
-
-type ConnectionHolder interface {
-	SetConn(net.Conn)
-	NetConn() net.Conn
-}
-
-type connectionHolder struct {
+type connection struct {
 	net.Conn
+
+	id              string
+	connectionState ConnectionState
+
+	closeWrapper ConnectionCloseWrapper
+
+	tlsConnectionStateSetter sync.Once
+	tlsConn                  *tls.Conn
+
+	originalAddress string
 }
 
-func (h *connectionHolder) SetConn(conn net.Conn) {
-	h.Conn = conn
+type ConnectionCloseWrapper interface {
+	AddParentCloseWrapper(ConnectionCloseWrapper)
+	BeforeClose(net.Conn) error
+	AfterClose(net.Conn) error
 }
 
-func (h *connectionHolder) NetConn() net.Conn {
-	return h.Conn
+type ConnWithTLSConnectionState interface {
+	ConnectionState() tls.ConnectionState
 }
 
-type connectionTracker struct {
-	logger logr.Logger
+type ConnectionOption func(*connection)
 
-	connection                 Connection
-	connWithTLSConnectionState ConnWithTLSConnectionState
+// Make sure the connection implements ConnectionStateGetter interface
+var _ ConnectionStateGetter = &connection{}
+
+func ConnectionWithCloserWrapper(closeWrapper ConnectionCloseWrapper) ConnectionOption {
+	return func(c *connection) {
+		if c.closeWrapper != nil && !reflect.DeepEqual(c.closeWrapper, closeWrapper) {
+			closeWrapper.AddParentCloseWrapper(c.closeWrapper)
+		}
+
+		c.closeWrapper = closeWrapper
+	}
 }
 
-func WrappedConnectionToContext(ctx context.Context, conn net.Conn) context.Context {
-	return context.WithValue(ctx, connectionContextKey, &connectionHolder{conn})
+func ConnectionWithState(state ConnectionState) ConnectionOption {
+	return func(c *connection) {
+		c.connectionState = state
+	}
 }
 
-func ConnectionHolderFromContext(ctx context.Context) (ConnectionHolder, bool) {
-	if c, ok := ctx.Value(connectionContextKey).(ConnectionHolder); ok {
-		return c, true
+func ConnectionWithOriginalAddress(address string) ConnectionOption {
+	return func(c *connection) {
+		c.originalAddress = address
+	}
+}
+
+func WrapConnection(conn net.Conn, opts ...ConnectionOption) net.Conn {
+	if _, ok := conn.(ConnectionStateGetter); ok {
+		return conn
 	}
 
-	return nil, false
-}
-
-func SetConnectionToContextConnectionHolder(ctx context.Context, conn net.Conn) bool {
-	if h, ok := ConnectionHolderFromContext(ctx); ok {
-		h.SetConn(conn)
-
-		return true
+	c := &connection{
+		Conn: conn,
 	}
 
-	return false
-}
+	c.setOptions(opts...)
 
-func WrappedConnectionFromContext(ctx context.Context) (Connection, bool) {
-	if c, ok := ctx.Value(connectionContextKey).(ConnectionHolder); ok {
-		return WrappedConnectionFromNetConn(c.NetConn())
+	if c.connectionState == nil {
+		c.connectionState = NewConnectionState()
 	}
 
-	return nil, false
+	c.connectionState.SetLocalAddr(conn.LocalAddr())
+	c.connectionState.SetRemoteAddr(conn.RemoteAddr())
+
+	c.id = uuid.NewString()
+
+	return c
 }
 
-func WrappedConnectionFromNetConn(conn net.Conn) (Connection, bool) {
-	t := &connectionTracker{
-		logger: ConnectionTrackerLogger,
-	}
-
-	connection := t.getConnection(conn)
-
-	if connection != nil {
-		connection.SetConnWithTLSConnectionState(t.connWithTLSConnectionState)
-	}
-
-	return connection, connection != nil
+func (c *connection) ID() string {
+	return c.id
 }
 
-func (t *connectionTracker) getConnection(c net.Conn) Connection {
-	t.logger.Info("check connection", "type", fmt.Sprintf("%T", c))
+func (c *connection) SetTLSConn(conn *tls.Conn) {
+	if c.tlsConn == nil {
+		c.tlsConn = conn
+	}
+}
 
-	if c, ok := c.(ConnWithTLSConnectionState); ok {
-		t.connWithTLSConnectionState = c
-		if t.connection != nil {
-			return t.connection
+func (c *connection) GetConnectionState() ConnectionState {
+	return c.connectionState
+}
+
+func (c *connection) NetConn() net.Conn {
+	return c.Conn
+}
+
+func (c *connection) Read(b []byte) (n int, err error) {
+	n, err = c.Conn.Read(b)
+
+	c.connectionState.SetTimeToFirstByte(time.Now())
+
+	c.tlsConnectionStateSetter.Do(c.setTLSConnectionState)
+
+	return
+}
+
+func (c *connection) Write(b []byte) (n int, err error) {
+	n, err = c.Conn.Write(b)
+
+	c.connectionState.SetTimeToFirstByte(time.Now())
+
+	c.tlsConnectionStateSetter.Do(c.setTLSConnectionState)
+
+	return
+}
+
+func (c *connection) Close() error {
+	if c.closeWrapper != nil {
+		if err := c.closeWrapper.BeforeClose(c); err != nil {
+			return err
 		}
 	}
 
-	if conn, ok := c.(Connection); ok && t.connection == nil {
-		t.connection = conn
+	if err := c.Conn.Close(); err != nil {
+		return err
 	}
 
-	if conn, ok := c.(interface {
-		NetConn() net.Conn
-	}); ok {
-		return t.getConnection(conn.NetConn())
-	} else if conn, ok := c.(interface {
-		GetConn() net.Conn
-	}); ok {
-		return t.getConnection(conn.GetConn())
+	if c.closeWrapper != nil {
+		if err := c.closeWrapper.AfterClose(c); err != nil {
+			return err
+		}
 	}
 
-	return t.connection
+	return nil
+}
+
+func (c *connection) setOptions(opts ...ConnectionOption) {
+	for _, opt := range opts {
+		opt(c)
+	}
+}
+
+func (c *connection) setTLSConnectionState() {
+	if c.connectionState.GetTLSConnectionState().HandshakeComplete {
+		return
+	}
+
+	if c.tlsConn != nil {
+		c.connectionState.SetTLSConnectionStateAsync(func() tls.ConnectionState {
+			cs := c.tlsConn.ConnectionState()
+			c.tlsConn = nil
+
+			return cs
+		})
+
+		return
+	}
+
+	t := &connectionStateTracker{
+		logger: ConnectionStateTrackerLogger,
+	}
+
+	tlsConn := t.getTLSConnection(c)
+	if tlsConn != nil {
+		if csc, ok := tlsConn.(interface {
+			ConnectionState() tls.ConnectionState
+		}); ok {
+			c.connectionState.SetTLSConnectionState(csc.ConnectionState())
+		}
+	}
+}
+
+func WrappedConnectionListener(l net.Listener) net.Listener {
+	return listener.NewListenerWithConnectionWrapper(l, func(c net.Conn) net.Conn {
+		return WrapConnection(c)
+	})
 }

@@ -20,6 +20,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var ErrInvalidCertificate = errors.New("invalid tls certificate")
@@ -31,6 +32,7 @@ type Certificate interface {
 	GetFirstURI() string
 	GetFirstDNSName() string
 	GetFirstIP() string
+	String() string
 }
 
 type certificate struct {
@@ -90,4 +92,34 @@ func (c *certificate) GetFirstIP() string {
 	}
 
 	return c.IPAddresses[0].String()
+}
+
+func (c *certificate) String() string {
+	p := make([]string, 0)
+
+	if s := c.GetSubject(); s != "" {
+		p = append(p, fmt.Sprintf("Subject=%s", s))
+	}
+
+	if u := c.URIs; len(u) > 0 {
+		uris := []string{}
+		for _, uri := range u {
+			uris = append(uris, uri.String())
+		}
+		p = append(p, fmt.Sprintf("URIs=%s", strings.Join(uris, ",")))
+	}
+
+	if d := c.DNSNames; len(d) > 0 {
+		p = append(p, fmt.Sprintf("DNSNames=%s", strings.Join(d, ",")))
+	}
+
+	if i := c.IPAddresses; len(i) > 0 {
+		ips := []string{}
+		for _, ip := range i {
+			ips = append(ips, ip.String())
+		}
+		p = append(p, fmt.Sprintf("IPs=%s", strings.Join(ips, ",")))
+	}
+
+	return strings.Join(p, " ")
 }

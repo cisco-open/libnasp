@@ -95,9 +95,9 @@ func (m *envoyHttpHandlerMiddleware) setXForwardedHeaders(req api.HTTPRequest, s
 }
 
 func (m *envoyHttpHandlerMiddleware) beforeInboundRequest(req api.HTTPRequest, stream api.Stream) {
-	if connection := req.Connection(); connection != nil {
-		m.setRequestProperties(req, stream, connection.GetTimeToFirstByte())
-		SetEnvoyConnectionInfo(connection, stream)
+	if connectionState := req.ConnectionState(); connectionState != nil {
+		m.setRequestProperties(req, stream, connectionState.GetTimeToFirstByte())
+		SetEnvoyConnectionInfo(connectionState, stream)
 		m.setXForwardedHeaders(req, stream)
 	}
 }
@@ -127,8 +127,8 @@ func (m *envoyHttpHandlerMiddleware) afterOutboundRequest(req api.HTTPRequest, s
 }
 
 func (m *envoyHttpHandlerMiddleware) beforeOutboundResponse(resp api.HTTPResponse, stream api.Stream) {
-	if connection := resp.Connection(); connection != nil {
-		SetEnvoyConnectionInfo(connection, stream)
+	if connectionState := resp.ConnectionState(); connectionState != nil {
+		SetEnvoyConnectionInfo(connectionState, stream)
 	}
 }
 
@@ -172,7 +172,7 @@ func (m *envoyHttpHandlerMiddleware) setResponseInfo(resp api.HTTPResponse, stre
 	}
 }
 
-func SetEnvoyConnectionInfo(conn network.Connection, stream api.Stream) {
+func SetEnvoyConnectionInfo(connectionState network.ConnectionState, stream api.Stream) {
 	remoteKey := "source"
 	connectionKey := "connection"
 	if stream.Direction() == api.ListenerDirectionOutbound {
@@ -181,21 +181,21 @@ func SetEnvoyConnectionInfo(conn network.Connection, stream api.Stream) {
 	}
 
 	connection := map[string]interface{}{}
-	connection["mtls"] = conn.GetPeerCertificate() != nil
-	if peerCert := conn.GetPeerCertificate(); peerCert != nil {
+	connection["mtls"] = connectionState.GetPeerCertificate() != nil
+	if peerCert := connectionState.GetPeerCertificate(); peerCert != nil {
 		connection["subject_peer_certificate"] = peerCert.GetSubject()
 		connection["dns_san_peer_certificate"] = peerCert.GetFirstDNSName()
 		connection["uri_san_peer_certificate"] = peerCert.GetFirstURI()
 		connection["sha256_peer_certificate_digest"] = peerCert.GetSHA256Digest()
 	}
 
-	if localCert := conn.GetLocalCertificate(); localCert != nil {
+	if localCert := connectionState.GetLocalCertificate(); localCert != nil {
 		connection["subject_local_certificate"] = localCert.GetSubject()
 		connection["dns_san_local_certificate"] = localCert.GetFirstDNSName()
 		connection["uri_san_local_certificate"] = localCert.GetFirstURI()
 	}
 
-	if cs := conn.GetConnectionState(); cs != nil {
+	if cs := connectionState.GetTLSConnectionState(); cs.HandshakeComplete {
 		connection["requested_server_name"] = cs.ServerName
 		connection["tls_version"] = cs.Version
 		connection["negotiated_protocol"] = cs.NegotiatedProtocol
@@ -204,7 +204,7 @@ func SetEnvoyConnectionInfo(conn network.Connection, stream api.Stream) {
 	stream.Logger().V(3).Info("set connection key", "key", connectionKey, "value", connection)
 	stream.Set(connectionKey, connection)
 
-	if ip, port, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
+	if ip, port, err := net.SplitHostPort(connectionState.RemoteAddr().String()); err == nil {
 		stream.Set(remoteKey+".address", ip)
 		if port, err := strconv.Atoi(port); err == nil {
 			stream.Set(remoteKey+".port", port)
@@ -215,7 +215,7 @@ func SetEnvoyConnectionInfo(conn network.Connection, stream api.Stream) {
 		}
 	}
 
-	if ip, port, err := net.SplitHostPort(conn.LocalAddr().String()); err == nil {
+	if ip, port, err := net.SplitHostPort(connectionState.LocalAddr().String()); err == nil {
 		stream.Set("destination.address", ip)
 		if port, err := strconv.Atoi(port); err == nil {
 			stream.Set("destination.port", port)

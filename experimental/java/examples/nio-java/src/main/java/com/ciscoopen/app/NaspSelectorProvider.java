@@ -35,13 +35,8 @@ class NaspSelector extends SelectorImpl {
         return (int) selectedKey;
     }
 
-    static int getAsyncRunningOpsFromSelectedKey(long selectedKey) {
-        return (int) (selectedKey >> 40 & 0xFF);
-    }
-
     private final nasp.Selector selector = new nasp.Selector();
     private final Map<Integer, SelectionKeyImpl> selectionKeyTable = new HashMap<>();
-    private final Map<Integer, Integer> runningAsyncOps = new HashMap<>();
 
     protected NaspSelector(SelectorProvider sp) {
         super(sp);
@@ -77,8 +72,6 @@ class NaspSelector extends SelectorImpl {
             long selectedKey = selectedKeys.getLong();
             int selectedKeyId = getSelectedKeyId(selectedKey);
 
-            updateRunningAsyncOps(selectedKeyId, getAsyncRunningOpsFromSelectedKey(selectedKey));
-
             SelectionKeyImpl selectionKey = selectionKeyTable.get(selectedKeyId);
             if (selectionKey != null) {
                 if (selectionKey.isValid()) {
@@ -88,32 +81,6 @@ class NaspSelector extends SelectorImpl {
         }
 
         return numKeysUpdated;
-    }
-
-    private void updateRunningAsyncOps(int selectedKeyId, int updateOps) {
-        int runningOps = 0;
-        Integer temp = runningAsyncOps.get(selectedKeyId);
-        if (temp != null) {
-            runningOps = temp;
-        }
-        if ((updateOps & SelectionKey.OP_READ) != 0) {
-            if ((runningOps & SelectionKey.OP_READ) == 0) {
-                runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
-            }
-        } else {
-            if ((runningOps & SelectionKey.OP_READ) != 0) {
-                runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_READ);
-            }
-        }
-        if ((updateOps & SelectionKey.OP_WRITE) != 0) {
-            if ((runningOps & SelectionKey.OP_WRITE) == 0) {
-                runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_WRITE);
-            }
-        } else {
-            if ((runningOps & SelectionKey.OP_WRITE) != 0) {
-                runningAsyncOps.put(selectedKeyId, runningOps & ~SelectionKey.OP_WRITE);
-            }
-        }
     }
 
     private byte[] nativeSelect(long timeout) {
@@ -130,9 +97,6 @@ class NaspSelector extends SelectorImpl {
     protected void implRegister(SelectionKeyImpl ski) {
         super.implRegister(ski);
         selectionKeyTable.put(ski.hashCode(), ski);
-
-        int interestOps = ski.interestOps();
-        handleAsyncOps(ski, interestOps);
     }
 
     @Override
@@ -143,73 +107,46 @@ class NaspSelector extends SelectorImpl {
     @Override
     protected void implDereg(SelectionKeyImpl ski) throws IOException {
         selectionKeyTable.remove(ski.hashCode());
-        runningAsyncOps.remove(ski.hashCode());
     }
 
     @Override
     protected void setEventOps(SelectionKeyImpl ski) {
-        int opsDiff = getAsyncOpsDiff(ski);
-
-        handleAsyncOps(ski, opsDiff);
-    }
-
-    /**
-     * Returns the diff between running async ops and the list the interest ops registered in the provided ski
-     *
-     * @param ski specifies the list of ops we are interested in
-     * @return the diff between running async ops and the list the interest ops
-     */
-    protected int getAsyncOpsDiff(SelectionKeyImpl ski) {
-        if (ski == null)
-            return 0;
-
         int interestOps = ski.interestOps();
-        Integer runningOps = runningAsyncOps.get(ski.hashCode());
-        if (runningOps == null || runningOps == 0) {
-            return interestOps;
+        if ((interestOps & SelectionKey.OP_WRITE) == 0)
+        {
+            selector.unregisterWriter(ski.hashCode());
         }
-
-        int mask = interestOps ^ runningOps;
-
-        return interestOps & mask;
+        handleAsyncOps(ski);
     }
 
-    protected void handleAsyncOps(SelectionKeyImpl ski, int opsDiff) {
-        int selectedKeyId = ski.hashCode();
-        int runningOps = 0;
-        if (runningAsyncOps.containsKey(selectedKeyId)) {
-            runningOps = runningAsyncOps.get(selectedKeyId);
-        }
+    protected void handleAsyncOps(SelectionKeyImpl ski) {
 
         if (ski.channel() instanceof NaspServerSocketChannel naspServerSockChan) {
-            handleAsyncOps(naspServerSockChan, ski.hashCode(), runningOps, opsDiff);
+            handleAsyncOps(naspServerSockChan, ski.hashCode(), ski.interestOps());
             return;
         }
 
         if (ski.channel() instanceof NaspSocketChannel naspSockChan) {
-            handleAsyncOps(naspSockChan, ski.hashCode(), runningOps, opsDiff);
+            handleAsyncOps(naspSockChan, ski.hashCode(), ski.interestOps());
         }
     }
 
-    protected void handleAsyncOps(NaspSocketChannel naspSocketChannel, int selectedKeyId, int runningOps, int opsDiff) {
-        if ((opsDiff & SelectionKey.OP_READ) != 0) {
+    protected void handleAsyncOps(NaspSocketChannel naspSocketChannel, int selectedKeyId, int interestedOps) {
+        if ((interestedOps & SelectionKey.OP_READ) != 0) {
             naspSocketChannel.getConnection().startAsyncRead(selectedKeyId, selector);
-            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_READ);
         }
 
-        if ((opsDiff & SelectionKey.OP_WRITE) != 0) {
+        if ((interestedOps & SelectionKey.OP_WRITE) != 0) {
             naspSocketChannel.getConnection().startAsyncWrite(selectedKeyId, selector);
-            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_WRITE);
         }
         
-        if ((opsDiff & SelectionKey.OP_CONNECT) != 0) {
+        if ((interestedOps & SelectionKey.OP_CONNECT) != 0) {
             //This could happen if we are servers not clients
             if (naspSocketChannel.getNaspTcpDialer() != null) {
                 InetSocketAddress address = naspSocketChannel.getAddress();
                 if (address != null) {
                     naspSocketChannel.getNaspTcpDialer().startAsyncDial(selectedKeyId, selector,
                             address.getHostString(), address.getPort());
-                    runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_CONNECT);
                 } else {
                     naspSocketChannel.setSelector(this);
                 }
@@ -217,10 +154,9 @@ class NaspSelector extends SelectorImpl {
         }
     }
 
-    protected void handleAsyncOps(NaspServerSocketChannel naspServerSocketChannel, int selectedKeyId, int runningOps, int opsDiff) {
-        if ((opsDiff & SelectionKey.OP_ACCEPT) != 0) {
+    protected void handleAsyncOps(NaspServerSocketChannel naspServerSocketChannel, int selectedKeyId, int interestedOps) {
+        if ((interestedOps & SelectionKey.OP_ACCEPT) != 0) {
             naspServerSocketChannel.socket().getNaspTcpListener().startAsyncAccept(selectedKeyId, selector);
-            runningAsyncOps.put(selectedKeyId, runningOps | SelectionKey.OP_ACCEPT);
         }
     }
 }

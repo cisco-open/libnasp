@@ -21,11 +21,11 @@ import (
 	"net/http"
 	"net/http/httptrace"
 
-	ltls "github.com/cisco-open/nasp/pkg/tls"
+	"github.com/cisco-open/nasp/pkg/network/listener"
 )
 
 type Server interface {
-	GetUnifiedListener() ltls.UnifiedListener
+	GetUnifiedListener() listener.UnifiedListener
 	Serve(l net.Listener) error
 	ServeTLS(l net.Listener, certFile, keyFile string) error
 	ServeWithTLSConfig(l net.Listener, config *tls.Config) error
@@ -35,7 +35,7 @@ type Server interface {
 type server struct {
 	*http.Server
 
-	unifiedListener ltls.UnifiedListener
+	unifiedListener listener.UnifiedListener
 }
 
 func WrapHTTPTransport(rt http.RoundTripper, dialer ConnectionDialer) http.RoundTripper {
@@ -52,7 +52,14 @@ func WrapHTTPTransport(rt http.RoundTripper, dialer ConnectionDialer) http.Round
 }
 
 func WrapHTTPServer(srv *http.Server) Server {
-	srv.ConnContext = WrappedConnectionToContext
+	srv.ConnContext = ConnectionStateToContextFromNetConn
+	srv.ConnState = func(conn net.Conn, cstate http.ConnState) {
+		if state, ok := ConnectionStateFromNetConn(conn); ok {
+			if cstate != http.StateActive {
+				state.ResetTimeToFirstByte()
+			}
+		}
+	}
 
 	return &server{
 		Server: srv,
@@ -63,18 +70,28 @@ func (s *server) GetHTTPServer() *http.Server {
 	return s.Server
 }
 
-func (s *server) GetUnifiedListener() ltls.UnifiedListener {
+func (s *server) GetUnifiedListener() listener.UnifiedListener {
 	return s.unifiedListener
 }
 
 func (s *server) Serve(l net.Listener) error {
-	s.unifiedListener = ltls.NewUnifiedListener(NewWrappedListener(l), nil, ltls.TLSModeDisabled)
+	s.unifiedListener = listener.NewUnifiedListener(l, nil, listener.TLSModeDisabled,
+		listener.UnifiedListenerWithTLSConnectionCreator(CreateTLSServerConn),
+		listener.UnifiedListenerWithConnectionWrapper(func(c net.Conn) net.Conn {
+			return WrapConnection(c)
+		}),
+	)
 
 	return s.Server.Serve(s.unifiedListener)
 }
 
 func (s *server) ServeWithTLSConfig(l net.Listener, config *tls.Config) error {
-	s.unifiedListener = ltls.NewUnifiedListener(NewWrappedListener(l), WrapTLSConfig(config), ltls.TLSModePermissive)
+	s.unifiedListener = listener.NewUnifiedListener(l, WrapTLSConfig(config), listener.TLSModePermissive,
+		listener.UnifiedListenerWithTLSConnectionCreator(CreateTLSServerConn),
+		listener.UnifiedListenerWithConnectionWrapper(func(c net.Conn) net.Conn {
+			return WrapConnection(c)
+		}),
+	)
 
 	return s.Server.Serve(s.unifiedListener)
 }
@@ -104,12 +121,21 @@ type transport struct {
 }
 
 func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	ctx := NewConnectionToContext(req.Context())
-	req = req.WithContext(httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+	ctx := NewConnectionStateHolderToContext(req.Context())
+
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
 		GotConn: func(i httptrace.GotConnInfo) {
-			SetConnectionToContextConnectionHolder(ctx, i.Conn)
+			if connWithState, ok := i.Conn.(ConnectionStateGetter); ok {
+				if h, ok := ConnectionStateHolderFromContext(ctx); ok {
+					state := connWithState.GetConnectionState()
+					state.ResetTimeToFirstByte()
+					h.Set(state)
+				}
+			}
 		},
-	}))
+	})
+
+	req = req.WithContext(ctx)
 
 	return t.RoundTripper.RoundTrip(req)
 }

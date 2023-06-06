@@ -16,8 +16,29 @@ package network
 
 import (
 	"crypto/tls"
+	"net"
 	"strings"
 )
+
+func CreateTLSConn(conn net.Conn, tlsConfig *tls.Config, f func(net.Conn, *tls.Config) *tls.Conn) *tls.Conn {
+	tlsConn := f(conn, tlsConfig)
+
+	if co, ok := conn.(interface {
+		SetTLSConn(*tls.Conn)
+	}); ok {
+		co.SetTLSConn(tlsConn)
+	}
+
+	return tlsConn
+}
+
+func CreateTLSServerConn(conn net.Conn, tlsConfig *tls.Config) *tls.Conn {
+	return CreateTLSConn(conn, tlsConfig, tls.Server)
+}
+
+func CreateTLSClientConn(conn net.Conn, tlsConfig *tls.Config) *tls.Conn {
+	return CreateTLSConn(conn, tlsConfig, tls.Client)
+}
 
 func WrapTLSConfig(config *tls.Config) *tls.Config { //nolint:gocognit
 	if config == nil {
@@ -82,10 +103,10 @@ func WrapTLSConfig(config *tls.Config) *tls.Config { //nolint:gocognit
 			}
 
 			if cert != nil {
-				if c, ok := WrappedConnectionFromContext(chi.Context()); ok {
-					c.SetLocalCertificate(cert)
-				} else if c, ok := WrappedConnectionFromNetConn(chi.Conn); ok {
-					c.SetLocalCertificate(cert)
+				if s, ok := ConnectionStateFromContext(chi.Context()); ok {
+					s.SetLocalCertificate(*cert)
+				} else if s, ok := ConnectionStateFromNetConn(chi.Conn); ok {
+					s.SetLocalCertificate(*cert)
 				}
 			}
 
@@ -126,8 +147,8 @@ func WrapTLSConfig(config *tls.Config) *tls.Config { //nolint:gocognit
 			}
 
 			if cert != nil {
-				if c, ok := WrappedConnectionFromContext(cri.Context()); ok {
-					c.SetLocalCertificate(cert)
+				if s, ok := ConnectionStateHolderFromContext(cri.Context()); ok {
+					s.Get().SetLocalCertificate(*cert)
 				}
 			}
 
