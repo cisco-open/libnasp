@@ -51,7 +51,7 @@ type WasmPlugin interface { //nolint:interfacebloat // we don't care
 	UnregisterFilterContext(instance WasmInstance, filterContext FilterContext)
 	GetFilterContext(instance WasmInstance, id int32) (FilterContext, bool)
 
-	GetWasmInstanceContext(instance WasmInstance) WasmInstanceContext
+	GetWasmInstanceContext(instance WasmInstance) (WasmInstanceContext, error)
 }
 
 type WasmPluginManager interface {

@@ -244,10 +244,10 @@ func (p *wasmPlugin) getPluginConfig() (content []byte, size int) {
 	return
 }
 
-func (p *wasmPlugin) GetWasmInstanceContext(instance api.WasmInstance) api.WasmInstanceContext {
+func (p *wasmPlugin) GetWasmInstanceContext(instance api.WasmInstance) (api.WasmInstanceContext, error) {
 	if v, ok := p.instanceContexts.Load(instance); ok {
 		if iwc, ok := v.(api.WasmInstanceContext); ok {
-			return iwc
+			return iwc, nil
 		}
 	}
 
@@ -263,7 +263,10 @@ func (p *wasmPlugin) GetWasmInstanceContext(instance api.WasmInstance) api.WasmI
 
 	instanceProperties := NewPropertyHolderWrapper(dotn.New(), p.ctx)
 
-	ctx := abi.NewContext(NewHostFunctions(instanceProperties, hostOptions...), instance)
+	ctx, err := abi.NewContext(NewHostFunctions(instanceProperties, hostOptions...), instance)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not create new context")
+	}
 
 	RootABIContextProperty(instanceProperties).Set(ctx)
 
@@ -275,16 +278,21 @@ func (p *wasmPlugin) GetWasmInstanceContext(instance api.WasmInstance) api.WasmI
 
 	p.instanceContexts.Store(instance, iwc)
 
-	return iwc
+	return iwc, nil
 }
 
 func (p *wasmPlugin) stopInstance(instance api.WasmInstance) error {
-	ctx := p.GetWasmInstanceContext(instance).GetABIContext()
+	ctx, err := p.GetWasmInstanceContext(instance)
+	if err != nil {
+		return err
+	}
+
+	abiCtx := ctx.GetABIContext()
 
 	instance.Lock(ctx)
 	defer instance.Unlock()
 
-	if err := StopWasmContext(p.ctx.ID(), ctx, p.logger); err != nil {
+	if err := StopWasmContext(p.ctx.ID(), abiCtx, p.logger); err != nil {
 		return err
 	}
 
@@ -295,18 +303,23 @@ func (p *wasmPlugin) stopInstance(instance api.WasmInstance) error {
 }
 
 func (p *wasmPlugin) startInstance(instance api.WasmInstance) error {
-	ctx := p.GetWasmInstanceContext(instance).GetABIContext()
+	ctx, err := p.GetWasmInstanceContext(instance)
+	if err != nil {
+		return err
+	}
 
-	instance.Lock(ctx)
+	abiCtx := ctx.GetABIContext()
+
+	instance.Lock(abiCtx)
 	defer instance.Unlock()
 
-	if err := ctx.GetExports().ProxyOnContextCreate(p.ctx.ID(), 0); err != nil {
+	if err := abiCtx.GetExports().ProxyOnContextCreate(p.ctx.ID(), 0); err != nil {
 		return errors.WrapIfWithDetails(err, "error at ProxyOnContextCreate", "contextID", p.ctx.ID())
 	} else {
 		p.logger.V(3).Info("root context is created successfully")
 	}
 
-	if res, err := ctx.GetExports().ProxyOnVmStart(p.ctx.ID(), 0); err != nil {
+	if res, err := abiCtx.GetExports().ProxyOnVmStart(p.ctx.ID(), 0); err != nil {
 		return errors.WrapIfWithDetails(err, "error at ProxyOnVmStart", "contextID", p.ctx.ID())
 	} else if !res {
 		return errors.NewWithDetails("unknown error at ProxyOnVmStart", "contextID", p.ctx.ID())
@@ -315,7 +328,7 @@ func (p *wasmPlugin) startInstance(instance api.WasmInstance) error {
 	}
 
 	_, size := p.getPluginConfig()
-	if res, err := ctx.GetExports().ProxyOnConfigure(p.ctx.ID(), int32(size)); err != nil {
+	if res, err := abiCtx.GetExports().ProxyOnConfigure(p.ctx.ID(), int32(size)); err != nil {
 		return errors.WrapIfWithDetails(err, "error at ProxyOnConfigure", "contextID", p.ctx.ID())
 	} else if !res {
 		return errors.NewWithDetails("unknown error at ProxyOnConfigure", "contextID", p.ctx.ID())

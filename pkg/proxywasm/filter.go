@@ -47,11 +47,22 @@ func NewFilterContext(plugin api.WasmPlugin, properties api.PropertyHolder) (api
 		}
 	}
 
+	wasmInstanceCtx, err := plugin.GetWasmInstanceContext(instance)
+	if err != nil {
+		return nil, errors.WrapIfWithDetails(err, "could not get wasm instance context", "pluginName", plugin.Name())
+	}
+
+	abiContext, err := abi.NewContext(NewHostFunctions(
+		NewPropertyHolderWrapper(properties, wasmInstanceCtx.GetProperties()),
+		hostOptions...,
+	), instance)
+
+	if err != nil {
+		return nil, errors.WrapIfWithDetails(err, "could not create context", "pluginName", plugin.Name())
+	}
+
 	context := &filterContext{
-		ABIContext: abi.NewContext(NewHostFunctions(
-			NewPropertyHolderWrapper(properties, plugin.GetWasmInstanceContext(instance).GetProperties()),
-			hostOptions...,
-		), instance),
+		ABIContext:  abiContext,
 		logger:      plugin.Logger(),
 		id:          plugin.Context().NewContextID(),
 		rootContext: plugin.Context(),
