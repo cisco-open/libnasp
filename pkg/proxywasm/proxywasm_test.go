@@ -71,7 +71,10 @@ func TestProxyOnTickAndSetEffectiveContext(t *testing.T) {
 	require.Nil(err)
 
 	require.Eventually(func() bool {
-		if v, ok := plugin.GetWasmInstanceContext(inst).GetProperties().Get("test-ids"); ok {
+		ctx, err := plugin.GetWasmInstanceContext(inst)
+		require.Nil(err)
+
+		if v, ok := ctx.GetProperties().Get("test-ids"); ok {
 			if ids, ok := v.(string); ok {
 				return "context-0,context-1,context-2,context-3,context-4" == ids
 			}
