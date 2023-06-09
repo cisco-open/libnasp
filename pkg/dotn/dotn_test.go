@@ -27,7 +27,7 @@ func TestDotnGetterSetter(t *testing.T) {
 
 	assert := assert.New(t)
 
-	m := dotn.New()
+	m := dotn.NewConcurrent()
 
 	nodeID := "sidecar~10.20.4.77~echo-7ffdff66-f5wwf.default~default.svc.cluster.local"
 	clusterName := "echo.default"

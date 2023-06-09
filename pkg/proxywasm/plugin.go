@@ -261,7 +261,7 @@ func (p *wasmPlugin) GetWasmInstanceContext(instance api.WasmInstance) api.WasmI
 		}
 	}
 
-	instanceProperties := NewPropertyHolderWrapper(dotn.New(), p.ctx)
+	instanceProperties := NewPropertyHolderWrapper(dotn.NewConcurrent(), p.ctx)
 
 	ctx := abi.NewContext(NewHostFunctions(instanceProperties, hostOptions...), instance)
 
