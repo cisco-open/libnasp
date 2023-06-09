@@ -261,7 +261,7 @@ func (p *wasmPlugin) GetWasmInstanceContext(instance api.WasmInstance) (api.Wasm
 		}
 	}
 
-	instanceProperties := NewPropertyHolderWrapper(dotn.New(), p.ctx)
+	instanceProperties := NewPropertyHolderWrapper(dotn.NewConcurrent(), p.ctx)
 
 	ctx, err := abi.NewContext(NewHostFunctions(instanceProperties, hostOptions...), instance)
 	if err != nil {
