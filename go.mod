@@ -9,7 +9,7 @@ replace (
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/banzaicloud/proxy-wasm-go-host v1.0.3-0.20230609071457-cd446728b246
+	github.com/banzaicloud/proxy-wasm-go-host v1.0.3
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3 v3.0.2-c1
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.8-c1
