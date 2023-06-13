@@ -55,9 +55,7 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 
 	prop, _ := d.discoveryClient.GetTCPClientPropertiesByHost(context.Background(), address)
 	if prop != nil {
-		if !prop.UseTLS() {
-			tlsConfig = nil
-		} else {
+		if prop.UseTLS() {
 			tlsConfig = d.tlsConfig.Clone()
 			tlsConfig.ServerName = prop.ServerName()
 		}
