@@ -49,13 +49,12 @@ func NewTCPDialer(streamHandler api.StreamHandler, tlsConfig *tls.Config, discov
 }
 
 func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string) (net.Conn, error) {
-	tlsConfig := d.tlsConfig.Clone()
+	var tlsConfig *tls.Config
 
 	prop, _ := d.discoveryClient.GetTCPClientPropertiesByHost(context.Background(), address)
 	if prop != nil {
-		if !prop.UseTLS() {
-			tlsConfig = nil
-		} else {
+		if prop.UseTLS() {
+			tlsConfig := d.tlsConfig.Clone()
 			tlsConfig.ServerName = prop.ServerName()
 		}
 		if endpointAddr, err := prop.Address(); err != nil {
