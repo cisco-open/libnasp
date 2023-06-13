@@ -18,25 +18,18 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"io"
 	"net"
 	"os"
 
 	"k8s.io/klog/v2"
 
 	"github.com/cisco-open/nasp/pkg/istio"
+	"github.com/cisco-open/nasp/pkg/network/proxy"
 )
 
 var heimdallURL string
 var serverAddress string
 var clientAddress string
-
-type NaspProxy struct {
-	localConnection         net.Conn
-	remoteConnection        net.Conn
-	istioIntegrationHandler istio.IstioIntegrationHandler
-	killSignal              chan bool
-}
 
 func init() {
 	flag.StringVar(&heimdallURL, "heimdall-url", "https://localhost:16443/config", "Heimdall URL")
@@ -87,58 +80,24 @@ func main() {
 		panic(err)
 	}
 
+	// d := &net.Dialer{}
+	d, err := iih.GetTCPDialer()
+	if err != nil {
+		panic(err)
+	}
+
 	for {
 		localConnection, err := l.Accept()
 		if err != nil {
 			panic(err)
 		}
 		klog.Info("Accepting connection on:", serverAddress)
-		naspProxy := &NaspProxy{localConnection: localConnection, killSignal: make(chan bool), istioIntegrationHandler: iih}
-		go naspProxy.proxy()
-	}
-}
 
-func (p *NaspProxy) proxy() {
-	defer p.localConnection.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	d, err := p.istioIntegrationHandler.GetTCPDialer()
-	if err != nil {
-		panic(err)
-	}
-	// d := &net.Dialer{}
-	// var err error
-	p.remoteConnection, err = d.DialContext(ctx, "tcp", clientAddress)
-	if err != nil {
-		panic(err)
-	}
-
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			n, err := p.localConnection.Read(buf)
-			if err != nil {
-				if err != io.EOF {
-					klog.Error(err)
-					p.killSignal <- true
-					return
-				}
-			}
-			if n == 0 {
-				klog.Info("Sent completed")
-				p.killSignal <- true
-				return
-			}
-			_, err = p.remoteConnection.Write(buf[:n])
-			if err != nil {
-				klog.Error(err)
-				p.killSignal <- true
-				return
-			}
-
+		remoteConnection, err := d.DialContext(ctx, "tcp", clientAddress)
+		if err != nil {
+			panic(err)
 		}
-	}()
-	<-p.killSignal
+
+		proxy.New(localConnection, remoteConnection).Start()
+	}
 }
