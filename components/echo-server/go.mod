@@ -34,7 +34,7 @@ require (
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/cncf/xds/go v0.0.0-20220520190051-1e77728a1eaa // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.0-20210816181553-5444fa50b93d // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/envoyproxy/go-control-plane v0.10.3-0.20220719090109-b024c36d9935 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.6.7 // indirect
@@ -73,11 +73,11 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/lestrrat-go/backoff/v2 v2.0.8 // indirect
-	github.com/lestrrat-go/blackmagic v1.0.0 // indirect
+	github.com/lestrrat-go/blackmagic v1.0.1 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
-	github.com/lestrrat-go/iter v1.0.1 // indirect
-	github.com/lestrrat-go/jwx v1.2.25 // indirect
-	github.com/lestrrat-go/option v1.0.0 // indirect
+	github.com/lestrrat-go/iter v1.0.2 // indirect
+	github.com/lestrrat-go/jwx v1.2.26 // indirect
+	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2 // indirect
