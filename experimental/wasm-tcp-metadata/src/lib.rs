@@ -115,11 +115,13 @@ impl MetadataFilter {
     }
 
     fn set_alpn(&mut self) {
-        if self.alpn == "" {
-            let alpn_buf = self
-                .get_property(vec!["upstream", "negotiated_protocol"])
-                .unwrap_or(Vec::<u8>::new());
-            self.alpn = str::from_utf8(&alpn_buf).unwrap().to_string();
+        if self.direction == TRAFFIC_DIRECTION_OUTBOUND {
+            if self.alpn == "" {
+                let alpn_buf = self
+                    .get_property(vec!["upstream", "negotiated_protocol"])
+                    .unwrap_or(Vec::<u8>::new());
+                self.alpn = str::from_utf8(&alpn_buf).unwrap().to_string();
+            }
         }
     }
 }
