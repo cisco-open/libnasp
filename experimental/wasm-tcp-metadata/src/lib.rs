@@ -117,7 +117,7 @@ impl MetadataFilter {
     fn set_alpn(&mut self) {
         if self.alpn == "" {
             let alpn_buf = self
-                .get_property(vec!["upstream.negotiated_protocol"])
+                .get_property(vec!["upstream", "negotiated_protocol"])
                 .unwrap_or(Vec::<u8>::new());
             self.alpn = str::from_utf8(&alpn_buf).unwrap().to_string();
         }
@@ -140,7 +140,7 @@ impl StreamContext for MetadataFilter {
         self.set_alpn();
 
         debug!(
-            "[context: {}] ALPN: [{}], direction: [{}]",
+            "[context: {}] on_downstream_data ALPN: [{}], direction: [{}]",
             self.context_id, self.alpn, self.direction
         );
 
@@ -264,6 +264,11 @@ impl StreamContext for MetadataFilter {
 
         self.set_direction();
         self.set_alpn();
+
+        debug!(
+            "[context: {}] on_upstream_data ALPN: [{}], direction: [{}]",
+            self.context_id, self.alpn, self.direction
+        );
 
         match self.direction {
             // parse incoming metadata
