@@ -69,7 +69,7 @@ func (p *port) Listen() error {
 	defer l.Close()
 
 	p.logger.V(2).Info("listening on address", "address", address)
-	p.session.server.eventBus.Publish(string(api.PortListenEventName), api.PortListenEvent{
+	if err := p.session.server.eventBus.Publish(string(api.PortListenEventName), api.PortListenEvent{
 		PortData: api.PortData{
 			Name:       p.req.Name,
 			Address:    address,
@@ -79,13 +79,15 @@ func (p *port) Listen() error {
 			Metadata:   p.session.ctrlStream.GetMetadata(),
 		},
 		SessionID: p.session.id,
-	})
+	}); err != nil {
+		p.logger.Error(err, "could not publish message")
+	}
 
 	for {
 		select {
 		case <-p.ctx.Done():
 			p.logger.V(2).Info("stop listening on address", "address", address)
-			p.session.server.eventBus.Publish(string(api.PortReleaseEventName), api.PortReleaseEvent{
+			if err := p.session.server.eventBus.Publish(string(api.PortReleaseEventName), api.PortReleaseEvent{
 				PortData: api.PortData{
 					Name:       p.req.ID,
 					Address:    address,
@@ -95,7 +97,9 @@ func (p *port) Listen() error {
 					Metadata:   p.session.ctrlStream.GetMetadata(),
 				},
 				SessionID: p.session.id,
-			})
+			}); err != nil {
+				p.logger.Error(err, "could not publish message")
+			}
 
 			return nil
 		default:
