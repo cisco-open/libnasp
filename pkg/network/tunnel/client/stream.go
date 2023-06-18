@@ -15,37 +15,45 @@
 package client
 
 import (
-	"encoding/json"
+	"io"
+	"time"
 
 	"emperror.dev/errors"
-	"github.com/xtaci/smux"
 
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 	"github.com/cisco-open/nasp/pkg/network/tunnel/common"
 )
 
 type ctrlStream struct {
-	api.ControlStream
+	api.MessageHandler
 
 	client *client
 }
 
-func NewControlStream(client *client, str *smux.Stream) api.ControlStream {
-	cs := common.NewControlStream(str, client.logger)
+func NewControlStream(client *client, str io.ReadWriteCloser) api.ControlStream {
+	mh := common.NewMessageHandler(str, client.logger)
 
 	s := &ctrlStream{
-		ControlStream: cs,
-		client:        client,
+		MessageHandler: mh,
+		client:         client,
 	}
 
-	cs.AddMessageHandler(api.AddPortResponseMessageType, s.addPortResponse)
-	cs.AddMessageHandler(api.RequestConnectionMessageType, s.requestConnection)
-	cs.AddMessageHandler(api.PingMessageType, s.ping)
+	mh.AddMessageHandler(api.PortRegisteredMessageType, s.portRegistered)
+	mh.AddMessageHandler(api.RequestConnectionMessageType, s.requestConnection)
+	mh.AddMessageHandler(api.PingMessageType, s.ping)
 
 	return s
 }
 
-func (s *ctrlStream) ping(msg []byte) error {
+func (s *ctrlStream) GetMetadata() map[string]string {
+	return nil
+}
+
+func (s *ctrlStream) GetUser() api.User {
+	return nil
+}
+
+func (s *ctrlStream) ping(msg api.Message, params ...any) error {
 	s.client.logger.V(3).Info("ping arrived, send pong")
 
 	_, _, err := api.SendMessage(s, api.PongMessageType, nil)
@@ -56,11 +64,15 @@ func (s *ctrlStream) ping(msg []byte) error {
 	return nil
 }
 
-func (s *ctrlStream) requestConnection(msg []byte) error {
-	var req api.RequestConnectionMessage
-	if err := json.Unmarshal(msg, &req); err != nil {
-		return errors.WrapIf(err, "could not unmarshal requestConnection message")
+func (s *ctrlStream) requestConnection(msg api.Message, params ...any) error {
+	var req api.ConnectionRequest
+	if err := msg.Decode(&req); err != nil {
+		return err
 	}
+
+	logger := s.client.logger.WithValues("portID", req.PortID, "connectionID", req.Identifier)
+
+	logger.V(2).Info("incoming connection request")
 
 	var mp *managedPort
 	if v, ok := s.client.managedPorts.Load(req.PortID); ok {
@@ -78,21 +90,43 @@ func (s *ctrlStream) requestConnection(msg []byte) error {
 		return errors.WrapIfWithDetails(err, "could not open tcp stream", "portID", req.PortID, "id", req.Identifier)
 	}
 
+	// for {
+	// 	buff := make([]byte, 4096)
+	// 	n, err := conn.Read(buff)
+	// 	if err != nil {
+	// 		logger.Error(err, "read error")
+	// 		break
+	// 	}
+	// 	fmt.Printf("%s", buff[:n])
+	// }
+
+	// return nil
+
+	logger.V(2).Info("stream is successfully created")
+
 	if conn, err := newconn(conn, "tcp", req.LocalAddress, req.RemoteAddress); err != nil {
 		return errors.WrapIf(err, "could not create wrapped connection")
 	} else {
-		s.client.logger.V(3).Info("put stream into the connection channel", "portID", mp.id, "requestedPort", mp.requestedPort, "remoteAddress", conn.RemoteAddr())
-
-		mp.connChan <- conn
+		select {
+		case mp.GetConnChannel() <- conn:
+			logger.V(2).Info("stream is accepted")
+		case <-time.After(s.client.acceptTimeout):
+			logger.Error(api.ErrAcceptTimeout, "could not establish connection")
+			if err := conn.Close(); err != nil {
+				logger.Error(err, "error during closing stream")
+			} else {
+				logger.V(2).Info("stream is closed")
+			}
+		}
 	}
 
 	return nil
 }
 
-func (s *ctrlStream) addPortResponse(msg []byte) error {
-	var resp api.AddPortResponseMessage
-	if err := json.Unmarshal(msg, &resp); err != nil {
-		return errors.WrapIf(err, "could not unmarshal addPortResponse message")
+func (s *ctrlStream) portRegistered(msg api.Message, params ...any) error {
+	var resp api.PortRegistered
+	if err := msg.Decode(&resp); err != nil {
+		return err
 	}
 
 	if v, ok := s.client.managedPorts.Load(resp.ID); ok {
@@ -108,7 +142,7 @@ func (s *ctrlStream) addPortResponse(msg []byte) error {
 			mp.remoteAddress = resp.Address
 			mp.initialized = true
 
-			s.client.logger.V(2).Info("port added", "portID", resp.ID, "remoteAddress", resp.Address)
+			s.client.logger.Info("port registered", "portID", resp.ID, "remoteAddress", resp.Address)
 
 			return nil
 		}

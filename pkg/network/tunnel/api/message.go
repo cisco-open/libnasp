@@ -18,17 +18,18 @@ import (
 	"encoding/json"
 	"io"
 
+	"emperror.dev/errors"
 	"github.com/google/uuid"
 )
 
 type Message struct {
-	ID   string      `json:"id"`
-	Type MessageType `json:"type"`
-	Data []byte      `json:"data"`
+	ID   string      `json:"id,omitempty"`
+	Type MessageType `json:"type,omitempty"`
+	Data []byte      `json:"data,omitempty"`
 }
 
 func (m Message) Decode(v any) error {
-	return json.Unmarshal(m.Data, &v)
+	return errors.WrapIf(json.Unmarshal(m.Data, &v), "could not unmarshal message")
 }
 
 type MessageType string
@@ -36,40 +37,71 @@ type MessageType string
 const (
 	OpenTCPStreamMessageType     MessageType = "openTCPStream"
 	OpenControlStreamMessageType MessageType = "openControlStream"
-	AddPortMessageType           MessageType = "addPort"
-	AddPortResponseMessageType   MessageType = "addPortResponse"
+	RequestPortMessageType       MessageType = "requestPort"
+	PortRegisteredMessageType    MessageType = "portRegistered"
 	PongMessageType              MessageType = "pong"
 	PingMessageType              MessageType = "ping"
 	RequestConnectionMessageType MessageType = "requestConnection"
-	StreamOpenedMessageType      MessageType = "streamOpened"
-
-	ErrCtrlStreamAlreadyExistsMessageType MessageType = "errCtrlStreamAlreadyExists"
-	ErrInvalidStreamTypeMessageType       MessageType = "errInvalidStreamType"
-	ErrInvalidStreamIDMessageType         MessageType = "errInvalidStreamID"
 )
 
-type OpenTCPStreamMessage struct {
-	ID string `json:"id"`
+type ErrorType string
+
+const (
+	ErrCtrlStreamAlreadyExistsErrorType ErrorType = "errCtrlStreamAlreadyExists"
+	ErrInvalidStreamTypeErrorType       ErrorType = "errInvalidStreamType"
+	ErrInvalidStreamIDErrorType         ErrorType = "errInvalidStreamID"
+	ErrAuthenticationFailureErrorType   ErrorType = "errAuthenticationFailure"
+)
+
+type BaseReponse struct {
+	ErrorType    ErrorType `json:"errorType,omitempty"`
+	ErrorMessage string    `json:"errorMessage,omitempty"`
+	Error        error     `json:"-"`
 }
 
-type AddPortRequestMessage struct {
-	Type          string `json:"type"`
-	ID            string `json:"id"`
-	RequestedPort int    `json:"port"`
+func (r *BaseReponse) SetError(t ErrorType, e error) {
+	r.Error = e
+	r.ErrorType = t
+	r.ErrorMessage = e.Error()
 }
 
-type AddPortResponseMessage struct {
-	Type         string `json:"tcp"`
-	ID           string `json:"id"`
-	AssignedPort int    `json:"port"`
-	Address      string `json:"address"`
+type OpenTCPStreamRequest struct {
+	ID string `json:"id,omitempty"`
 }
 
-type RequestConnectionMessage struct {
-	PortID        string `json:"portID"`
-	Identifier    string `json:"identifier"`
-	RemoteAddress string `json:"remoteAddress"`
-	LocalAddress  string `json:"localAddress"`
+type OpenTCPStreamResponse struct {
+	BaseReponse `json:",inline"`
+}
+type OpenControlStreamRequest struct {
+	Metadata    map[string]string `json:"metadata,omitempty"`
+	BearerToken string            `json:"token,omitempty"`
+}
+
+type OpenControlStreamResponse struct {
+	BaseReponse `json:",inline"`
+}
+
+type RequestPort struct {
+	Type          string `json:"type,omitempty"`
+	ID            string `json:"id,omitempty"`
+	Name          string `json:"name,omitempty"`
+	RequestedPort int    `json:"requestedPort,omitempty"`
+	TargetPort    int    `json:"targetPort,omitempty"`
+}
+
+type PortRegistered struct {
+	Type         string `json:"tcp,omitempty"`
+	ID           string `json:"id,omitempty"`
+	Name         string `json:"name,omitempty"`
+	AssignedPort int    `json:"port,omitempty"`
+	Address      string `json:"address,omitempty"`
+}
+
+type ConnectionRequest struct {
+	PortID        string `json:"portID,omitempty"`
+	Identifier    string `json:"identifier,omitempty"`
+	RemoteAddress string `json:"remoteAddress,omitempty"`
+	LocalAddress  string `json:"localAddress,omitempty"`
 }
 
 func CreateMessage(messageType MessageType, message interface{}) (Message, []byte, error) {

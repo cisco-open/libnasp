@@ -20,24 +20,32 @@ import (
 	"net"
 	"os"
 	"time"
+
+	"github.com/go-logr/logr"
+
+	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 )
 
 type port struct {
 	session *session
 
-	id           string
+	req          api.RequestPort
 	assignedPort int
+
+	logger logr.Logger
 
 	ctx  context.Context
 	ctxc context.CancelFunc
 }
 
-func NewPort(session *session, id string, assignedPort int) *port {
+func NewPort(session *session, req api.RequestPort, assignedPort int) *port {
 	port := &port{
 		session: session,
 
-		id:           id,
+		req:          req,
 		assignedPort: assignedPort,
+
+		logger: session.Logger().WithValues("name", req.Name, "assignedPort", assignedPort),
 	}
 
 	port.ctx, port.ctxc = context.WithCancel(context.Background())
@@ -60,12 +68,34 @@ func (p *port) Listen() error {
 	}
 	defer l.Close()
 
-	p.session.server.logger.V(2).Info("listening on address", "address", address)
+	p.logger.V(2).Info("listening on address", "address", address)
+	p.session.server.eventBus.Publish(string(api.PortListenEventName), api.PortListenEvent{
+		PortData: api.PortData{
+			Name:       p.req.Name,
+			Address:    address,
+			Port:       p.assignedPort,
+			TargetPort: p.req.TargetPort,
+			User:       p.session.ctrlStream.GetUser(),
+			Metadata:   p.session.ctrlStream.GetMetadata(),
+		},
+		SessionID: p.session.id,
+	})
 
 	for {
 		select {
 		case <-p.ctx.Done():
-			p.session.server.logger.V(2).Info("stop listening on address", "address", address)
+			p.logger.V(2).Info("stop listening on address", "address", address)
+			p.session.server.eventBus.Publish(string(api.PortReleaseEventName), api.PortReleaseEvent{
+				PortData: api.PortData{
+					Name:       p.req.ID,
+					Address:    address,
+					Port:       p.assignedPort,
+					TargetPort: p.req.TargetPort,
+					User:       p.session.ctrlStream.GetUser(),
+					Metadata:   p.session.ctrlStream.GetMetadata(),
+				},
+				SessionID: p.session.id,
+			})
 
 			return nil
 		default:
@@ -79,19 +109,31 @@ func (p *port) Listen() error {
 			}
 
 			c, err := l.Accept()
-			if os.IsTimeout(err) {
-				continue
-			}
-
 			if err != nil {
-				p.session.server.logger.Error(err, "could not accept")
+				if !os.IsTimeout(err) {
+					p.logger.Error(err, "could not accept")
+				}
 				continue
 			}
 
-			if err := p.session.RequestConn(p.id, c); err != nil {
-				p.session.server.logger.Error(err, "could not request connection")
-				c.Close()
+			c = &conn{c}
+
+			if err := p.session.RequestConn(p.req.ID, c); err != nil {
+				p.logger.Error(err, "could not request connection")
+				if err := c.Close(); err != nil {
+					p.logger.Error(err, "error during closing connection")
+				}
 			}
 		}
 	}
+}
+
+type conn struct {
+	net.Conn
+}
+
+func (c *conn) Close() error {
+	fmt.Println("connection closed")
+
+	return c.Conn.Close()
 }

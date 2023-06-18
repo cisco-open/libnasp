@@ -23,7 +23,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/go-logr/logr"
-	"github.com/xtaci/smux"
+	"golang.ngrok.com/muxado"
 
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 )
@@ -37,26 +37,36 @@ type client struct {
 
 	serverAddress string
 	logger        logr.Logger
-	muxConfig     *smux.Config
+	muxConfig     *muxado.Config
 	dialer        api.Dialer
 	backoff       backoff.BackOff
+	metadata      map[string]string
+	bearerToken   string
+	acceptTimeout time.Duration
 }
 
 var (
-	defaultBackoff = backoff.NewConstantBackOff(time.Second * 5)
-	defaultLogger  = logr.Discard()
-	defaultDialer  = &net.Dialer{Timeout: time.Second * 10}
+	defaultBackoff       = backoff.NewConstantBackOff(time.Second * 5)
+	defaultLogger        = logr.Discard()
+	defaultDialer        = &net.Dialer{Timeout: time.Second * 10}
+	defaultAcceptTimeout = time.Second * 10
 )
 
 type ClientOption func(*client)
 
-func ClientWithLogger(logger logr.Logger) ClientOption {
+func ClientWithAcceptTimeout(d time.Duration) ClientOption {
 	return func(c *client) {
-		c.logger = logger
+		c.acceptTimeout = d
 	}
 }
 
-func ClientWithSmuxConfig(config *smux.Config) ClientOption {
+func ClientWithLogger(logger logr.Logger) ClientOption {
+	return func(c *client) {
+		c.logger = logger.WithName("bifrost")
+	}
+}
+
+func ClientWithConfig(config *muxado.Config) ClientOption {
 	return func(c *client) {
 		c.muxConfig = config
 	}
@@ -71,6 +81,18 @@ func ClientWithDialer(dialer api.Dialer) ClientOption {
 func ClientWithBackoff(backoff backoff.BackOff) ClientOption {
 	return func(c *client) {
 		c.backoff = backoff
+	}
+}
+
+func ClientWithMetadata(md map[string]string) ClientOption {
+	return func(c *client) {
+		c.metadata = md
+	}
+}
+
+func ClientWithBearerToken(token string) ClientOption {
+	return func(c *client) {
+		c.bearerToken = token
 	}
 }
 
@@ -97,13 +119,11 @@ func NewClient(serverAddress string, options ...ClientOption) api.Client {
 		c.backoff = defaultBackoff
 	}
 
+	if c.acceptTimeout == 0 {
+		c.acceptTimeout = defaultAcceptTimeout
+	}
+
 	return c
-}
-
-func (c *client) AddTCPPort(id string, requestedPort int) (net.Listener, error) {
-	c.logger.V(2).Info("add port", "id", id, "requestedPort", requestedPort)
-
-	return c.addOrGetManagedPort(id, requestedPort)
 }
 
 func (c *client) Connect(ctx context.Context) error {
@@ -118,16 +138,17 @@ func (c *client) Connect(ctx context.Context) error {
 }
 
 func (c *client) connect(ctx context.Context) error {
-	c.logger.V(2).Info("connecting to server", "server", c.serverAddress)
+	c.logger.Info("connecting to server", "server", c.serverAddress)
 	conn, err := c.dialer.DialContext(ctx, "tcp", c.serverAddress)
 	if err != nil {
 		return err
 	}
 
-	session, err := smux.Client(conn, c.muxConfig)
-	if err != nil {
-		return errors.WrapIf(err, "could not initialize client connection")
-	}
+	session := muxado.Client(conn, c.muxConfig)
+	// session, err := yamux.Client(conn, c.muxConfig)
+	// if err != nil {
+	// 	return errors.WrapIf(err, "could not initialize client connection")
+	// }
 
 	c.session = NewSession(c, session)
 	defer c.session.Close()
@@ -142,31 +163,31 @@ func (c *client) connect(ctx context.Context) error {
 	return errors.WithStackIf(api.ErrConnectionClosed)
 }
 
-func (c *client) sendAddPortMessage(id string, requestedPort int) error {
-	_, _, err := api.SendMessage(c.session.GetControlStream(), api.AddPortMessageType, &api.AddPortRequestMessage{
+func (c *client) requestPort(id string, options api.ManagedPortOptions) error {
+	c.logger.V(2).Info("request port", "portID", id, "requestedPort", options.GetRequestedPort())
+
+	m, _, err := api.SendMessage(c.session.GetControlStream(), api.RequestPortMessageType, &api.RequestPort{
 		Type:          "tcp",
 		ID:            id,
-		RequestedPort: requestedPort,
+		Name:          options.GetName(),
+		RequestedPort: options.GetRequestedPort(),
+		TargetPort:    options.GetTargetPort(),
 	})
 
-	return errors.WrapIfWithDetails(err, "could not send message", "type", api.AddPortMessageType)
+	return errors.WrapIfWithDetails(err, "could not send message", "type", m.Type)
 }
 
-func (c *client) addOrGetManagedPort(id string, requestedPort int) (net.Listener, error) {
-	var mp *managedPort
-
-	v, _ := c.managedPorts.Load(id)
-	if p, ok := v.(*managedPort); ok {
-		mp = p
+func (c *client) GetTCPListener(id string, options api.ManagedPortOptions) (net.Listener, error) {
+	if _, found := c.managedPorts.Load(id); found {
+		return nil, api.ErrPortAlreadyExists
 	}
-	if mp == nil {
-		mp = NewManagedPort(id, requestedPort)
-		c.managedPorts.Store(id, mp)
 
-		if c.connected {
-			if err := c.sendAddPortMessage(id, requestedPort); err != nil {
-				return nil, err
-			}
+	mp := NewManagedPort(id, options)
+	c.managedPorts.Store(id, mp)
+
+	if c.connected {
+		if err := c.requestPort(id, options); err != nil {
+			return nil, err
 		}
 	}
 
@@ -176,16 +197,16 @@ func (c *client) addOrGetManagedPort(id string, requestedPort int) (net.Listener
 func (c *client) onConnected() {
 	c.connected = true
 
-	c.logger.V(2).Info("client connected", "server", c.serverAddress)
+	c.logger.Info("client connected", "server", c.serverAddress)
 }
 
 func (c *client) onControlStreamConnected() {
-	c.logger.V(2).Info("control stream connected", "server", c.serverAddress)
+	c.logger.V(1).Info("control stream connected", "server", c.serverAddress)
 
 	c.managedPorts.Range(func(key any, value any) bool {
 		if mp, ok := value.(*managedPort); ok {
 			if !mp.initialized {
-				if err := c.sendAddPortMessage(mp.id, mp.requestedPort); err != nil {
+				if err := c.requestPort(mp.id, mp.options); err != nil {
 					c.logger.Error(err, "")
 				}
 			}
@@ -206,5 +227,5 @@ func (c *client) onDisconnected() {
 		return true
 	})
 
-	c.logger.V(2).Info("client disconnected", "server", c.serverAddress)
+	c.logger.Info("client disconnected", "server", c.serverAddress)
 }
