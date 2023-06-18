@@ -40,7 +40,7 @@ func CreateTLSClientConn(conn net.Conn, tlsConfig *tls.Config) *tls.Conn {
 	return CreateTLSConn(conn, tlsConfig, tls.Client)
 }
 
-func WrapTLSConfig(config *tls.Config) *tls.Config { //nolint:gocognit
+func WrapTLSConfig(config *tls.Config) *tls.Config { //nolint:gocognit,funlen
 	if config == nil {
 		return nil
 	}
@@ -50,6 +50,7 @@ func WrapTLSConfig(config *tls.Config) *tls.Config { //nolint:gocognit
 	// server
 	if len(config.Certificates) > 0 || config.GetCertificate != nil { //nolint:nestif
 		tlsConfig.Certificates = nil
+		tlsConfig.SessionTicketsDisabled = true
 		tlsConfig.GetCertificate = func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			getCert := func(config *tls.Config) (*tls.Certificate, error) {
 				var err error
@@ -105,7 +106,8 @@ func WrapTLSConfig(config *tls.Config) *tls.Config { //nolint:gocognit
 			if cert != nil {
 				if s, ok := ConnectionStateFromContext(chi.Context()); ok {
 					s.SetLocalCertificate(*cert)
-				} else if s, ok := ConnectionStateFromNetConn(chi.Conn); ok {
+				}
+				if s, ok := ConnectionStateFromNetConn(chi.Conn); ok {
 					s.SetLocalCertificate(*cert)
 				}
 			}
