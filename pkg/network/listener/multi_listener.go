@@ -84,8 +84,19 @@ func NewMultiListener(l net.Listener, options ...MultiListenerOption) MultiListe
 	return lstn
 }
 
-func (l *multipleListeners) AddListener(lis net.Listener) error {
+func (l *multipleListeners) getID(lis net.Listener) string {
 	id := lis.Addr().String()
+	if withIDGetter, ok := lis.(interface {
+		ID() string
+	}); ok {
+		return withIDGetter.ID()
+	}
+
+	return id
+}
+
+func (l *multipleListeners) AddListener(lis net.Listener) error {
+	id := l.getID(lis)
 
 	if _, ok := l.listeners.Load(id); ok {
 		return errors.WithStackIf(ErrAlreadyExists)
@@ -106,7 +117,7 @@ func (l *multipleListeners) AddListener(lis net.Listener) error {
 }
 
 func (l *multipleListeners) RemoveListener(lis net.Listener) {
-	id := lis.Addr().String()
+	id := l.getID(lis)
 
 	if v, loaded := l.listeners.LoadAndDelete(id); loaded {
 		if lis, ok := v.(*listener); ok {
@@ -118,14 +129,10 @@ func (l *multipleListeners) RemoveListener(lis net.Listener) {
 
 func (l *multipleListeners) Accept() (net.Conn, error) {
 	for {
-		select {
-		case accept := <-l.acceptChan:
-			l.logger.V(3).Info("connection on listener", "id", accept.listenerID, "address", accept.listener.Addr().String())
+		accept := <-l.acceptChan
+		l.logger.V(3).Info("connection on listener", "id", accept.listenerID, "address", accept.listener.Addr().String())
 
-			return accept.conn, accept.err
-		default:
-			time.Sleep(time.Millisecond * 50)
-		}
+		return accept.conn, accept.err
 	}
 }
 
@@ -169,7 +176,7 @@ func (l *multipleListeners) startListener(id string, lis *listener) {
 			}
 
 			c, err := lis.Accept()
-			if os.IsTimeout(err) {
+			if isTimeoutErr(err) {
 				continue
 			}
 
@@ -181,4 +188,8 @@ func (l *multipleListeners) startListener(id string, lis *listener) {
 			}
 		}
 	}
+}
+
+func isTimeoutErr(err error) bool {
+	return os.IsTimeout(err) || (err != nil && err.Error() == "timeout")
 }
