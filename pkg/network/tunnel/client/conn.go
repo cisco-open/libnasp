@@ -49,6 +49,25 @@ func newconn(conn net.Conn, network string, laddr, raddr string) (*connection, e
 	}
 }
 
+func (c *connection) Read(b []byte) (n int, err error) {
+	// fmt.Printf("reading from [%s]\n", c.remoteAddress)
+	buff := make([]byte, cap(b))
+
+	n, err = c.Conn.Read(buff)
+
+	// fmt.Printf("read\n|%s|\n", string(buff))
+
+	n = copy(b, buff[:n])
+
+	return n, err
+}
+
+func (c *connection) Write(b []byte) (n int, err error) {
+	// fmt.Printf("write\n|%s|\n", string(b))
+
+	return c.Conn.Write(b)
+}
+
 func (c *connection) NetConn() net.Conn {
 	return c.Conn
 }

@@ -24,7 +24,7 @@ var _ net.Listener = &managedPort{}
 
 type managedPort struct {
 	id            string
-	requestedPort int
+	options       api.ManagedPortOptions
 	remoteAddress string
 
 	connChan chan net.Conn
@@ -32,17 +32,57 @@ type managedPort struct {
 	initialized bool
 }
 
-func NewManagedPort(id string, requestedPort int) *managedPort {
-	return &managedPort{
-		id:            id,
-		requestedPort: requestedPort,
+type ManagedPortOptions struct {
+	name          string
+	requestedPort int
+	targetPort    int
+}
 
-		connChan: make(chan net.Conn, 1),
+func (o *ManagedPortOptions) SetTargetPort(port int) {
+	o.targetPort = port
+}
+
+func (o *ManagedPortOptions) GetTargetPort() int {
+	return o.targetPort
+}
+
+func (o *ManagedPortOptions) SetRequestedPort(port int) {
+	o.requestedPort = port
+}
+
+func (o *ManagedPortOptions) GetRequestedPort() int {
+	return o.requestedPort
+}
+
+func (o *ManagedPortOptions) SetName(name string) {
+	o.name = name
+}
+
+func (o *ManagedPortOptions) GetName() string {
+	return o.name
+}
+
+func NewManagedPort(id string, options api.ManagedPortOptions) *managedPort {
+	return &managedPort{
+		id:      id,
+		options: options,
+
+		connChan: make(chan net.Conn),
 	}
 }
 
+func (p *managedPort) ID() string {
+	return p.id
+}
+
+func (p *managedPort) GetConnChannel() chan<- net.Conn {
+	return p.connChan
+}
+
 func (p *managedPort) Accept() (net.Conn, error) {
+	// fmt.Println("accept waiting")
 	conn, open := <-p.connChan
+	// fmt.Printf("accepted [%s] [%#v]\n", conn.RemoteAddr().String(), conn)
 
 	if !open {
 		return nil, api.ErrListenerStopped
@@ -51,6 +91,18 @@ func (p *managedPort) Accept() (net.Conn, error) {
 	if conn == nil {
 		return nil, api.ErrInvalidConnection
 	}
+
+	// go func(c net.Conn) {
+	// 	for {
+	// 		buff := make([]byte, 4096)
+	// 		n, err := c.Read(buff)
+	// 		if err != nil {
+	// 			klog.Background().Error(err, "read error")
+	// 			return
+	// 		}
+	// 		fmt.Printf("%s", buff[:n])
+	// 	}
+	// }(conn)
 
 	return conn, nil
 }
@@ -69,6 +121,6 @@ func (p *managedPort) Addr() net.Addr {
 	}
 
 	return &net.TCPAddr{
-		Port: p.requestedPort,
+		Port: p.options.GetRequestedPort(),
 	}
 }
