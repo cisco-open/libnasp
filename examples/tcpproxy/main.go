@@ -16,10 +16,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"net"
-	"os"
 
 	"k8s.io/klog/v2"
 
@@ -30,24 +28,21 @@ import (
 var heimdallURL string
 var serverAddress string
 var clientAddress string
+var naspEnabled bool
+var bufferSize int
 
 func init() {
-	flag.StringVar(&heimdallURL, "heimdall-url", "https://localhost:16443/config", "Heimdall URL")
 	flag.StringVar(&serverAddress, "server-address", ":5002", "tcp server address")
 	flag.StringVar(&clientAddress, "client-address", ":5001", "tcp client address")
+	flag.BoolVar(&naspEnabled, "nasp-enabled", true, "whether Nasp is enabled")
+	flag.IntVar(&bufferSize, "buffer-size", 4096, "length of buffer in bytes to read or write")
 	klog.InitFlags(nil)
 	flag.Parse()
 }
 
 func getIIH(ctx context.Context) (istio.IstioIntegrationHandler, error) {
-	authToken := os.Getenv("NASP_AUTH_TOKEN")
-	if authToken == "" {
-		panic(errors.New("NASP_AUTH_TOKEN env var must be specified"))
-	}
-
 	istioHandlerConfig := istio.DefaultIstioIntegrationHandlerConfig
-	istioHandlerConfig.IstioCAConfigGetter = istio.IstioCAConfigGetterHeimdall(ctx, heimdallURL, authToken, "v1")
-
+	istioHandlerConfig.Enabled = naspEnabled
 	iih, err := istio.NewIstioIntegrationHandler(&istioHandlerConfig, klog.TODO())
 	if err != nil {
 		return nil, err
@@ -65,12 +60,12 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	iih, err := getIIH(ctx)
+	l, err := net.Listen("tcp", serverAddress)
 	if err != nil {
 		panic(err)
 	}
 
-	l, err := net.Listen("tcp", serverAddress)
+	iih, err := getIIH(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -80,7 +75,6 @@ func main() {
 		panic(err)
 	}
 
-	// d := &net.Dialer{}
 	d, err := iih.GetTCPDialer()
 	if err != nil {
 		panic(err)
@@ -98,6 +92,6 @@ func main() {
 			panic(err)
 		}
 
-		proxy.New(localConnection, remoteConnection).Start()
+		go proxy.New(localConnection, remoteConnection, proxy.WithBufferSize(bufferSize)).Start()
 	}
 }
