@@ -27,15 +27,33 @@ type proxy struct {
 	lclosed, rclosed bool
 
 	mu sync.Mutex
+
+	bufferSize int
 }
 
-func New(lconn, rconn io.ReadWriteCloser) *proxy {
-	return &proxy{
+type ProxyOption func(*proxy)
+
+func WithBufferSize(size int) ProxyOption {
+	return func(p *proxy) {
+		p.bufferSize = size
+	}
+}
+
+func New(lconn, rconn io.ReadWriteCloser, options ...ProxyOption) *proxy {
+	p := &proxy{
 		lconn: lconn,
 		rconn: rconn,
 
 		mu: sync.Mutex{},
+
+		bufferSize: 4096,
 	}
+
+	for _, option := range options {
+		option(p)
+	}
+
+	return p
 }
 
 func (p *proxy) Start() {
@@ -88,7 +106,7 @@ func (p *proxy) proxy(wg *sync.WaitGroup, src, dst io.ReadWriteCloser) error {
 }
 
 func (p *proxy) copy(src, dst io.ReadWriter) error {
-	buff := make([]byte, 0xffff)
+	buff := make([]byte, p.bufferSize)
 	for {
 		n, err := src.Read(buff)
 		if err != nil {
