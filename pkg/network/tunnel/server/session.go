@@ -104,6 +104,9 @@ func (s *session) Handle(ctx context.Context) error {
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) {
 				return nil
 			}
+			if errc, _ := muxado.GetError(err); errc == muxado.PeerEOF {
+				return nil
+			}
 			if err != nil {
 				return errors.WrapIf(err, "could not accept stream")
 			}
@@ -147,7 +150,13 @@ func (s *session) Close() error {
 	s.ctx = nil
 	s.ctxc = nil
 
-	return s.session.Close()
+	err := s.session.Close()
+	errc, err := muxado.GetError(err)
+	if errc == muxado.SessionClosed {
+		err = nil
+	}
+
+	return err
 }
 
 func (s *session) requestPort(req api.RequestPort) int {
@@ -241,7 +250,9 @@ func (s *session) handleStream(stream io.ReadWriteCloser) error {
 				s.logger.Error(err, "error during stream close")
 			}
 		}
-		s.logger.Error(err, "error during message handling", append([]interface{}{"type", msg.Type}, errors.GetDetails(err)...)...)
+		if errors.Cause(err).Error() != "stream closed" {
+			s.logger.Error(err, "error during message handling", append([]interface{}{"type", msg.Type}, errors.GetDetails(err)...)...)
+		}
 	}
 
 	return nil
