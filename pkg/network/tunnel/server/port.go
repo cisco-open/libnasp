@@ -120,8 +120,6 @@ func (p *port) Listen() error {
 				continue
 			}
 
-			c = &conn{c}
-
 			if err := p.session.RequestConn(p.req.ID, c); err != nil {
 				p.logger.Error(err, "could not request connection")
 				if err := c.Close(); err != nil {
@@ -130,14 +128,4 @@ func (p *port) Listen() error {
 			}
 		}
 	}
-}
-
-type conn struct {
-	net.Conn
-}
-
-func (c *conn) Close() error {
-	fmt.Println("connection closed")
-
-	return c.Conn.Close()
 }

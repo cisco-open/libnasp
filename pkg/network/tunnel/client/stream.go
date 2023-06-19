@@ -90,18 +90,6 @@ func (s *ctrlStream) requestConnection(msg api.Message, params ...any) error {
 		return errors.WrapIfWithDetails(err, "could not open tcp stream", "portID", req.PortID, "id", req.Identifier)
 	}
 
-	// for {
-	// 	buff := make([]byte, 4096)
-	// 	n, err := conn.Read(buff)
-	// 	if err != nil {
-	// 		logger.Error(err, "read error")
-	// 		break
-	// 	}
-	// 	fmt.Printf("%s", buff[:n])
-	// }
-
-	// return nil
-
 	logger.V(2).Info("stream is successfully created")
 
 	if conn, err := newconn(conn, "tcp", req.LocalAddress, req.RemoteAddress); err != nil {

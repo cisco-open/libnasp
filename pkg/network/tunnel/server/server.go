@@ -45,6 +45,8 @@ type server struct {
 	keepaliveTimeout    time.Duration
 	listenerWrapperFunc ListenerWrapperFunc
 
+	muxConfig *muxado.Config
+
 	eventBus      *eventbus.EventBus
 	authenticator api.Authenticator
 }
@@ -97,6 +99,12 @@ func ServerWithAuthenticator(auth api.Authenticator) ServerOption {
 	}
 }
 
+func ServerWithMuxadoConfig(config *muxado.Config) ServerOption {
+	return func(s *server) {
+		s.muxConfig = config
+	}
+}
+
 func NewServer(listenAddress string, options ...ServerOption) (api.Server, error) {
 	s := &server{
 		listenAddress:    listenAddress,
@@ -143,33 +151,30 @@ func (s *server) Start(ctx context.Context) error {
 		return errors.WrapIf(err, "could not wrap listener")
 	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			conn, err := l.Accept()
-			if err != nil {
-				return errors.WrapIf(err, "could not accept")
-			}
-
-			go func() {
-				if err := s.handleConn(ctx, conn); err != nil {
-					s.logger.Error(err, "error during connection handling")
-				}
-			}()
+	go func() {
+		<-ctx.Done()
+		s.logger.Info("context cancelled: closing listener")
+		if err := l.Close(); err != nil {
+			s.logger.Error(err, "error during listener close")
 		}
+	}()
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			return errors.WrapIf(err, "could not accept")
+		}
+
+		go func() {
+			if err := s.handleConn(ctx, conn); err != nil {
+				s.logger.Error(err, "error during connection handling")
+			}
+		}()
 	}
 }
 
 func (s *server) handleConn(ctx context.Context, conn net.Conn) error {
-	sess := muxado.Server(conn, nil)
-	// sess, err := yamux.Server(conn, nil)
-	// if err != nil {
-	// 	return errors.WrapIf(err, "could not create mux server")
-	// }
-
-	session := NewSession(s, sess)
+	session := NewSession(s, muxado.Server(conn, s.muxConfig))
 	s.sessions.Store(conn.RemoteAddr().String(), session)
 	session.Logger().Info("session opened")
 

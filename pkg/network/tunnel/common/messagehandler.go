@@ -56,10 +56,10 @@ func (s *messageHandler) Handle() error {
 			return errors.WrapIf(err, "could not decode message")
 		}
 
-		// go func(msg api.Message) {
-		if err := s.HandleMessage(msg); err != nil {
-			s.logger.Error(err, "error during message handling", append([]interface{}{"type", msg.Type}, errors.GetDetails(err)...)...)
-		}
-		// }(msg)
+		go func(msg api.Message) {
+			if err := s.HandleMessage(msg); err != nil {
+				s.logger.Error(err, "error during message handling", append([]interface{}{"type", msg.Type}, errors.GetDetails(err)...)...)
+			}
+		}(msg)
 	}
 }

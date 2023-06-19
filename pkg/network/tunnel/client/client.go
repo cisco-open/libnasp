@@ -66,7 +66,7 @@ func ClientWithLogger(logger logr.Logger) ClientOption {
 	}
 }
 
-func ClientWithConfig(config *muxado.Config) ClientOption {
+func ClientWithMuxadoConfig(config *muxado.Config) ClientOption {
 	return func(c *client) {
 		c.muxConfig = config
 	}
@@ -144,13 +144,7 @@ func (c *client) connect(ctx context.Context) error {
 		return err
 	}
 
-	session := muxado.Client(conn, c.muxConfig)
-	// session, err := yamux.Client(conn, c.muxConfig)
-	// if err != nil {
-	// 	return errors.WrapIf(err, "could not initialize client connection")
-	// }
-
-	c.session = NewSession(c, session)
+	c.session = NewSession(c, muxado.Client(conn, c.muxConfig))
 	defer c.session.Close()
 
 	c.onConnected()

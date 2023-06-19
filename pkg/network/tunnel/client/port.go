@@ -80,9 +80,7 @@ func (p *managedPort) GetConnChannel() chan<- net.Conn {
 }
 
 func (p *managedPort) Accept() (net.Conn, error) {
-	// fmt.Println("accept waiting")
 	conn, open := <-p.connChan
-	// fmt.Printf("accepted [%s] [%#v]\n", conn.RemoteAddr().String(), conn)
 
 	if !open {
 		return nil, api.ErrListenerStopped
@@ -91,18 +89,6 @@ func (p *managedPort) Accept() (net.Conn, error) {
 	if conn == nil {
 		return nil, api.ErrInvalidConnection
 	}
-
-	// go func(c net.Conn) {
-	// 	for {
-	// 		buff := make([]byte, 4096)
-	// 		n, err := c.Read(buff)
-	// 		if err != nil {
-	// 			klog.Background().Error(err, "read error")
-	// 			return
-	// 		}
-	// 		fmt.Printf("%s", buff[:n])
-	// 	}
-	// }(conn)
 
 	return conn, nil
 }
