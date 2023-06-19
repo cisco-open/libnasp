@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 
+	"emperror.dev/errors"
 	"google.golang.org/grpc"
 
 	"github.com/cisco-open/nasp/pkg/istio/discovery"
@@ -40,11 +41,20 @@ func (h *passthroughIstioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error)
 	return &net.Dialer{}, nil
 }
 
-func (h *passthroughIstioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddress string, handler http.Handler) error {
+func (h *passthroughIstioIntegrationHandler) ServeHTTP(ctx context.Context, nl net.Listener, listenAddress string, handler http.Handler) error {
 	return (&http.Server{
 		Addr:    listenAddress,
 		Handler: handler,
-	}).ListenAndServe()
+	}).Serve(nl)
+}
+
+func (h *passthroughIstioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddress string, handler http.Handler) error {
+	ln, err := net.Listen("tcp", listenAddress)
+	if err != nil {
+		return err
+	}
+
+	return h.ServeHTTP(ctx, ln, listenAddress, handler)
 }
 
 func (h *passthroughIstioIntegrationHandler) GetDiscoveryClient() discovery.DiscoveryClient {
@@ -57,4 +67,8 @@ func (h *passthroughIstioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOp
 
 func (h *passthroughIstioIntegrationHandler) Run(context.Context) error {
 	return nil
+}
+
+func (h *passthroughIstioIntegrationHandler) GetVirtualTCPListener(int, string) (net.Listener, error) {
+	return nil, errors.New("not implemented")
 }
