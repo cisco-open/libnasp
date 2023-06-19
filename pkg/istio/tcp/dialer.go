@@ -49,13 +49,14 @@ func NewTCPDialer(streamHandler api.StreamHandler, tlsConfig *tls.Config, discov
 }
 
 func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string) (net.Conn, error) {
-	tlsConfig := d.tlsConfig.Clone()
+	var tlsConfig *tls.Config
 
 	prop, _ := d.discoveryClient.GetTCPClientPropertiesByHost(context.Background(), address)
 	if prop != nil {
 		if !prop.UseTLS() {
 			tlsConfig = nil
 		} else {
+			tlsConfig = d.tlsConfig.Clone()
 			tlsConfig.ServerName = prop.ServerName()
 		}
 		if endpointAddr, err := prop.Address(); err != nil {
@@ -99,7 +100,7 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 
 	var cp pool.Pool
 	if !d.connectionPoolRegistry.HasPool(address) {
-		d.streamHandler.Logger().Info("new pool created", "address", address)
+		d.streamHandler.Logger().V(2).Info("new pool created", "address", address)
 		p, err := pool.NewChannelPool(
 			f,
 			pool.ChannelPoolWithLogger(d.streamHandler.Logger()),
@@ -116,7 +117,7 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 		return nil, err
 	}
 
-	d.streamHandler.Logger().Info("pool stat", "address", address, "len", cp.Len())
+	d.streamHandler.Logger().V(2).Info("pool stat", "address", address, "len", cp.Len())
 
 	return cp.Get()
 }
