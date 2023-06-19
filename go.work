@@ -3,6 +3,7 @@ go 1.19
 use (
 	.
 	./components/bifrost
+	./components/bifrost/deploy/charts
 	./components/echo-server
 	./components/heimdall
 	./components/heimdall/deploy/charts

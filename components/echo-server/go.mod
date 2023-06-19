@@ -2,7 +2,10 @@ module github.com/cisco-open/nasp/components/echo-server
 
 go 1.19
 
-replace github.com/cisco-open/nasp => ../..
+replace (
+	github.com/cisco-open/nasp => ../..
+	github.com/cisco-open/nasp/components/bifrost => ../../components/bifrost
+)
 
 require (
 	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
@@ -32,6 +35,7 @@ require (
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
+	github.com/cisco-open/nasp/components/bifrost v0.0.0-00010101000000-000000000000 // indirect
 	github.com/cncf/xds/go v0.0.0-20220520190051-1e77728a1eaa // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect

@@ -2,6 +2,7 @@ run:
   skip-dirs:
     - .gen
     - ".*~"
+    - "playground"
   skip-files:
     - ".*zz_.*\\.go$"
 
