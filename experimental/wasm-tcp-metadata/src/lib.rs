@@ -41,6 +41,7 @@ pub fn _start() {
             metadata_received: false,
             metadata_exchanged: false,
             metadata_sent: false,
+            metadata_exchange_disabled: false,
         })
     });
 }
@@ -55,6 +56,7 @@ struct MetadataFilter {
     metadata_received: bool,
     metadata_exchanged: bool,
     metadata_sent: bool,
+    metadata_exchange_disabled: bool,
 }
 
 impl MetadataFilter {
@@ -98,6 +100,7 @@ impl RootContext for MetadataFilter {
             metadata_received: self.metadata_received,
             metadata_exchanged: self.metadata_exchanged,
             metadata_sent: self.metadata_sent,
+            metadata_exchange_disabled: self.metadata_exchange_disabled,
         }))
     }
 
@@ -115,11 +118,21 @@ impl MetadataFilter {
     }
 
     fn set_alpn(&mut self) {
+        let mut key = "upstream";
+        if self.direction == TRAFFIC_DIRECTION_INBOUND {
+            key = "connection";
+        }
+
+        if self.alpn != "" {
+            return;
+        }
+
+        let alpn_buf = self
+            .get_property(vec![key, "negotiated_protocol"])
+            .unwrap_or(Vec::<u8>::new());
+        self.alpn = str::from_utf8(&alpn_buf).unwrap().to_string();
         if self.alpn == "" {
-            let alpn_buf = self
-                .get_property(vec!["upstream.negotiated_protocol"])
-                .unwrap_or(Vec::<u8>::new());
-            self.alpn = str::from_utf8(&alpn_buf).unwrap().to_string();
+            self.alpn = String::from("unspecified");
         }
     }
 }
@@ -131,6 +144,11 @@ impl StreamContext for MetadataFilter {
             self.context_id, _data_size
         );
 
+        if self.metadata_exchange_disabled {
+            debug!("[context: {}] metadata exchange disabled", self.context_id);
+            return Action::Continue;
+        }
+
         if self.metadata_exchanged {
             debug!("[context: {}] metadata already exchanged", self.context_id);
             return Action::Continue;
@@ -140,11 +158,12 @@ impl StreamContext for MetadataFilter {
         self.set_alpn();
 
         debug!(
-            "[context: {}] ALPN: [{}], direction: [{}]",
+            "[context: {}] on_downstream_data ALPN: [{}], direction: [{}]",
             self.context_id, self.alpn, self.direction
         );
 
         match self.direction {
+            // downstream - outbound -> local->remote -> outgoing
             // send local metadata by prepending it into the downstream buffer
             TRAFFIC_DIRECTION_OUTBOUND => {
                 if self.alpn != MX_ALPN || self.metadata_sent {
@@ -172,6 +191,7 @@ impl StreamContext for MetadataFilter {
 
                 Action::Continue
             }
+            // downstream - inbound -> remote->local -> incoming
             // parse incoming metadata
             TRAFFIC_DIRECTION_INBOUND => {
                 // check if we have at least 4 byte
@@ -242,7 +262,10 @@ impl StreamContext for MetadataFilter {
                         self.set_upstream_data(0, 0, &buffer);
                         debug!("[context: {}] upstream data set", self.context_id);
                         self.metadata_sent = true;
+                        self.metadata_exchanged = true;
                     }
+                } else {
+                    self.metadata_exchanged = true;
                 }
 
                 Action::Continue
@@ -257,6 +280,11 @@ impl StreamContext for MetadataFilter {
             self.context_id, _data_size
         );
 
+        if self.metadata_exchange_disabled {
+            debug!("[context: {}] metadata exchange disabled", self.context_id);
+            return Action::Continue;
+        }
+
         if self.metadata_exchanged {
             debug!("[context: {}] metadata already exchanged", self.context_id);
             return Action::Continue;
@@ -265,7 +293,13 @@ impl StreamContext for MetadataFilter {
         self.set_direction();
         self.set_alpn();
 
+        debug!(
+            "[context: {}] on_upstream_data ALPN: [{}], direction: [{}]",
+            self.context_id, self.alpn, self.direction
+        );
+
         match self.direction {
+            // upstream - outbound -> remote->local -> incoming
             // parse incoming metadata
             TRAFFIC_DIRECTION_OUTBOUND => {
                 // check if we have at least 4 byte
@@ -314,10 +348,13 @@ impl StreamContext for MetadataFilter {
                     self.set_upstream_data(0, usize::MAX, &remainder);
 
                     self.metadata_exchanged = true;
+                } else {
+                    self.metadata_exchange_disabled = true;
                 }
 
                 Action::Continue
             }
+            // upstream - inbound -> local->remote -> outgoing
             // send local metadata by prepending it into the downstream buffer
             TRAFFIC_DIRECTION_INBOUND => {
                 if !self.metadata_received || !self.metadata_id_received || self.metadata_sent {
