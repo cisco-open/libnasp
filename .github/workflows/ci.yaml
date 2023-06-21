@@ -46,7 +46,7 @@ jobs:
 
       - name: Build TCP metadata exchange filter
         run: |
-          make tcp-metadata-exchange-filter
+          make tcp-metadata-exchange-filter-shrinked
 
       - name: Run unit tests
         run: make test
