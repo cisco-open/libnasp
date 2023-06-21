@@ -45,12 +45,6 @@ jobs:
         id: set-git-refname
         run: echo "git_refname=$(echo "${{ github.ref }}" | sed -r 's@refs/(heads|pull|tags)/@@g')" >> $GITHUB_OUTPUT
 
-      - name: Build TCP metadata exchange filter
-        run: |
-          rustup toolchain install nightly
-          rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
-          make tcp-metadata-exchange-filter-shrinked
-
       - name: Deploy to kind cluster (istio-operator)
         run: |
           test/deploy-kind.sh
