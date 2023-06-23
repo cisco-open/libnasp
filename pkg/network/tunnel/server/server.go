@@ -176,13 +176,13 @@ func (s *server) Start(ctx context.Context) error {
 func (s *server) handleConn(ctx context.Context, conn net.Conn) error {
 	session := NewSession(s, muxado.Server(conn, s.muxConfig))
 	s.sessions.Store(conn.RemoteAddr().String(), session)
-	session.Logger().Info("session opened")
+	session.Logger().V(1).Info("session opened")
 
 	defer func() {
 		if err := session.Close(); err != nil {
 			session.Logger().Error(err, "error during session close")
 		} else {
-			session.Logger().Info("session closed")
+			session.Logger().V(1).Info("session closed")
 		}
 		s.sessions.Delete(conn.RemoteAddr().String())
 	}()

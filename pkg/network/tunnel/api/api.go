@@ -43,11 +43,11 @@ type Client interface {
 }
 
 type ManagedPortOptions interface {
-	SetName(string)
+	SetName(string) ManagedPortOptions
 	GetName() string
-	SetRequestedPort(int)
+	SetRequestedPort(int) ManagedPortOptions
 	GetRequestedPort() int
-	SetTargetPort(int)
+	SetTargetPort(int) ManagedPortOptions
 	GetTargetPort() int
 }
 

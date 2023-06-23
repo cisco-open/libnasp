@@ -38,24 +38,30 @@ type ManagedPortOptions struct {
 	targetPort    int
 }
 
-func (o *ManagedPortOptions) SetTargetPort(port int) {
+func (o *ManagedPortOptions) SetTargetPort(port int) api.ManagedPortOptions {
 	o.targetPort = port
+
+	return o
 }
 
 func (o *ManagedPortOptions) GetTargetPort() int {
 	return o.targetPort
 }
 
-func (o *ManagedPortOptions) SetRequestedPort(port int) {
+func (o *ManagedPortOptions) SetRequestedPort(port int) api.ManagedPortOptions {
 	o.requestedPort = port
+
+	return o
 }
 
 func (o *ManagedPortOptions) GetRequestedPort() int {
 	return o.requestedPort
 }
 
-func (o *ManagedPortOptions) SetName(name string) {
+func (o *ManagedPortOptions) SetName(name string) api.ManagedPortOptions {
 	o.name = name
+
+	return o
 }
 
 func (o *ManagedPortOptions) GetName() string {

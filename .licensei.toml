@@ -24,5 +24,9 @@ ignoreFiles = [
   "istio_ca_client.go",
 ]
 
+ignorePaths = [
+  "playground",
+]
+
 template = """Copyright (c) :YEAR: Cisco and/or its affiliates. All rights reserved.
 """

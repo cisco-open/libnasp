@@ -85,12 +85,16 @@ func (s *session) Handle(ctx context.Context) error {
 
 	go func() {
 		t := time.NewTicker(time.Second * 1)
+		defer t.Stop()
+
 		for {
 			select {
 			case <-s.ctx.Done():
 				return
 			case <-t.C:
-				s.logger.Info("active connections", "count", atomic.LoadUint32(&s.activeConnections))
+				if s.ctrlStream != nil {
+					s.logger.Info("active connections", "count", atomic.LoadUint32(&s.activeConnections))
+				}
 			}
 		}
 	}()
@@ -101,10 +105,10 @@ func (s *session) Handle(ctx context.Context) error {
 			return nil
 		default:
 			stream, err := s.session.Accept()
-			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
 				return nil
 			}
-			if errc, _ := muxado.GetError(err); errc == muxado.PeerEOF {
+			if errc, _ := muxado.GetError(errors.Cause(err)); errc == muxado.PeerEOF || errc == muxado.SessionClosed {
 				return nil
 			}
 			if err != nil {
@@ -121,7 +125,7 @@ func (s *session) Handle(ctx context.Context) error {
 }
 
 func (s *session) Close() error {
-	if s.ctx == nil {
+	if s.ctxc == nil {
 		return nil
 	}
 
@@ -147,7 +151,6 @@ func (s *session) Close() error {
 	}
 
 	s.ctxc()
-	s.ctx = nil
 	s.ctxc = nil
 
 	err := s.session.Close()
@@ -162,6 +165,10 @@ func (s *session) Close() error {
 func (s *session) requestPort(req api.RequestPort) int {
 	var assignedPort int
 
+	logger := s.logger.WithValues("portID", req.ID, "requestedPort", req.RequestedPort)
+
+	logger.V(2).Info("request port")
+
 	if req.RequestedPort > 0 {
 		if s.server.portProvider.GetPort(req.RequestedPort) {
 			assignedPort = req.RequestedPort
@@ -174,7 +181,7 @@ func (s *session) requestPort(req api.RequestPort) int {
 		return 0
 	}
 
-	s.logger.V(2).Info("get free port", "portID", req.ID, "assignedPort", assignedPort)
+	logger.V(2).Info("port assigned", "assignedPort", assignedPort)
 
 	mp := NewPort(s, req, assignedPort)
 
@@ -241,6 +248,10 @@ func (s *session) handleStream(stream io.ReadWriteCloser) error {
 
 	var msg api.Message
 	if err := json.NewDecoder(stream).Decode(&msg); err != nil {
+		// close stream in case of json decode error
+		if err := s.Close(); err != nil {
+			s.logger.Error(err, "error during stream close")
+		}
 		return err
 	}
 
@@ -250,7 +261,7 @@ func (s *session) handleStream(stream io.ReadWriteCloser) error {
 				s.logger.Error(err, "error during stream close")
 			}
 		}
-		if errors.Cause(err).Error() != "stream closed" {
+		if errors.Cause(err).Error() != "stream closed" && errors.Cause(err).Error() != "session closed" {
 			s.logger.Error(err, "error during message handling", append([]interface{}{"type", msg.Type}, errors.GetDetails(err)...)...)
 		}
 	}

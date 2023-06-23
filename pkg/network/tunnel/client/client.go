@@ -172,6 +172,14 @@ func (c *client) requestPort(id string, options api.ManagedPortOptions) error {
 }
 
 func (c *client) GetTCPListener(id string, options api.ManagedPortOptions) (net.Listener, error) {
+	if options == nil {
+		options = &ManagedPortOptions{}
+	}
+
+	if options.GetName() == "" {
+		options.SetName(id)
+	}
+
 	if _, found := c.managedPorts.Load(id); found {
 		return nil, api.ErrPortAlreadyExists
 	}
@@ -179,7 +187,7 @@ func (c *client) GetTCPListener(id string, options api.ManagedPortOptions) (net.
 	mp := NewManagedPort(id, options)
 	c.managedPorts.Store(id, mp)
 
-	if c.connected {
+	if c.connected && c.session.GetControlStream() != nil {
 		if err := c.requestPort(id, options); err != nil {
 			return nil, err
 		}
