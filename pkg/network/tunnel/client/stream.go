@@ -38,7 +38,7 @@ func NewControlStream(client *client, str io.ReadWriteCloser) api.ControlStream 
 		client:         client,
 	}
 
-	mh.AddMessageHandler(api.PortRegisteredMessageType, s.portRegistered)
+	mh.AddMessageHandler(api.RequestPortMessageType, s.requestPortResponse)
 	mh.AddMessageHandler(api.RequestConnectionMessageType, s.requestConnection)
 	mh.AddMessageHandler(api.PingMessageType, s.ping)
 
@@ -111,8 +111,8 @@ func (s *ctrlStream) requestConnection(msg api.Message, params ...any) error {
 	return nil
 }
 
-func (s *ctrlStream) portRegistered(msg api.Message, params ...any) error {
-	var resp api.PortRegistered
+func (s *ctrlStream) requestPortResponse(msg api.Message, params ...any) error {
+	var resp api.RequestPortResponse
 	if err := msg.Decode(&resp); err != nil {
 		return err
 	}
@@ -124,13 +124,13 @@ func (s *ctrlStream) portRegistered(msg api.Message, params ...any) error {
 
 				s.client.managedPorts.Delete(resp.ID)
 
-				return errors.NewWithDetails("could not assign port", "portID", resp.ID)
+				return errors.NewWithDetails("could not assign port", "portID", resp.ID, "requestedPort", resp.RequestedPort)
 			}
 
 			mp.remoteAddress = resp.Address
 			mp.initialized = true
 
-			s.client.logger.Info("port registered", "portID", resp.ID, "remoteAddress", resp.Address)
+			s.client.logger.Info("port assigned", "portID", resp.ID, "remoteAddress", resp.Address)
 
 			return nil
 		}

@@ -38,7 +38,6 @@ const (
 	OpenTCPStreamMessageType     MessageType = "openTCPStream"
 	OpenControlStreamMessageType MessageType = "openControlStream"
 	RequestPortMessageType       MessageType = "requestPort"
-	PortRegisteredMessageType    MessageType = "portRegistered"
 	PongMessageType              MessageType = "pong"
 	PingMessageType              MessageType = "ping"
 	RequestConnectionMessageType MessageType = "requestConnection"
@@ -89,12 +88,13 @@ type RequestPort struct {
 	TargetPort    int    `json:"targetPort,omitempty"`
 }
 
-type PortRegistered struct {
-	Type         string `json:"tcp,omitempty"`
-	ID           string `json:"id,omitempty"`
-	Name         string `json:"name,omitempty"`
-	AssignedPort int    `json:"port,omitempty"`
-	Address      string `json:"address,omitempty"`
+type RequestPortResponse struct {
+	Type          string `json:"tcp,omitempty"`
+	ID            string `json:"id,omitempty"`
+	Name          string `json:"name,omitempty"`
+	AssignedPort  int    `json:"port,omitempty"`
+	Address       string `json:"address,omitempty"`
+	RequestedPort int    `json:"requestedPort,omitempty"`
 }
 
 type ConnectionRequest struct {

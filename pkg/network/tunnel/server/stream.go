@@ -129,17 +129,13 @@ func (s *ctrlStream) requestPort(msg api.Message, params ...any) error {
 		return err
 	}
 
-	if req.Name == "" {
-		return nil
-	}
-
 	assignedPort := s.session.requestPort(req)
 	var addPortErr error
 	if assignedPort == 0 {
 		addPortErr = errors.NewWithDetails("could not assign port", "portID", req.ID, "requestedPort", req.RequestedPort)
 	}
 
-	_, _, err := api.SendMessage(s.stream, api.PortRegisteredMessageType, &api.PortRegistered{
+	_, _, err := api.SendMessage(s.stream, api.RequestPortMessageType, &api.RequestPortResponse{
 		Type:         "tcp",
 		ID:           req.ID,
 		Name:         req.Name,
@@ -148,6 +144,7 @@ func (s *ctrlStream) requestPort(msg api.Message, params ...any) error {
 			IP:   net.ParseIP("0.0.0.0"),
 			Port: assignedPort,
 		}).String(),
+		RequestedPort: req.RequestedPort,
 	})
 	if err != nil {
 		return errors.WrapIf(err, "could not send addPortResponse message")
