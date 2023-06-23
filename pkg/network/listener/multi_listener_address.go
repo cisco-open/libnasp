@@ -19,6 +19,8 @@ import (
 	"strings"
 )
 
+const addressSeparator = ","
+
 type addr struct {
 	net  string
 	addr string
@@ -30,6 +32,25 @@ func (a addr) Network() string {
 
 func (a addr) String() string {
 	return a.addr
+}
+
+func (l *multipleListeners) Addrs() []net.Addr {
+	addrs := []net.Addr{}
+
+	networks := strings.Split(l.Addr().Network(), addressSeparator)
+	addresses := strings.Split(l.Addr().String(), addressSeparator)
+
+	for i, net := range networks {
+		if len(addresses) < i+1 {
+			continue
+		}
+		addrs = append(addrs, addr{
+			net:  net,
+			addr: addresses[i],
+		})
+	}
+
+	return addrs
 }
 
 func (l *multipleListeners) Addr() net.Addr {
@@ -46,7 +67,7 @@ func (l *multipleListeners) Addr() net.Addr {
 	})
 
 	return addr{
-		net:  strings.Join(networks, ","),
-		addr: strings.Join(addresses, ","),
+		net:  strings.Join(networks, addressSeparator),
+		addr: strings.Join(addresses, addressSeparator),
 	}
 }
