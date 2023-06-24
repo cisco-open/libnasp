@@ -74,6 +74,9 @@ func (c *poolConnection) IsClosed() bool {
 
 // Acquire is used to signal when the connection is served from the connection pool.
 func (c *poolConnection) Acquire() {
+	// set deadline to zero
+	c.Conn.SetDeadline(time.Time{})
+
 	c.stopIdleTimer()
 }
 
@@ -82,6 +85,9 @@ func (c *poolConnection) Release() {
 	if c.idleTimeout > 0 {
 		c.setIdleTimer(c.idleTimeout)
 	}
+
+	// set deadline to past to unblock read/writes
+	c.Conn.SetDeadline(time.Now().Add(-time.Millisecond))
 }
 
 func (c *poolConnection) setIdleTimer(idleTimeout time.Duration) {

@@ -42,7 +42,7 @@ type ConnectionChannel chan Connection
 
 // channelPool implements the Pool interface based on buffered channels.
 type channelPool struct {
-	mu    sync.RWMutex
+	mu    sync.Mutex
 	conns ConnectionChannel
 
 	factory Factory
@@ -189,8 +189,8 @@ func (c *channelPool) Put(conn net.Conn) error {
 		return ErrNilConnection
 	}
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	c.removeClosedConnections()
 
@@ -259,8 +259,8 @@ func (c *channelPool) Len() int {
 
 // getConnsAndFactory returns the connection channel and the factory.
 func (c *channelPool) getConnsAndFactory() (ConnectionChannel, Factory) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	c.removeClosedConnections()
 	conns := c.conns
