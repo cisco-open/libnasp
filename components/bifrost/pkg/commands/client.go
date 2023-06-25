@@ -110,54 +110,7 @@ func NewClientCommand() *cobra.Command {
 				}
 			}
 
-			wg := sync.WaitGroup{}
-			for k, addr := range localAddresses {
-				var requestedPort int
-				var targetPort int
-				v := addrRegex.FindStringSubmatch(addr)
-				if len(v) < 5 {
-					logger.Info("invalid local address", "address", addr)
-					continue
-				}
-				if v, err := strconv.Atoi(v[2]); err == nil {
-					requestedPort = v
-				}
-				if v, err := strconv.Atoi(v[4]); err == nil {
-					targetPort = v
-				}
-				addr = fmt.Sprintf("%s:%s", v[3], v[4])
-				tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
-				if err != nil {
-					return err
-				}
-
-				name := fmt.Sprintf("port-%d", k+1)
-
-				l, err := tclient.GetVirtualTCPListener(requestedPort, targetPort, name)
-				if err != nil {
-					return err
-				}
-
-				wg.Add(1)
-				go func(logger logr.Logger) {
-					logger.Info("start proxy", "destination", tcpAddr.String())
-					defer func() {
-						logger.Info("proxying stopped")
-						wg.Done()
-					}()
-					(&proxyclient{
-						Listener: l,
-
-						dialer:  dialer,
-						logger:  logger,
-						tcpAddr: tcpAddr,
-					}).Run(ctx)
-				}(logger.WithName(name))
-			}
-
-			wg.Wait()
-
-			return nil
+			return runProxies(ctx, localAddresses, dialer, tclient, logger)
 		},
 	}
 
@@ -172,6 +125,58 @@ func NewClientCommand() *cobra.Command {
 	}
 
 	return cmd
+}
+
+func runProxies(ctx context.Context, localAddresses []string, dialer api.Dialer, tclient TunnelClient, logger logr.Logger) error {
+	wg := sync.WaitGroup{}
+
+	for k, addr := range localAddresses {
+		var requestedPort int
+		var targetPort int
+		v := addrRegex.FindStringSubmatch(addr)
+		if len(v) < 5 {
+			logger.Info("invalid local address", "address", addr)
+			continue
+		}
+		if v, err := strconv.Atoi(v[2]); err == nil {
+			requestedPort = v
+		}
+		if v, err := strconv.Atoi(v[4]); err == nil {
+			targetPort = v
+		}
+		addr = fmt.Sprintf("%s:%s", v[3], v[4])
+		tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
+		if err != nil {
+			return err
+		}
+
+		name := fmt.Sprintf("port-%d", k+1)
+
+		l, err := tclient.GetVirtualTCPListener(requestedPort, targetPort, name)
+		if err != nil {
+			return err
+		}
+
+		wg.Add(1)
+		go func(logger logr.Logger) {
+			logger.Info("start proxy", "destination", tcpAddr.String())
+			defer func() {
+				logger.Info("proxying stopped")
+				wg.Done()
+			}()
+			(&proxyclient{
+				Listener: l,
+
+				dialer:  dialer,
+				logger:  logger,
+				tcpAddr: tcpAddr,
+			}).Run(ctx)
+		}(logger.WithName(name))
+	}
+
+	wg.Wait()
+
+	return nil
 }
 
 type TunnelClient interface {
