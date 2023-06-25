@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bifrost.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bifrost.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "bifrost.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        sidecar.istio.io/inject: "false"
+        nasp.k8s.cisco.com/inject: "true"
+        {{- include "bifrost.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "bifrost.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+          - server
+          ports:
+            - name: tcp-control
+              containerPort: {{ .Values.server.port }}
+              protocol: TCP
+            - name: healthz
+              containerPort: {{ .Values.healthz.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: healthz
+          readinessProbe:
+            httpGet:
+              path: /
+              port: healthz
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: SERVER_ADDRESS
+              value: ":{{ .Values.server.port }}"
+            - name: HEALTHCHECK_ADDRESS
+              value: ":{{ .Values.healthz.port }}"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
