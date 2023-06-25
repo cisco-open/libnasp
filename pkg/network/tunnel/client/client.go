@@ -23,6 +23,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	"golang.ngrok.com/muxado"
 
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
@@ -158,7 +159,7 @@ func (c *client) connect(ctx context.Context) error {
 }
 
 func (c *client) requestPort(id string, options api.ManagedPortOptions) error {
-	c.logger.V(2).Info("request port", "portID", id, "requestedPort", options.GetRequestedPort())
+	c.logger.V(2).Info("request port", "portID", id, "name", options.GetName(), "requestedPort", options.GetRequestedPort())
 
 	m, _, err := api.SendMessage(c.session.GetControlStream(), api.RequestPortMessageType, &api.RequestPort{
 		Type:          "tcp",
@@ -171,17 +172,15 @@ func (c *client) requestPort(id string, options api.ManagedPortOptions) error {
 	return errors.WrapIfWithDetails(err, "could not send message", "type", m.Type)
 }
 
-func (c *client) GetTCPListener(id string, options api.ManagedPortOptions) (net.Listener, error) {
+func (c *client) GetTCPListener(options api.ManagedPortOptions) (net.Listener, error) {
 	if options == nil {
 		options = &ManagedPortOptions{}
 	}
 
+	id := uuid.NewString()
+
 	if options.GetName() == "" {
 		options.SetName(id)
-	}
-
-	if _, found := c.managedPorts.Load(id); found {
-		return nil, api.ErrPortAlreadyExists
 	}
 
 	mp := NewManagedPort(id, options)
