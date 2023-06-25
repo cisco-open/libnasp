@@ -93,63 +93,9 @@ func (r *EndpointsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			continue
 		}
 
-		getSubset := func(ports PortConfigs, svcPorts []corev1.ServicePort) corev1.EndpointSubset {
-			subset := corev1.EndpointSubset{
-				Addresses: []corev1.EndpointAddress{},
-				Ports:     []corev1.EndpointPort{},
-			}
-
-			isSvcPortExists := func(port PortConfig, svcPorts []corev1.ServicePort) (PortConfig, bool) {
-				if port.Name == "http-metrics" {
-					return port, true
-				}
-
-				for _, svcPort := range svcPorts {
-					if svcPort.TargetPort.StrVal == port.Name || svcPort.TargetPort.IntValue() == port.TargetPort {
-						port.Name = svcPort.Name
-
-						return port, true
-					}
-				}
-
-				return port, false
-			}
-
-			for _, port := range ports {
-				var found bool
-				port, found := isSvcPortExists(port, svcPorts)
-				if !found {
-					continue
-				}
-
-				addr, err := net.ResolveTCPAddr("tcp", port.Address)
-				if err != nil {
-					continue
-				}
-
-				found = false
-				for _, v := range subset.Addresses {
-					if v.IP == addr.IP.String() {
-						found = true
-						break
-					}
-				}
-				if !found {
-					subset.Addresses = append(subset.Addresses, corev1.EndpointAddress{IP: addr.IP.String()})
-				}
-				subset.Ports = append(subset.Ports, corev1.EndpointPort{
-					Name:     port.Name,
-					Protocol: corev1.ProtocolTCP,
-					Port:     int32(port.Port),
-				})
-			}
-
-			return subset
-		}
-
 		reso.Subsets = make([]corev1.EndpointSubset, 0)
 		for _, ports := range portsBySessionID {
-			reso.Subsets = append(reso.Subsets, getSubset(ports, svc.Spec.Ports))
+			reso.Subsets = append(reso.Subsets, r.getSubset(ports, svc.Spec.Ports))
 		}
 
 		rec := reconciler.NewGenericReconciler(r.Client, r.Logger, reconciler.ReconcilerOpts{})
@@ -214,6 +160,60 @@ func (r *EndpointsReconciler) SetupWithManager(mgr ctrl.Manager) (err error) {
 	}
 
 	return nil
+}
+
+func (r *EndpointsReconciler) getSubset(ports PortConfigs, svcPorts []corev1.ServicePort) corev1.EndpointSubset {
+	subset := corev1.EndpointSubset{
+		Addresses: []corev1.EndpointAddress{},
+		Ports:     []corev1.EndpointPort{},
+	}
+
+	isSvcPortExists := func(port PortConfig, svcPorts []corev1.ServicePort) (PortConfig, bool) {
+		if port.Name == "http-metrics" {
+			return port, true
+		}
+
+		for _, svcPort := range svcPorts {
+			if svcPort.TargetPort.StrVal == port.Name || svcPort.TargetPort.IntValue() == port.TargetPort {
+				port.Name = svcPort.Name
+
+				return port, true
+			}
+		}
+
+		return port, false
+	}
+
+	for _, port := range ports {
+		var found bool
+		port, found := isSvcPortExists(port, svcPorts)
+		if !found {
+			continue
+		}
+
+		addr, err := net.ResolveTCPAddr("tcp", port.Address)
+		if err != nil {
+			continue
+		}
+
+		found = false
+		for _, v := range subset.Addresses {
+			if v.IP == addr.IP.String() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			subset.Addresses = append(subset.Addresses, corev1.EndpointAddress{IP: addr.IP.String()})
+		}
+		subset.Ports = append(subset.Ports, corev1.EndpointPort{
+			Name:     port.Name,
+			Protocol: corev1.ProtocolTCP,
+			Port:     int32(port.Port),
+		})
+	}
+
+	return subset
 }
 
 func (r *EndpointsReconciler) collectPortsBySessionAndService(ctx context.Context) (PortsByServiceAndSessionID, error) {

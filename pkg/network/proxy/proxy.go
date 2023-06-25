@@ -24,8 +24,6 @@ import (
 type proxy struct {
 	lconn, rconn io.ReadWriteCloser
 
-	lclosed, rclosed bool
-
 	mu     sync.Mutex
 	closel sync.Once
 	closer sync.Once
@@ -67,7 +65,7 @@ func (p *proxy) Start() {
 		_ = p.proxy(p.lconn, p.rconn)
 
 		p.closer.Do(func() {
-			p.close(p.rconn)
+			_ = p.close(p.rconn)
 		})
 	}()
 
@@ -76,21 +74,21 @@ func (p *proxy) Start() {
 		_ = p.proxy(p.rconn, p.lconn)
 
 		p.closel.Do(func() {
-			p.close(p.lconn)
+			_ = p.close(p.lconn)
 		})
 	}()
 
 	wg.Wait()
 }
 
-func (p *proxy) close(conn io.ReadWriteCloser) {
+func (p *proxy) close(conn io.ReadWriteCloser) error {
 	if d, ok := conn.(interface {
 		CloseWrite() error
 	}); ok {
-		d.CloseWrite()
-	} else {
-		conn.Close()
+		return d.CloseWrite()
 	}
+
+	return conn.Close()
 }
 
 func (p *proxy) proxy(src, dst io.ReadWriteCloser) error {
