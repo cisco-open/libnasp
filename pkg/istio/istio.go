@@ -19,7 +19,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -35,6 +34,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/banzaicloud/operator-tools/pkg/utils"
 	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero"
 	"github.com/cisco-open/nasp/components/bifrost/pkg/k8s"
 	"github.com/cisco-open/nasp/pkg/ca"
@@ -125,7 +125,9 @@ type IstioIntegrationHandlerConfig struct {
 	ClientFilters       []api.WasmPluginConfig
 	IstioCAConfigGetter IstioCAConfigGetterFunc
 	DefaultWASMRuntime  string
-	BifrostAddress      string
+
+	BifrostAddress              string
+	ExposeMetricsThroughBifrost *bool
 }
 
 type PushgatewayConfig struct {
@@ -168,6 +170,9 @@ func (c *IstioIntegrationHandlerConfig) SetDefaults() {
 	if c.BifrostAddress == "" {
 		c.BifrostAddress = os.Getenv("BIFROST_ADDRESS")
 	}
+	if c.ExposeMetricsThroughBifrost == nil {
+		c.ExposeMetricsThroughBifrost = utils.BoolPointer(true)
+	}
 }
 
 type istioIntegrationHandler struct {
@@ -191,7 +196,7 @@ type IstioIntegrationHandler interface {
 	ListenAndServe(ctx context.Context, listenAddress string, handler http.Handler) error
 	GetHTTPTransport(transport http.RoundTripper) (http.RoundTripper, error)
 	GetTCPListener(l net.Listener) (net.Listener, error)
-	GetVirtualTCPListener(targetPort int, name string) (net.Listener, error)
+	GetVirtualTCPListener(requestedPort int, targetPort int, name string) (net.Listener, error)
 	GetTCPDialer() (itcp.Dialer, error)
 	GetDiscoveryClient() discovery.DiscoveryClient
 }
@@ -244,6 +249,11 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 		}
 
 		e.Labels[k8slabels.NASPMonitoringPathLabel] = base64.RawURLEncoding.EncodeToString([]byte(config.MetricsPath))
+	}
+
+	// turn off auto registration for now if bifrost is used
+	if config.BifrostAddress != "" {
+		delete(e.AdditionalMetadata, "AUTO_REGISTER_GROUP")
 	}
 
 	baseContext.Set("node", e.GetNodePropertiesFromEnvironment())
@@ -418,15 +428,6 @@ func (h *istioIntegrationHandler) Run(ctx context.Context) error {
 		return err
 	}
 
-	if h.config.PushgatewayConfig == nil {
-		go h.RunMetricsServer(ctx)
-	} else {
-		// TODO(@waynz0r): check this
-		go func() {
-			_ = h.RunMetricsPusher(ctx)
-		}()
-	}
-
 	if h.config.BifrostAddress != "" {
 		dialer, err := h.GetTCPDialer()
 		if err != nil {
@@ -456,27 +457,61 @@ func (h *istioIntegrationHandler) Run(ctx context.Context) error {
 		}()
 	}
 
+	if h.config.PushgatewayConfig == nil {
+		go h.RunMetricsServer(ctx)
+	} else {
+		// TODO(@waynz0r): check this
+		go func() {
+			_ = h.RunMetricsPusher(ctx)
+		}()
+	}
+
 	return nil
 }
 
-func (h *istioIntegrationHandler) GetVirtualTCPListener(targetPort int, name string) (net.Listener, error) {
+func (h *istioIntegrationHandler) GetVirtualTCPListener(requestedPort int, targetPort int, name string) (net.Listener, error) {
 	if h.tunnelClient == nil {
 		return nil, errors.New("bifrost client is not initialized")
 	}
 
 	opts := &tclient.ManagedPortOptions{}
+	opts.SetRequestedPort(requestedPort)
 	opts.SetTargetPort(targetPort)
 	opts.SetName(name)
 
-	return h.tunnelClient.GetTCPListener(fmt.Sprintf("%d", targetPort), opts)
+	return h.tunnelClient.GetTCPListener(opts)
 }
 
 func (h *istioIntegrationHandler) RunMetricsServer(ctx context.Context) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(h.config.MetricsPath, h.metricHandler.HTTPHandler().ServeHTTP)
 	s := http.Server{Addr: h.config.MetricsAddress, Handler: mux, ReadHeaderTimeout: time.Second * 60}
+
+	ln := listener.NewMultiListener()
+	if s.Addr != "" {
+		tcpln, err := net.Listen("tcp", s.Addr)
+		if err != nil {
+			h.logger.Error(err, "could not listen on tcp port")
+		} else {
+			if err := ln.AddListener(tcpln); err != nil {
+				h.logger.Error(err, "could not add tcp listener")
+			}
+		}
+	}
+	if h.config.BifrostAddress != "" && utils.PointerToBool(h.config.ExposeMetricsThroughBifrost) {
+		if l, err := h.GetVirtualTCPListener(0, 16090, "http-metrics"); err != nil {
+			h.logger.Error(err, "could not create virtual listener")
+		} else {
+			if err := ln.AddListener(l); err != nil {
+				h.logger.Error(err, "could not add virtual listener")
+			}
+		}
+	}
+
 	go func() {
-		_ = s.ListenAndServe()
+		if err := h.ServeHTTP(ctx, ln, s.Addr, mux); err != nil {
+			h.logger.Error(err, "error during serving http")
+		}
 	}()
 
 	<-ctx.Done()
