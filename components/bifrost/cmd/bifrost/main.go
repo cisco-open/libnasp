@@ -18,8 +18,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/klog/v2"
 
 	"github.com/cisco-open/nasp/components/bifrost/pkg/commands"
@@ -33,6 +35,8 @@ var (
 )
 
 func init() {
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
 	fs := flag.NewFlagSet("", flag.PanicOnError)
 	klog.InitFlags(fs)
 	rootCmd.PersistentFlags().AddGoFlagSet(fs)

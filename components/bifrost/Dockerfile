@@ -21,8 +21,10 @@ COPY ./go.mod /go/src/app/
 COPY ./go.sum /go/src/app/
 
 # Copy the Bifrost go module manifests
-COPY components/bifrost/go.mod /go/src/app/components/bifrost
-COPY components/bifrost/go.sum /go/src/app/components/bifrost
+COPY components/heimdall/go.mod /go/src/app/components/heimdall/
+COPY components/heimdall/go.sum /go/src/app/components/heimdall/
+COPY components/bifrost/go.mod /go/src/app/components/bifrost/
+COPY components/bifrost/go.sum /go/src/app/components/bifrost/
 
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod go mod download
 
