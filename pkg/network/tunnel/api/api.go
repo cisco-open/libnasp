@@ -34,12 +34,14 @@ var (
 	ErrAcceptTimeout           = errors.New("accepting connection timed out")
 	ErrInvalidParam            = errors.New("invalid parameter")
 	ErrCtrlStreamAlreadyExists = errors.New("control stream already exists")
-	ErrPortAlreadyExists       = errors.New("port already exists")
+	ErrInvalidPortRange        = errors.New("invalid port range")
+	ErrRequestedPortNoAvail    = errors.New("requested port is not available")
+	ErrFeePortNoAvail          = errors.New("there is no free port available")
 )
 
 type Client interface {
 	Connect(ctx context.Context) error
-	GetTCPListener(id string, options ManagedPortOptions) (net.Listener, error)
+	GetTCPListener(options ManagedPortOptions) (net.Listener, error)
 }
 
 type ManagedPortOptions interface {

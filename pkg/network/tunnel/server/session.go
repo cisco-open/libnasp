@@ -93,7 +93,7 @@ func (s *session) Handle(ctx context.Context) error {
 				return
 			case <-t.C:
 				if s.ctrlStream != nil {
-					s.logger.Info("active connections", "count", atomic.LoadUint32(&s.activeConnections))
+					s.logger.V(1).Info("active connections", "count", atomic.LoadUint32(&s.activeConnections))
 				}
 			}
 		}
@@ -162,7 +162,7 @@ func (s *session) Close() error {
 	return err
 }
 
-func (s *session) requestPort(req api.RequestPort) int {
+func (s *session) requestPort(req api.RequestPort) (int, error) {
 	var assignedPort int
 
 	logger := s.logger.WithValues("portID", req.ID, "requestedPort", req.RequestedPort)
@@ -173,12 +173,15 @@ func (s *session) requestPort(req api.RequestPort) int {
 		if s.server.portProvider.GetPort(req.RequestedPort) {
 			assignedPort = req.RequestedPort
 		}
+		if assignedPort == 0 {
+			return assignedPort, api.ErrRequestedPortNoAvail
+		}
 	} else {
 		assignedPort = s.server.portProvider.GetFreePort()
 	}
 
 	if assignedPort == 0 {
-		return 0
+		return 0, api.ErrFeePortNoAvail
 	}
 
 	logger.V(2).Info("port assigned", "assignedPort", assignedPort)
@@ -187,13 +190,18 @@ func (s *session) requestPort(req api.RequestPort) int {
 
 	s.ports.Store(req.Name, mp)
 
+	l, err := mp.CreateListener()
+	if err != nil {
+		return 0, err
+	}
+
 	go func() {
-		if err := mp.Listen(); err != nil {
+		if err := mp.Listen(l); err != nil {
 			s.logger.Error(err, "could not listen")
 		}
 	}()
 
-	return assignedPort
+	return assignedPort, nil
 }
 
 func (s *session) RequestConn(portID string, c net.Conn) error {

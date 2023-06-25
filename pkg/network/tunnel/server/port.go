@@ -59,20 +59,25 @@ func (p *port) Close() error {
 	return nil
 }
 
-func (p *port) Listen() error {
+func (p *port) CreateListener() (net.Listener, error) {
 	address := fmt.Sprintf(":%d", p.assignedPort)
 
 	l, err := net.Listen("tcp", address)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	return l, nil
+}
+
+func (p *port) Listen(l net.Listener) error {
 	defer l.Close()
 
-	p.logger.V(2).Info("listening on address", "address", address)
+	p.logger.V(2).Info("listening on address", "address", l.Addr().String())
 	if err := p.session.server.eventBus.Publish(string(api.PortListenEventName), api.PortListenEvent{
 		PortData: api.PortData{
 			Name:       p.req.Name,
-			Address:    address,
+			Address:    l.Addr().String(),
 			Port:       p.assignedPort,
 			TargetPort: p.req.TargetPort,
 			User:       p.session.ctrlStream.GetUser(),
@@ -86,11 +91,11 @@ func (p *port) Listen() error {
 	for {
 		select {
 		case <-p.ctx.Done():
-			p.logger.V(2).Info("stop listening on address", "address", address)
+			p.logger.V(2).Info("stop listening on address", "address", l.Addr().String())
 			if err := p.session.server.eventBus.Publish(string(api.PortReleaseEventName), api.PortReleaseEvent{
 				PortData: api.PortData{
 					Name:       p.req.ID,
-					Address:    address,
+					Address:    l.Addr().String(),
 					Port:       p.assignedPort,
 					TargetPort: p.req.TargetPort,
 					User:       p.session.ctrlStream.GetUser(),

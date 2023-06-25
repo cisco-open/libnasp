@@ -130,7 +130,7 @@ func (s *ctrlStream) requestPortResponse(msg api.Message, params ...any) error {
 			mp.remoteAddress = resp.Address
 			mp.initialized = true
 
-			s.client.logger.Info("port assigned", "portID", resp.ID, "remoteAddress", resp.Address)
+			s.client.logger.Info("port assigned", "portID", resp.ID, "remoteAddress", resp.Address, "targetPort", mp.options.GetTargetPort())
 
 			return nil
 		}

@@ -69,6 +69,6 @@ func (h *passthroughIstioIntegrationHandler) Run(context.Context) error {
 	return nil
 }
 
-func (h *passthroughIstioIntegrationHandler) GetVirtualTCPListener(int, string) (net.Listener, error) {
+func (h *passthroughIstioIntegrationHandler) GetVirtualTCPListener(int, int, string) (net.Listener, error) {
 	return nil, errors.New("not implemented")
 }
