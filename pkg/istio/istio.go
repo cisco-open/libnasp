@@ -57,6 +57,10 @@ import (
 	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
 )
 
+var DefaultNetDialer = &net.Dialer{
+	Timeout: time.Second * 10,
+}
+
 var DefaultIstioIntegrationHandlerConfig = IstioIntegrationHandlerConfig{
 	Enabled:        true,
 	MetricsPath:    "/stats/prometheus",
@@ -128,6 +132,8 @@ type IstioIntegrationHandlerConfig struct {
 
 	BifrostAddress              string
 	ExposeMetricsThroughBifrost *bool
+
+	NetDialer *net.Dialer
 }
 
 type PushgatewayConfig struct {
@@ -173,6 +179,10 @@ func (c *IstioIntegrationHandlerConfig) SetDefaults() {
 	if c.ExposeMetricsThroughBifrost == nil {
 		c.ExposeMetricsThroughBifrost = utils.BoolPointer(true)
 	}
+
+	if c.NetDialer == nil {
+		c.NetDialer = DefaultNetDialer
+	}
 }
 
 type istioIntegrationHandler struct {
@@ -197,7 +207,7 @@ type IstioIntegrationHandler interface {
 	GetHTTPTransport(transport http.RoundTripper) (http.RoundTripper, error)
 	GetTCPListener(l net.Listener) (net.Listener, error)
 	GetVirtualTCPListener(requestedPort int, targetPort int, name string) (net.Listener, error)
-	GetTCPDialer() (itcp.Dialer, error)
+	GetTCPDialer(d *net.Dialer) (itcp.Dialer, error)
 	GetDiscoveryClient() discovery.DiscoveryClient
 }
 
@@ -429,7 +439,7 @@ func (h *istioIntegrationHandler) Run(ctx context.Context) error {
 	}
 
 	if h.config.BifrostAddress != "" {
-		dialer, err := h.GetTCPDialer()
+		dialer, err := h.GetTCPDialer(nil)
 		if err != nil {
 			return errors.WrapIf(err, "could not get NASP tcp dialer")
 		}
@@ -653,7 +663,11 @@ func (h *istioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, 
 	return tcp.WrapListener(l, streamHandler), nil
 }
 
-func (h *istioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error) {
+func (h *istioIntegrationHandler) GetTCPDialer(dialer *net.Dialer) (itcp.Dialer, error) {
+	if dialer == nil {
+		dialer = h.config.NetDialer
+	}
+
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(h.caClient.GetCAPem())
 
@@ -679,7 +693,7 @@ func (h *istioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error) {
 		return nil, errors.Wrap(err, "could not get stream handler")
 	}
 
-	return itcp.NewTCPDialer(streamHandler, tlsConfig, h.discoveryClient), nil
+	return itcp.NewTCPDialer(streamHandler, tlsConfig, h.discoveryClient, dialer), nil
 }
 
 func (h *istioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConfig {
