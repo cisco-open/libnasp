@@ -34,15 +34,17 @@ type tcpDialer struct {
 	streamHandler   api.StreamHandler
 	tlsConfig       *tls.Config
 	discoveryClient discovery.DiscoveryClient
+	dialer          *net.Dialer
 
 	connectionPoolRegistry pool.Registry
 }
 
-func NewTCPDialer(streamHandler api.StreamHandler, tlsConfig *tls.Config, discoveryClient discovery.DiscoveryClient) Dialer {
+func NewTCPDialer(streamHandler api.StreamHandler, tlsConfig *tls.Config, discoveryClient discovery.DiscoveryClient, dialer *net.Dialer) Dialer {
 	return &tcpDialer{
 		streamHandler:   streamHandler,
 		tlsConfig:       tlsConfig,
 		discoveryClient: discoveryClient,
+		dialer:          dialer,
 
 		connectionPoolRegistry: pool.NewSyncMapPoolRegistry(pool.SyncMapPoolRegistryWithLogger(streamHandler.Logger())),
 	}
@@ -71,6 +73,7 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 	opts := []network.DialerOption{
 		network.DialerWithConnectionOptions(network.ConnectionWithCloserWrapper(d.discoveryClient.NewConnectionCloseWrapper())),
 		network.DialerWithDialerWrapper(d.discoveryClient.NewDialWrapper()),
+		network.DialerWithNetDialer(d.dialer),
 	}
 
 	var connectionDialer network.ConnectionDialer

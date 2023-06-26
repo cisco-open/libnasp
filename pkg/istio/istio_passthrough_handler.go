@@ -37,8 +37,12 @@ func (h *passthroughIstioIntegrationHandler) GetTCPListener(l net.Listener) (net
 	return l, nil
 }
 
-func (h *passthroughIstioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error) {
-	return &net.Dialer{}, nil
+func (h *passthroughIstioIntegrationHandler) GetTCPDialer(d *net.Dialer) (itcp.Dialer, error) {
+	if d == nil {
+		return DefaultNetDialer, nil
+	}
+
+	return d, nil
 }
 
 func (h *passthroughIstioIntegrationHandler) ServeHTTP(ctx context.Context, nl net.Listener, listenAddress string, handler http.Handler) error {

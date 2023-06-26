@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strconv"
 	"sync"
+	"time"
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
@@ -61,15 +62,19 @@ func NewClientCommand() *cobra.Command {
 
 			ctx := context.Background()
 
+			netDialer := &net.Dialer{
+				Timeout: time.Second * 10,
+			}
+
 			var tclient TunnelClient
-			var dialer api.Dialer
-			dialer = &net.Dialer{}
+			var dialer api.Dialer = netDialer
 
 			if naspEnabled {
 				istioConfig := istio.DefaultIstioIntegrationHandlerConfig
 				if !directClient {
 					istioConfig.BifrostAddress = serverAddress
 				}
+				istioConfig.NetDialer = netDialer
 				ih, err := istio.NewIstioIntegrationHandler(&istioConfig, logger)
 				if err != nil {
 					return errors.WrapIf(err, "could not instantiate NASP istio integration handler")
@@ -80,7 +85,7 @@ func NewClientCommand() *cobra.Command {
 					return errors.WrapIf(err, "could not run istio integration handler")
 				}
 
-				dialer, err = ih.GetTCPDialer()
+				dialer, err = ih.GetTCPDialer(netDialer)
 				if err != nil {
 					return errors.WrapIf(err, "could not get NASP tcp dialer")
 				}

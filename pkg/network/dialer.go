@@ -45,6 +45,18 @@ type DialWrapper interface {
 
 type DialerOption func(*dialer)
 
+func DialerWithNetDialer(nd *net.Dialer) DialerOption {
+	return func(d *dialer) {
+		d.netDialer = nd
+	}
+}
+
+func DialerWithTLSConfig(config *tls.Config) DialerOption {
+	return func(d *dialer) {
+		d.tlsConfig = config
+	}
+}
+
 func DialerWithDialerWrapper(w DialWrapper) DialerOption {
 	return func(d *dialer) {
 		if d.dialWrapper != nil && !reflect.DeepEqual(d.dialWrapper, w) {
@@ -83,27 +95,19 @@ func NewDialerWithTLS(certFile, keyFile string, insecure bool, opts ...DialerOpt
 		return nil, err
 	}
 
-	d := &dialer{
-		tlsConfig: &tls.Config{
-			Certificates:       []tls.Certificate{tlsCert},
-			RootCAs:            certPool,
-			InsecureSkipVerify: insecure,
-		},
-	}
+	opts = append(opts, DialerWithTLSConfig(&tls.Config{
+		Certificates:       []tls.Certificate{tlsCert},
+		RootCAs:            certPool,
+		InsecureSkipVerify: insecure,
+	}))
 
-	d.setOptions(opts...)
-
-	return d, nil
+	return NewDialer(opts...), nil
 }
 
 func NewDialerWithTLSConfig(config *tls.Config, opts ...DialerOption) ConnectionDialer {
-	d := &dialer{
-		tlsConfig: config,
-	}
+	opts = append(opts, DialerWithTLSConfig(config))
 
-	d.setOptions(opts...)
-
-	return d
+	return NewDialer(opts...)
 }
 
 func (d *dialer) setOptions(opts ...DialerOption) {
@@ -164,7 +168,7 @@ func (d *dialer) dialContext(dialer connectionDialer, ctx context.Context, netwo
 
 func (d *dialer) getTLSDialer() *tls.Dialer {
 	return &tls.Dialer{
-		NetDialer: d.netDialer,
+		NetDialer: d.getNetDialer(),
 		Config:    WrapTLSConfig(d.tlsConfig),
 	}
 }

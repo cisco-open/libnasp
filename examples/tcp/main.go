@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -135,7 +136,9 @@ func client() {
 		panic(err)
 	}
 
-	d, err := iih.GetTCPDialer()
+	d, err := iih.GetTCPDialer(&net.Dialer{
+		Timeout: time.Second * 10,
+	})
 	if err != nil {
 		panic(err)
 	}
