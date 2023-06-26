@@ -61,7 +61,7 @@ func NewServerCommand() *cobra.Command {
 
 			serverAddress := viper.GetString("server-address")
 			healthCheckAddress := viper.GetString("healthcheck-address")
-			naspEnabled := viper.GetBool("with-nasp-support")
+			naspEnabled := viper.GetBool("with-nasp")
 
 			options := []server.ServerOption{server.ServerWithLogger(logger)}
 
