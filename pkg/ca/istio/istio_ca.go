@@ -46,6 +46,7 @@ type IstioCAClientConfig struct {
 	Revision      string
 	MeshID        string
 	TrustDomain   string
+	ZipkinAddress string
 }
 
 func NewIstioCAClient(config IstioCAClientConfig, logger logr.Logger) ca.Client {

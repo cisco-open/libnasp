@@ -98,7 +98,7 @@ func (h *httpHandler) serve(responseWriter http.ResponseWriter, request *http.Re
 	proxywasm.HTTPRequestProperty(stream).Set(wrappedRequest)
 	proxywasm.HTTPResponseProperty(stream).Set(wrappedResponse)
 
-	h.BeforeRequest(wrappedRequest, stream)
+	wrappedRequest, stream = h.BeforeRequest(wrappedRequest, stream)
 
 	if err := stream.HandleHTTPRequest(wrappedRequest); err != nil {
 		h.Logger().Error(err, "could not handle request")
@@ -112,7 +112,7 @@ func (h *httpHandler) serve(responseWriter http.ResponseWriter, request *http.Re
 
 	h.handler.ServeHTTP(crw, request)
 
-	h.AfterRequest(wrappedRequest, stream)
+	wrappedRequest, stream = h.AfterRequest(wrappedRequest, stream)
 
 	resp.ContentLength = int64(len(crw.body))
 	if crw.statusCode == 0 {
@@ -121,14 +121,14 @@ func (h *httpHandler) serve(responseWriter http.ResponseWriter, request *http.Re
 	resp.StatusCode = crw.statusCode
 	resp.Body = io.NopCloser(bytes.NewReader(crw.body))
 
-	h.BeforeResponse(wrappedResponse, stream)
+	wrappedResponse, stream = h.BeforeResponse(wrappedRequest.Context(), wrappedResponse, stream)
 
 	if err := stream.HandleHTTPResponse(wrappedResponse); err != nil {
 		h.Logger().Error(err, "could not handle response")
 		return
 	}
 
-	h.AfterResponse(wrappedResponse, stream)
+	h.AfterResponse(wrappedRequest.Context(), wrappedResponse, stream)
 
 	h.writeResponse(crw, responseWriter, resp)
 }

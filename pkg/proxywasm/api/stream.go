@@ -15,6 +15,7 @@
 package api
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/url"
@@ -63,20 +64,26 @@ type HTTPResponse interface {
 
 	ContentLength() int64
 	StatusCode() int
+	Error() error
 
 	ConnectionState() network.ConnectionState
 }
 
+//nolint:interfacebloat
 type HTTPRequest interface {
 	URL() *url.URL
 	Header() HeaderMap
 	Trailer() HeaderMap
 	Body() io.ReadCloser
 	SetBody(io.ReadCloser)
+	ContentLength() int64
+	Context() context.Context
+	WithContext(ctx context.Context) HTTPRequest
 
 	HTTPProtocol() string
 	Host() string
 	Method() string
+	RemoteAddr() string
 
 	ConnectionState() network.ConnectionState
 }

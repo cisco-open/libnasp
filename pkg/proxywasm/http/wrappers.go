@@ -15,6 +15,7 @@
 package http
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -59,8 +60,25 @@ func (r *HTTPRequest) Body() io.ReadCloser {
 	return r.Request.Body
 }
 
+func (r *HTTPResponse) Error() error {
+	return nil
+}
+
 func (r *HTTPRequest) SetBody(body io.ReadCloser) {
 	r.Request.Body = body
+}
+
+func (r *HTTPRequest) ContentLength() int64 {
+	return r.Request.ContentLength
+}
+
+func (r *HTTPRequest) Context() context.Context {
+	return r.Request.Context()
+}
+
+func (r *HTTPRequest) WithContext(ctx context.Context) api.HTTPRequest {
+	r.Request = r.Request.WithContext(ctx)
+	return WrapHTTPRequest(r.Request)
 }
 
 func (r *HTTPRequest) HTTPProtocol() string {
@@ -81,6 +99,10 @@ func (r *HTTPRequest) ConnectionState() network.ConnectionState {
 	}
 
 	return nil
+}
+
+func (r *HTTPRequest) RemoteAddr() string {
+	return r.Request.RemoteAddr
 }
 
 func (r *HTTPResponse) GetHTTPResponse() *http.Response {

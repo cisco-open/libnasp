@@ -15,6 +15,7 @@
 package middleware
 
 import (
+	"context"
 	"net"
 	"strconv"
 	"time"
@@ -34,40 +35,44 @@ func NewEnvoyHTTPHandlerMiddleware() lhttp.HandleMiddleware {
 	return &envoyHttpHandlerMiddleware{}
 }
 
-func (m *envoyHttpHandlerMiddleware) BeforeRequest(req api.HTTPRequest, stream api.Stream) {
+func (m *envoyHttpHandlerMiddleware) BeforeRequest(req api.HTTPRequest, stream api.Stream) (api.HTTPRequest, api.Stream) {
 	if stream.Direction() == api.ListenerDirectionOutbound {
 		m.beforeOutboundRequest(req, stream)
-		return
 	}
 
 	m.beforeInboundRequest(req, stream)
+
+	return req, stream
 }
 
-func (m *envoyHttpHandlerMiddleware) AfterRequest(req api.HTTPRequest, stream api.Stream) {
+func (m *envoyHttpHandlerMiddleware) AfterRequest(req api.HTTPRequest, stream api.Stream) (api.HTTPRequest, api.Stream) {
 	if stream.Direction() == api.ListenerDirectionOutbound {
 		m.afterOutboundRequest(req, stream)
-		return
 	}
 
 	m.afterInboundRequest(req, stream)
+
+	return req, stream
 }
 
-func (m *envoyHttpHandlerMiddleware) BeforeResponse(resp api.HTTPResponse, stream api.Stream) {
+func (m *envoyHttpHandlerMiddleware) BeforeResponse(ctx context.Context, resp api.HTTPResponse, stream api.Stream) (api.HTTPResponse, api.Stream) {
 	if stream.Direction() == api.ListenerDirectionOutbound {
 		m.beforeOutboundResponse(resp, stream)
-		return
 	}
 
 	m.beforeInboundResponse(resp, stream)
+
+	return resp, stream
 }
 
-func (m *envoyHttpHandlerMiddleware) AfterResponse(resp api.HTTPResponse, stream api.Stream) {
+func (m *envoyHttpHandlerMiddleware) AfterResponse(ctx context.Context, resp api.HTTPResponse, stream api.Stream) (api.HTTPResponse, api.Stream) {
 	if stream.Direction() == api.ListenerDirectionOutbound {
 		m.afterOutboundResponse(resp, stream)
-		return
 	}
 
 	m.afterInboundResponse(resp, stream)
+
+	return resp, stream
 }
 
 // INBOUND

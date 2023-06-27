@@ -165,6 +165,7 @@ func GetIstioCAClientConfigWithKubeConfig(clusterID string, istioRevision string
 		Revision:      istioRevision,
 		MeshID:        mc.GetDefaultConfig().GetMeshId(),
 		TrustDomain:   mc.GetTrustDomain(),
+		ZipkinAddress: mc.GetDefaultConfig().GetZipkinAddress(),
 	}, nil
 }
 

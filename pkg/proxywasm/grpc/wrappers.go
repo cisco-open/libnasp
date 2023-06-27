@@ -15,8 +15,11 @@
 package grpc
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net/url"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -29,6 +32,8 @@ type GRPCRequest struct {
 	url             *url.URL
 	header          metadata.MD
 	connectionState network.ConnectionState
+	target          string
+	method          string
 }
 
 type GRPCResponse struct {
@@ -36,14 +41,16 @@ type GRPCResponse struct {
 	header          metadata.MD
 	trailer         metadata.MD
 	connectionState network.ConnectionState
+	error           error
 }
 
-func WrapGRPCResponse(statusCode codes.Code, header metadata.MD, trailer metadata.MD, connectionState network.ConnectionState) api.HTTPResponse {
+func WrapGRPCResponse(statusCode codes.Code, header metadata.MD, trailer metadata.MD, connectionState network.ConnectionState, err error) api.HTTPResponse {
 	return &GRPCResponse{
 		statusCode:      statusCode,
 		header:          header,
 		trailer:         trailer,
 		connectionState: connectionState,
+		error:           err,
 	}
 }
 
@@ -53,6 +60,10 @@ func (r *GRPCResponse) Header() api.HeaderMap {
 
 func (r *GRPCResponse) Trailer() api.HeaderMap {
 	return WrapGRPCMetadata(r.trailer)
+}
+
+func (r *GRPCResponse) Error() error {
+	return r.error
 }
 
 func (r *GRPCResponse) Body() io.ReadCloser {
@@ -111,14 +122,16 @@ func (r *GRPCResponse) StatusCode() int {
 	}
 }
 
-func WrapGRPCRequest(rawURL string, header metadata.MD, connectionState network.ConnectionState) api.HTTPRequest {
+func WrapGRPCRequest(target string, method string, header metadata.MD, connectionState network.ConnectionState) api.HTTPRequest {
 	r := &GRPCRequest{
 		url:             &url.URL{},
 		header:          header,
 		connectionState: connectionState,
+		target:          target,
+		method:          method,
 	}
 
-	if u, err := url.Parse(rawURL); err != nil {
+	if u, err := url.Parse(fmt.Sprintf("https://%s/%s", target, strings.TrimLeft(method, "/"))); err != nil {
 		r.url = u
 	}
 
@@ -153,11 +166,27 @@ func (r *GRPCRequest) Host() string {
 }
 
 func (r *GRPCRequest) Method() string {
-	return ""
+	return r.method
 }
 
 func (r *GRPCRequest) ConnectionState() network.ConnectionState {
 	return r.connectionState
+}
+
+func (r *GRPCRequest) ContentLength() int64 {
+	return 0
+}
+
+func (r *GRPCRequest) Context() context.Context {
+	return nil
+}
+
+func (r *GRPCRequest) RemoteAddr() string {
+	return r.connectionState.RemoteAddr().String()
+}
+
+func (r *GRPCRequest) WithContext(ctx context.Context) api.HTTPRequest {
+	return nil
 }
 
 type grpcHeaderMap struct {
