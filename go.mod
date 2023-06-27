@@ -11,10 +11,10 @@ replace (
 require (
 	emperror.dev/errors v0.8.1
 	github.com/banzaicloud/operator-tools v0.21.0
-	github.com/banzaicloud/proxy-wasm-go-host v1.0.2
+	github.com/banzaicloud/proxy-wasm-go-host v1.0.5
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmer v1.0.4-c1
-	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v3 v3.0.2-c1
-	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.0.0-pre.8-c1
+	github.com/banzaicloud/proxy-wasm-go-host/runtime/wasmtime/v9 v9.0.0
+	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.2.1
 	github.com/blend/go-sdk v1.20220411.3
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cisco-open/nasp/components/bifrost v0.0.0-00010101000000-000000000000
@@ -58,7 +58,7 @@ require (
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bytecodealliance/wasmtime-go/v3 v3.0.2 // indirect
+	github.com/bytecodealliance/wasmtime-go/v9 v9.0.0 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
@@ -128,7 +128,7 @@ require (
 	github.com/spf13/cobra v1.6.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
-	github.com/tetratelabs/wazero v1.0.0-pre.8 // indirect
+	github.com/tetratelabs/wazero v1.2.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/wasmerio/wasmer-go v1.0.4 // indirect
