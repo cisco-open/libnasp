@@ -15,7 +15,8 @@ ignored = [
   "gopkg.in/fsnotify.v1",
   "gopkg.in/square/go-jose.v2", # Apache v2.0
   "github.com/cisco-open/nasp", # Apache v2.0
-  "emperror.dev/errors" # MIT license
+  "emperror.dev/errors", # MIT license
+  "golang.ngrok.com/muxado" # MIT license
 ]
 
 [header]
