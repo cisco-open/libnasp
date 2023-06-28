@@ -2,6 +2,7 @@ name: Mobile and Java build
 
 on:
   pull_request:
+    types: [ labeled ]
 
 env:
   GO_VERSION: "1.20"
@@ -9,6 +10,7 @@ env:
 
 jobs:
   build:
+    if: ${{ github.event.label.name == 'mobile' }}
     name: Mobile and Java build
     runs-on: macos-12
 
