@@ -2,7 +2,7 @@ name: Mobile and Java build
 
 on:
   pull_request:
-    types: [ labeled ]
+    types: [ labeled, opened, reopened, synchronize ]
 
 env:
   GO_VERSION: "1.20"
@@ -10,7 +10,7 @@ env:
 
 jobs:
   build:
-    if: ${{ github.event.label.name == 'mobile' }}
+    if: contains(github.event.pull_request.labels.*.name, 'mobile')
     name: Mobile and Java build
     runs-on: macos-12
 
