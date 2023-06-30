@@ -20,6 +20,7 @@ import (
 	"flag"
 	"net"
 	"os"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -61,7 +62,6 @@ func getIIH(ctx context.Context) (istio.IstioIntegrationHandler, error) {
 }
 
 func main() {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -80,8 +80,10 @@ func main() {
 		panic(err)
 	}
 
-	// d := &net.Dialer{}
-	d, err := iih.GetTCPDialer()
+	netDialer := &net.Dialer{
+		Timeout: time.Second * 10,
+	}
+	d, err := iih.GetTCPDialer(netDialer)
 	if err != nil {
 		panic(err)
 	}

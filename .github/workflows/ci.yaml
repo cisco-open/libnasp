@@ -44,8 +44,11 @@ jobs:
           restore-keys: |
             build-deps-v2
 
-      - name: Run unit tests
-        run: make test
+      - name: Run vet
+        run: make vet-all
 
       - name: Run lint
         run: make lint-all
+
+      - name: Run unit tests
+        run: make test
