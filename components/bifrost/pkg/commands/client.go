@@ -55,6 +55,8 @@ func NewClientCommand() *cobra.Command {
 			naspEnabled := viper.GetBool("with-nasp")
 			directClient := !viper.GetBool("with-nasp-bifrost")
 			authToken := viper.GetString("auth-token")
+			k8sServiceName := viper.GetString("k8s-service-name")
+			labels := viper.GetStringMapString("label")
 
 			if len(localAddresses) == 0 {
 				return ErrLocalAddressNotSpecified
@@ -100,9 +102,12 @@ func NewClientCommand() *cobra.Command {
 					opts = append(opts, client.ClientWithBearerToken(authToken))
 				}
 
-				opts = append(opts, client.ClientWithMetadata(map[string]string{
-					k8s.ClientServiceNameLabel: "demo",
-				}))
+				if k8sServiceName != "" {
+					labels[k8s.ClientServiceNameLabel] = k8sServiceName
+				}
+
+				opts = append(opts, client.ClientWithMetadata(labels))
+
 				c := client.NewClient(serverAddress, opts...)
 				go func() {
 					if err := c.Connect(context.Background()); err != nil {
@@ -124,6 +129,8 @@ func NewClientCommand() *cobra.Command {
 	cmd.Flags().Bool("with-nasp", false, "Whether to use Nasp")
 	cmd.Flags().Bool("with-nasp-bifrost", true, "Whether to use Nasp internal bifrost client or direct client")
 	cmd.Flags().String("auth-token", "", "Bifrost authentication token")
+	cmd.Flags().String("k8s-service-name", "", "K8s service name")
+	cmd.Flags().StringToString("label", nil, "Labels associated with the workload")
 
 	if err := viper.BindPFlags(cmd.Flags()); err != nil {
 		panic(err)
