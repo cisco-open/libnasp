@@ -444,12 +444,13 @@ func (h *istioIntegrationHandler) Run(ctx context.Context) error {
 			return errors.WrapIf(err, "could not get NASP tcp dialer")
 		}
 
+		envLabels := h.environment.GetLabels()
+		envLabels[k8s.ClientServiceNameLabel] = labels.IstioCanonicalServiceName(h.environment.Labels, h.environment.WorkloadName)
+
 		options := []tclient.ClientOption{
 			tclient.ClientWithDialer(dialer),
 			tclient.ClientWithLogger(h.logger.WithName("bifrost-client")),
-			tclient.ClientWithMetadata(map[string]string{
-				k8s.ClientServiceNameLabel: labels.IstioCanonicalServiceName(h.environment.Labels, h.environment.WorkloadName),
-			}),
+			tclient.ClientWithMetadata(envLabels),
 		}
 
 		if getter, ok := h.caClient.(interface {
