@@ -33,7 +33,7 @@ jobs:
           path: bin/
           key: build-deps-v2-{{ hashFiles('common.mk') }}
           restore-keys: |
-            build-deps-v2
+            build-deps-v2-
 
       - name: Cache licenses
         id: cache-licenses
@@ -42,11 +42,13 @@ jobs:
           path: |
             .licensei.cache
             components/heimdall/.licensei.cache
+            components/echo-server/.licensei.cache
+            components/bifrost/.licensei.cache
             experimental/mobile/.licensei.cache
             experimental/java/.licensei.cache
           key: licensei-v2-${{ hashFiles('go.sum') }}
           restore-keys: |
-            licensei-v2
+            licensei-v2-
 
       - name: Download license information for dependencies
         env:
