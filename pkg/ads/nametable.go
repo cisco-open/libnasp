@@ -24,7 +24,7 @@ import (
 	istio_networking_nds_v1 "istio.io/istio/pkg/dns/proto"
 )
 
-// resolveHostName resolves the provides host name to IP addresses using
+// ResolveHost resolves the provides host name to IP addresses using
 // Istio's NDS
 func (c *client) ResolveHost(hostName string) ([]net.IP, error) {
 	var hostIPs []net.IP

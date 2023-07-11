@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/cisco-open/nasp/pkg/ads/internal/filterchain"
+
 	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
 	"github.com/cisco-open/nasp/pkg/ads/internal/util"
 
@@ -36,6 +38,7 @@ type listenerProperties struct {
 	permissive               bool
 	requireClientCertificate bool
 	metadata                 map[string]interface{}
+	inboundListener          *envoy_config_listener_v3.Listener
 }
 
 func (lp *listenerProperties) UseTLS() bool {
@@ -52,6 +55,10 @@ func (lp *listenerProperties) IsClientCertificateRequired() bool {
 
 func (lp *listenerProperties) Metadata() map[string]interface{} {
 	return lp.metadata
+}
+
+func (lp *listenerProperties) NetworkFilters(networkFilterSelectOpts ...NetworkFilterSelectOption) ([]NetworkFilter, error) {
+	return listenerNetworkFilters(lp.inboundListener, networkFilterSelectOpts...)
 }
 
 func (lp *listenerProperties) String() string {
@@ -183,8 +190,13 @@ func (c *client) getListenerProperties(input getListenerPropertiesInput) (Listen
 		return nil, errors.WrapIf(err, "couldn't list inbound listeners for address")
 	}
 	for _, lstnr := range listeners {
-		// matching rules https://github.com/envoyproxy/go-control-plane/blob/v0.9.9/envoy/config/listener/v3/listener_components.pb.go#L211
-		filterChains, err := findFilterChain(lstnr.GetFilterChains(), input.port, net.ParseIP(input.host))
+		// find listener's filter chains that are matching the first 2 steps of the rules described here
+		// https://github.com/envoyproxy/go-control-plane/blob/v0.9.9/envoy/config/listener/v3/listener_components.pb.go#L211
+		// which is enough to determine the properties of a workload listener
+		filterChains, err := filterchain.Filter(lstnr,
+			filterchain.WithDestinationPort(input.port),
+			filterchain.WithDestinationIP(net.ParseIP(input.host)))
+
 		if err != nil {
 			return nil, err
 		}
@@ -231,6 +243,7 @@ func (c *client) getListenerProperties(input getListenerPropertiesInput) (Listen
 				// shows whether client certificate is required
 				requireClientCertificate: requireClientCertificate,
 				metadata:                 metadata,
+				inboundListener:          matchedListener,
 			}
 		}
 	}
@@ -240,84 +253,4 @@ func (c *client) getListenerProperties(input getListenerPropertiesInput) (Listen
 	}
 
 	return lp, nil
-}
-
-// findFilterChain returns filter chain items from the provided
-// 'filterChains' that are matching the first 2 steps of the rules described here
-// https://github.com/envoyproxy/go-control-plane/blob/v0.9.9/envoy/config/listener/v3/listener_components.pb.go#L211
-// which is enough to determine the properties of a workload listener
-func findFilterChain(filterChains []*envoy_config_listener_v3.FilterChain, port uint32, ip net.IP) ([]*envoy_config_listener_v3.FilterChain, error) {
-	// 1. match by destination port
-	var fcsMatchedByPort []*envoy_config_listener_v3.FilterChain
-
-	// match by exact destination port first as that is the most specific match
-	// if there are no matches by specific destination port then check the next most specific
-	// match which is the filter chain matches with no destination port
-	dstPortsToMatch := []uint32{port, 0}
-	for _, matchPort := range dstPortsToMatch {
-		for _, fc := range filterChains {
-			fcm := fc.GetFilterChainMatch()
-
-			dstPort := uint32(0)
-			if fcm.GetDestinationPort() != nil {
-				dstPort = fcm.GetDestinationPort().GetValue()
-			}
-
-			if matchPort == dstPort {
-				fcsMatchedByPort = append(fcsMatchedByPort, fc)
-			}
-		}
-
-		if len(fcsMatchedByPort) > 0 {
-			break
-		}
-	}
-
-	// 2. match destination IP address
-	var fcsMatchedByDstIP []*envoy_config_listener_v3.FilterChain
-	for _, fc := range fcsMatchedByPort {
-		cidrs := fc.GetFilterChainMatch().GetPrefixRanges()
-		if cidrs != nil {
-			// verify destination IP address matches any of the cidrs of the filter chain
-			ok, err := matchPrefixRanges(cidrs, ip)
-			if err != nil {
-				return nil, err
-			}
-			if ok {
-				fcsMatchedByDstIP = append(fcsMatchedByDstIP, fc)
-			}
-		}
-	}
-
-	// if there are no filter chain matches by CIDR than the next most specific matches are those
-	// which don't have a CIDR defined
-	if len(fcsMatchedByDstIP) == 0 {
-		// if there is no CIDR specified for the filter chain main
-		for _, fc := range fcsMatchedByPort {
-			if fc.GetFilterChainMatch().GetPrefixRanges() == nil {
-				fcsMatchedByDstIP = append(fcsMatchedByDstIP, fc)
-			}
-		}
-	}
-
-	return fcsMatchedByDstIP, nil
-}
-
-func matchPrefixRanges(prefixRanges []*envoy_config_core_v3.CidrRange, ip net.IP) (bool, error) {
-	for _, cidr := range prefixRanges {
-		if cidr.GetAddressPrefix() == "" {
-			continue
-		}
-
-		cidrStr := fmt.Sprintf("%s/%d", cidr.GetAddressPrefix(), cidr.GetPrefixLen().GetValue())
-		_, ipnet, err := net.ParseCIDR(cidrStr)
-		if err != nil {
-			return false, errors.WrapIff(err, "couldn't parse address prefix: %q", cidrStr)
-		}
-
-		if ipnet.Contains(ip) {
-			return true, nil
-		}
-	}
-	return false, nil
 }
