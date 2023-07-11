@@ -22,14 +22,13 @@ import (
 	"sync"
 	"time"
 
-	adsconfig "github.com/cisco-open/nasp/pkg/ads/config"
-
 	"emperror.dev/errors"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/cisco-open/nasp/pkg/ads"
+	adsconfig "github.com/cisco-open/nasp/pkg/ads/config"
 	"github.com/cisco-open/nasp/pkg/ca"
 	"github.com/cisco-open/nasp/pkg/environment"
 )

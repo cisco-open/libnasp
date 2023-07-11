@@ -18,18 +18,17 @@ import (
 	"encoding/json"
 	"sync"
 
-	"google.golang.org/protobuf/types/known/anypb"
-
+	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoy_extensions_filters_network_tcp_proxy_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/tcp_proxy/v3"
 	auth "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
+	extensions_transport_sockets_tls_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	discovery_v3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	resource_v3 "github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
-
-	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // KeyValueCollection thread-safe collection of <K, V> items
@@ -170,6 +169,17 @@ func GetDownstreamTlsContext(ts *envoy_config_core_v3.TransportSocket) *auth.Dow
 		if err := anypb.UnmarshalTo(typedConfig, dsc, proto.UnmarshalOptions{}); err == nil {
 			return dsc
 		}
+	}
+
+	return nil
+}
+
+func GetCertificateValidationContextFromCommonTLSContext(commonTLSContext *extensions_transport_sockets_tls_v3.CommonTlsContext) *extensions_transport_sockets_tls_v3.CertificateValidationContext {
+	switch t := commonTLSContext.GetValidationContextType().(type) {
+	case *extensions_transport_sockets_tls_v3.CommonTlsContext_CombinedValidationContext:
+		return t.CombinedValidationContext.GetDefaultValidationContext()
+	case *extensions_transport_sockets_tls_v3.CommonTlsContext_ValidationContext:
+		return t.ValidationContext
 	}
 
 	return nil

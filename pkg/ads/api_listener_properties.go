@@ -24,6 +24,7 @@ import (
 
 	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
 	"github.com/cisco-open/nasp/pkg/ads/internal/util"
+	"github.com/cisco-open/nasp/pkg/tls/verify"
 
 	"emperror.dev/errors"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -36,6 +37,8 @@ type listenerProperties struct {
 	permissive               bool
 	requireClientCertificate bool
 	metadata                 map[string]interface{}
+
+	certVerifierConfig *verify.CertVerifierConfig
 }
 
 func (lp *listenerProperties) UseTLS() bool {
@@ -52,6 +55,10 @@ func (lp *listenerProperties) IsClientCertificateRequired() bool {
 
 func (lp *listenerProperties) Metadata() map[string]interface{} {
 	return lp.metadata
+}
+
+func (lp *listenerProperties) GetCertVerifierConfig() *verify.CertVerifierConfig {
+	return lp.certVerifierConfig
 }
 
 func (lp *listenerProperties) String() string {
@@ -194,7 +201,7 @@ func (c *client) getListenerProperties(input getListenerPropertiesInput) (Listen
 			filterChains = append(filterChains, lstnr.GetDefaultFilterChain())
 		}
 
-		if len(filterChains) > 0 {
+		if len(filterChains) > 0 { //nolint:nestif
 			if matchedListener != nil {
 				return nil, errors.New("multiple listeners found")
 			}
@@ -203,6 +210,7 @@ func (c *client) getListenerProperties(input getListenerPropertiesInput) (Listen
 			tlsTransportProto := false
 			rawBufferTransProto := false
 			requireClientCertificate := false
+			var certVerifierConfig *verify.CertVerifierConfig
 
 			for _, fc := range filterChains {
 				fcm := fc.GetFilterChainMatch()
@@ -212,6 +220,10 @@ func (c *client) getListenerProperties(input getListenerPropertiesInput) (Listen
 					tlsTransportProto = true
 					if ts := util.GetDownstreamTlsContext(fc.TransportSocket); ts != nil {
 						requireClientCertificate = ts.RequireClientCertificate.GetValue()
+
+						if validationContext := util.GetCertificateValidationContextFromCommonTLSContext(ts.GetCommonTlsContext()); validationContext != nil {
+							certVerifierConfig = GetCertVerifierConfigFromValidationContext(validationContext)
+						}
 					}
 				case xds_filters.RawBufferTransportProtocol:
 					rawBufferTransProto = true
@@ -231,6 +243,8 @@ func (c *client) getListenerProperties(input getListenerPropertiesInput) (Listen
 				// shows whether client certificate is required
 				requireClientCertificate: requireClientCertificate,
 				metadata:                 metadata,
+
+				certVerifierConfig: certVerifierConfig,
 			}
 		}
 	}

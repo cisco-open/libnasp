@@ -22,23 +22,21 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
-	"github.com/cisco-open/nasp/pkg/ads/internal/loadbalancer"
-
-	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
-
-	"github.com/cisco-open/nasp/pkg/ads/internal/util"
-
-	"github.com/cisco-open/nasp/pkg/ads/internal/cluster"
-	routemeta "github.com/cisco-open/nasp/pkg/ads/internal/route"
-
-	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
-	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
-
 	"emperror.dev/errors"
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
+	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+	extensions_transport_sockets_tls_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
+
+	"github.com/cisco-open/nasp/pkg/ads/internal/cluster"
+	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
+	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
+	"github.com/cisco-open/nasp/pkg/ads/internal/loadbalancer"
+	routemeta "github.com/cisco-open/nasp/pkg/ads/internal/route"
+	"github.com/cisco-open/nasp/pkg/ads/internal/util"
+	"github.com/cisco-open/nasp/pkg/tls/verify"
 )
 
 type clientProperties struct {
@@ -47,6 +45,8 @@ type clientProperties struct {
 	serverName string
 	address    net.Addr
 	metadata   map[string]interface{}
+
+	certVerifierConfig *verify.CertVerifierConfig
 }
 
 func (p *clientProperties) UseTLS() bool {
@@ -70,6 +70,10 @@ func (p *clientProperties) Address() (net.Addr, error) {
 
 func (p *clientProperties) Metadata() map[string]interface{} {
 	return p.metadata
+}
+
+func (p *clientProperties) GetCertVerifierConfig() *verify.CertVerifierConfig {
+	return p.certVerifierConfig
 }
 
 func (p *clientProperties) String() string {
@@ -410,6 +414,13 @@ func (c *client) newClientProperties(cl *envoy_config_cluster_v3.Cluster, route 
 		useTLS:     cluster.UsesTls(transports),
 		address:    endpointAddress,
 		metadata:   metadata,
+	}
+
+	upstreamTLSContext := &extensions_transport_sockets_tls_v3.UpstreamTlsContext{}
+	if len(transports) > 0 && transports[0].GetTypedConfig().UnmarshalTo(upstreamTLSContext) == nil {
+		if validationContext := util.GetCertificateValidationContextFromCommonTLSContext(upstreamTLSContext.GetCommonTlsContext()); validationContext != nil {
+			clientProps.certVerifierConfig = GetCertVerifierConfigFromValidationContext(validationContext)
+		}
 	}
 
 	return clientProps, nil
