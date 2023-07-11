@@ -16,10 +16,11 @@ package discovery
 
 import (
 	"context"
-
 	"net"
 
 	"github.com/go-logr/logr"
+
+	"github.com/cisco-open/nasp/pkg/tls/verify"
 )
 
 type DiscoveryClient interface {
@@ -58,6 +59,7 @@ type ClientProperties interface {
 	Permissive() bool
 	ServerName() string
 	Metadata() map[string]interface{}
+	GetCertVerifierConfig() *verify.CertVerifierConfig
 }
 
 type HTTPClientProperties interface {
