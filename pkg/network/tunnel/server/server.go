@@ -22,7 +22,8 @@ import (
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
-	"github.com/xtaci/smux"
+	"github.com/werbenhu/eventbus"
+	"golang.ngrok.com/muxado"
 
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 )
@@ -43,6 +44,11 @@ type server struct {
 	sessionTimeout      time.Duration
 	keepaliveTimeout    time.Duration
 	listenerWrapperFunc ListenerWrapperFunc
+
+	muxConfig *muxado.Config
+
+	eventBus      *eventbus.EventBus
+	authenticator api.Authenticator
 }
 
 type ServerOption func(*server)
@@ -79,6 +85,26 @@ func ServerWithListenerWrapperFunc(listenerWrapperFunc ListenerWrapperFunc) Serv
 	}
 }
 
+func ServerWithEventSubscribe(topic string, handler any) ServerOption {
+	return func(srv *server) {
+		if err := srv.eventBus.Subscribe(topic, handler); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func ServerWithAuthenticator(auth api.Authenticator) ServerOption {
+	return func(srv *server) {
+		srv.authenticator = auth
+	}
+}
+
+func ServerWithMuxadoConfig(config *muxado.Config) ServerOption {
+	return func(s *server) {
+		s.muxConfig = config
+	}
+}
+
 func NewServer(listenAddress string, options ...ServerOption) (api.Server, error) {
 	s := &server{
 		listenAddress:    listenAddress,
@@ -88,6 +114,8 @@ func NewServer(listenAddress string, options ...ServerOption) (api.Server, error
 		listenerWrapperFunc: func(l net.Listener) (net.Listener, error) {
 			return l, nil
 		},
+
+		eventBus: eventbus.New(),
 	}
 
 	for _, option := range options {
@@ -123,6 +151,14 @@ func (s *server) Start(ctx context.Context) error {
 		return errors.WrapIf(err, "could not wrap listener")
 	}
 
+	go func() {
+		<-ctx.Done()
+		s.logger.Info("context cancelled: closing listener")
+		if err := l.Close(); err != nil {
+			s.logger.Error(err, "error during listener close")
+		}
+	}()
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -130,28 +166,26 @@ func (s *server) Start(ctx context.Context) error {
 		}
 
 		go func() {
-			if err := s.handleConn(conn); err != nil {
+			if err := s.handleConn(ctx, conn); err != nil {
 				s.logger.Error(err, "error during connection handling")
 			}
 		}()
 	}
 }
 
-func (s *server) handleConn(conn net.Conn) error {
-	sess, err := smux.Server(conn, nil)
-	if err != nil {
-		return errors.WrapIf(err, "could not create mux server")
-	}
-
-	session := NewSession(s, sess)
-
+func (s *server) handleConn(ctx context.Context, conn net.Conn) error {
+	session := NewSession(s, muxado.Server(conn, s.muxConfig))
 	s.sessions.Store(conn.RemoteAddr().String(), session)
+	session.Logger().V(1).Info("session opened")
 
 	defer func() {
-		s.logger.V(2).Info("session closed")
-		session.Close()
+		if err := session.Close(); err != nil {
+			session.Logger().Error(err, "error during session close")
+		} else {
+			session.Logger().V(1).Info("session closed")
+		}
 		s.sessions.Delete(conn.RemoteAddr().String())
 	}()
 
-	return session.Handle()
+	return session.Handle(ctx)
 }

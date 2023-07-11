@@ -29,6 +29,7 @@ build
 !/.idea/modules.xml
 !/.idea/vcs.xml
 /.licensei.cache
+/**/.licensei.cache
 bin/*
 cover.out
 .DS_Store

@@ -22,6 +22,10 @@ import (
 type store map[string]interface{}
 type array []interface{}
 
+func New() *store {
+	return &store{}
+}
+
 func (m store) Get(key string) (value interface{}, ok bool) {
 	pieces := strings.Split(strings.ReplaceAll(key, "\\.", "\x00"), ".")
 

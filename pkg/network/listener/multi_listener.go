@@ -17,20 +17,25 @@ package listener
 import (
 	"context"
 	"net"
-	"os"
 	"sync"
-	"time"
+	"sync/atomic"
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
 )
 
-var ErrAlreadyExists = errors.New("listener already exists")
+var (
+	ErrListenerClosed        = errors.New("listener is closed")
+	ErrListenerAlreadyExists = errors.New("listener already exists")
+	ErrInvalidNilListener    = errors.New("nil listener is not allowed")
+)
 
 type MultiListener interface {
 	net.Listener
+	Addrs() []net.Addr
 
 	AddListener(lis net.Listener) error
+	AddListeners(lis ...net.Listener) error
 	RemoveListener(lis net.Listener)
 }
 
@@ -45,6 +50,7 @@ type multipleListeners struct {
 	listeners sync.Map
 
 	acceptChan chan accept
+	closed     atomic.Bool
 
 	logger logr.Logger
 }
@@ -64,7 +70,7 @@ func MultiListenerWithLogger(logger logr.Logger) MultiListenerOption {
 	}
 }
 
-func NewMultiListener(l net.Listener, options ...MultiListenerOption) MultiListener {
+func NewMultiListener(options ...MultiListenerOption) MultiListener {
 	lstn := &multipleListeners{
 		listeners: sync.Map{},
 
@@ -79,16 +85,38 @@ func NewMultiListener(l net.Listener, options ...MultiListenerOption) MultiListe
 		lstn.logger = logr.Discard()
 	}
 
-	_ = lstn.AddListener(l)
-
 	return lstn
 }
 
+func (l *multipleListeners) AddListeners(listeners ...net.Listener) error {
+	if l.closed.Load() {
+		return errors.WithStack(ErrListenerClosed)
+	}
+
+	var e error
+
+	for _, lis := range listeners {
+		if err := l.AddListener(lis); err != nil {
+			e = errors.Append(e, errors.WithStack(err))
+		}
+	}
+
+	return e
+}
+
 func (l *multipleListeners) AddListener(lis net.Listener) error {
-	id := lis.Addr().String()
+	if l.closed.Load() {
+		return errors.WithStack(ErrListenerClosed)
+	}
+
+	if lis == nil {
+		return errors.WithStackIf(ErrInvalidNilListener)
+	}
+
+	id := l.getID(lis)
 
 	if _, ok := l.listeners.Load(id); ok {
-		return errors.WithStackIf(ErrAlreadyExists)
+		return errors.WithStackIf(ErrListenerAlreadyExists)
 	}
 
 	lstn := &listener{
@@ -106,7 +134,7 @@ func (l *multipleListeners) AddListener(lis net.Listener) error {
 }
 
 func (l *multipleListeners) RemoveListener(lis net.Listener) {
-	id := lis.Addr().String()
+	id := l.getID(lis)
 
 	if v, loaded := l.listeners.LoadAndDelete(id); loaded {
 		if lis, ok := v.(*listener); ok {
@@ -117,19 +145,27 @@ func (l *multipleListeners) RemoveListener(lis net.Listener) {
 }
 
 func (l *multipleListeners) Accept() (net.Conn, error) {
+	if l.closed.Load() {
+		return nil, errors.WithStack(ErrListenerClosed)
+	}
+
 	for {
-		select {
-		case accept := <-l.acceptChan:
+		accept, ok := <-l.acceptChan
+		if ok {
 			l.logger.V(3).Info("connection on listener", "id", accept.listenerID, "address", accept.listener.Addr().String())
 
 			return accept.conn, accept.err
-		default:
-			time.Sleep(time.Millisecond * 50)
+		} else {
+			return nil, errors.WithStack(ErrListenerClosed)
 		}
 	}
 }
 
-func (l *multipleListeners) Close() (err error) {
+func (l *multipleListeners) Close() error {
+	if l.closed.Load() {
+		return errors.WithStack(ErrListenerClosed)
+	}
+
 	listeners := make([]net.Listener, 0)
 	l.listeners.Range(func(k, v any) bool {
 		if v, ok := v.(net.Listener); ok {
@@ -143,42 +179,49 @@ func (l *multipleListeners) Close() (err error) {
 		l.RemoveListener(lis)
 	}
 
-	return err
+	close(l.acceptChan)
+
+	l.closed.Store(true)
+
+	l.logger.V(2).Info("multi listener closed")
+
+	return nil
 }
 
 func (l *multipleListeners) startListener(id string, lis *listener) {
 	l.logger.V(2).Info("start listener", "id", id)
 	defer l.logger.V(2).Info("listener stopped", "id", id)
 
+	go func(lis *listener) {
+		<-lis.ctx.Done()
+		if err := lis.Listener.Close(); err != nil {
+			l.logger.Error(err, "could not close listener")
+		}
+	}(lis)
+
 	for {
-		select {
-		case <-lis.ctx.Done():
-			if err := lis.Listener.Close(); err != nil {
-				l.logger.Error(err, "could not close listener")
-			}
+		c, err := lis.Accept()
+		// break on net close error
+		if errors.Is(err, net.ErrClosed) {
+			break
+		}
 
-			return
-		default:
-			if lis, ok := lis.Listener.(interface {
-				SetDeadline(t time.Time) error
-			}); ok {
-				err := lis.SetDeadline(time.Now().Add(time.Second * 1))
-				if err != nil {
-					l.logger.Error(err, "could not set deadline for listener", "id", id)
-				}
-			}
-
-			c, err := lis.Accept()
-			if os.IsTimeout(err) {
-				continue
-			}
-
-			l.acceptChan <- accept{
-				listenerID: id,
-				listener:   lis,
-				conn:       c,
-				err:        err,
-			}
+		l.acceptChan <- accept{
+			listenerID: id,
+			listener:   lis,
+			conn:       c,
+			err:        err,
 		}
 	}
+}
+
+func (l *multipleListeners) getID(lis net.Listener) string {
+	id := lis.Addr().String()
+	if withIDGetter, ok := lis.(interface {
+		ID() string
+	}); ok {
+		return withIDGetter.ID()
+	}
+
+	return id
 }

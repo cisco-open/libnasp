@@ -15,13 +15,18 @@ ignored = [
   "gopkg.in/fsnotify.v1",
   "gopkg.in/square/go-jose.v2", # Apache v2.0
   "github.com/cisco-open/nasp", # Apache v2.0
-  "emperror.dev/errors" # MIT license
+  "emperror.dev/errors", # MIT license
+  "golang.ngrok.com/muxado" # MIT license
 ]
 
 [header]
 ignoreFiles = [
   "*.pb.go",
   "istio_ca_client.go",
+]
+
+ignorePaths = [
+  "playground",
 ]
 
 template = """Copyright (c) :YEAR: Cisco and/or its affiliates. All rights reserved.

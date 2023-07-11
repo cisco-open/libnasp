@@ -17,38 +17,32 @@ package common
 import (
 	"encoding/json"
 	"io"
-	"sync"
 
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
-	"github.com/xtaci/smux"
 
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 )
 
-type ctrlStream struct {
+type messageHandler struct {
 	io.ReadWriteCloser
+	MessageHandlerRegistry
 
-	logger          logr.Logger
-	messageHandlers sync.Map
+	logger logr.Logger
 }
 
-func NewControlStream(str *smux.Stream, logger logr.Logger) api.ControlStream {
-	s := &ctrlStream{
-		ReadWriteCloser: str,
+func NewMessageHandler(str io.ReadWriteCloser, logger logr.Logger) api.MessageHandler {
+	s := &messageHandler{
+		ReadWriteCloser:        str,
+		MessageHandlerRegistry: NewMessageHandlerRegistry(),
 
-		logger:          logger,
-		messageHandlers: sync.Map{},
+		logger: logger,
 	}
 
 	return s
 }
 
-func (s *ctrlStream) AddMessageHandler(messageType api.MessageType, handler api.MessageHandler) {
-	s.messageHandlers.Store(messageType, handler)
-}
-
-func (s *ctrlStream) Handle() error {
+func (s *messageHandler) Handle() error {
 	s.logger.V(3).Info("handle control stream")
 
 	var msg api.Message
@@ -56,21 +50,16 @@ func (s *ctrlStream) Handle() error {
 	d := json.NewDecoder(s)
 	for {
 		if err := d.Decode(&msg); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
 			return errors.WrapIf(err, "could not decode message")
 		}
 
-		if err := s.handleMessage(msg); err != nil {
-			s.logger.Error(err, "error during message handling", append([]interface{}{"type", msg.Type}, errors.GetDetails(err)...)...)
-		}
+		go func(msg api.Message) {
+			if err := s.HandleMessage(msg); err != nil {
+				s.logger.Error(err, "error during message handling", append([]interface{}{"type", msg.Type}, errors.GetDetails(err)...)...)
+			}
+		}(msg)
 	}
-}
-
-func (s *ctrlStream) handleMessage(msg api.Message) error {
-	if v, ok := s.messageHandlers.Load(msg.Type); ok {
-		if handler, ok := v.(api.MessageHandler); ok {
-			return handler(msg.Data)
-		}
-	}
-
-	return errors.WithDetails(api.ErrInvalidMessageType, "type", msg.Type)
 }

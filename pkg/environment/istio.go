@@ -91,6 +91,54 @@ func (e *IstioEnvironment) GetDNSServiceDomain() string {
 	return e.PodNamespace + ".svc." + e.GetDNSDomain()
 }
 
+func (e *IstioEnvironment) GetLabels() map[string]string {
+	if e.Labels == nil {
+		e.Labels = map[string]string{}
+	}
+
+	return e.Labels
+}
+
+func (e *IstioEnvironment) GetPlatformMetadata() map[string]string {
+	if e.PlatformMetadata == nil {
+		e.PlatformMetadata = map[string]string{}
+	}
+
+	return e.PlatformMetadata
+}
+
+func (e *IstioEnvironment) GetAdditionalMetadata() map[string]string {
+	if e.AdditionalMetadata == nil {
+		e.AdditionalMetadata = map[string]string{}
+	}
+
+	return e.AdditionalMetadata
+}
+
+func (e *IstioEnvironment) GetAppContainers() []string {
+	if e.AppContainers == nil {
+		e.AppContainers = []string{}
+	}
+
+	return e.AppContainers
+}
+
+func (e *IstioEnvironment) GetInstanceIPs() []string {
+	if e.InstanceIPs == nil {
+		e.InstanceIPs = []string{}
+	}
+
+	return e.InstanceIPs
+}
+
+func (e *IstioEnvironment) GetSearchDomains() []string {
+	if e.SearchDomains == nil {
+		e.SearchDomains = []string{}
+	}
+
+	return e.SearchDomains
+}
+
 func (e *IstioEnvironment) Override(otherEnv IstioEnvironment) {
 	e.Type = otherEnv.Type
 	e.PodName = otherEnv.PodName

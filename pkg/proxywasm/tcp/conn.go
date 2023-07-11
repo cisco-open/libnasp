@@ -19,6 +19,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"emperror.dev/errors"
 
@@ -28,7 +29,10 @@ import (
 	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
 )
 
-const internalBufferSize = 16384
+const (
+	internalBufferSize      = 2048
+	internalWriteBufferSize = 4096
+)
 
 type wrappedConn struct {
 	net.Conn
@@ -40,7 +44,7 @@ type wrappedConn struct {
 	writeBuffer     api.IoBuffer
 	internalBuffer  []byte
 
-	connectionInfoSet bool
+	connectionInfoSet atomic.Bool
 
 	writeMu sync.Mutex
 	readMu  sync.Mutex
@@ -127,8 +131,13 @@ func (c *wrappedConn) read(b []byte) (int, error) {
 		return x, nil
 	}
 
+	if diff := cap(b) - cap(c.internalBuffer); diff > 0 {
+		c.internalBuffer = append(c.internalBuffer, make([]byte, diff)...)
+	}
+
 	// read from the underlying reader
 	n, err := c.Conn.Read(c.internalBuffer)
+	c.setConnectionState()
 	if n == 0 { // return if there is no more data
 		return n, err
 	}
@@ -175,12 +184,7 @@ func (c *wrappedConn) Write(b []byte) (int, error) {
 		return 0, io.EOF
 	}
 
-	if !c.connectionInfoSet {
-		if connectionState, ok := network.ConnectionStateFromNetConn(c); ok {
-			middleware.SetEnvoyConnectionInfo(connectionState, c.stream)
-			c.connectionInfoSet = true
-		}
-	}
+	c.setConnectionState()
 
 	n, err := c.writeBuffer.Write(b)
 	if err != nil {
@@ -198,12 +202,21 @@ func (c *wrappedConn) Write(b []byte) (int, error) {
 	}
 
 	for {
-		n1, err := io.Copy(c.Conn, io.LimitReader(c.writeBuffer, int64(internalBufferSize)))
+		n1, err := io.Copy(c.Conn, io.LimitReader(c.writeBuffer, int64(internalWriteBufferSize)))
 		if err != nil {
 			return 0, err
 		}
 		if n1 == 0 {
 			return n, nil
+		}
+	}
+}
+
+func (c *wrappedConn) setConnectionState() {
+	if !c.connectionInfoSet.Load() {
+		if connectionState, ok := network.ConnectionStateFromNetConn(c); ok {
+			middleware.SetEnvoyConnectionInfo(connectionState, c.stream)
+			c.connectionInfoSet.Store(true)
 		}
 	}
 }

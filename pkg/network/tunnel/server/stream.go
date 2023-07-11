@@ -15,57 +15,73 @@
 package server
 
 import (
-	"encoding/json"
+	"io"
 	"net"
 	"time"
 
 	"emperror.dev/errors"
-	"github.com/xtaci/smux"
+	"github.com/go-logr/logr"
 
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 	"github.com/cisco-open/nasp/pkg/network/tunnel/common"
 )
 
 type ctrlStream struct {
-	api.ControlStream
+	api.MessageHandler
 
 	session *session
-	stream  *smux.Stream
+	stream  io.ReadWriteCloser
+	logger  logr.Logger
 
 	lastPong time.Time
 
 	keepaliveTimer *time.Timer
+
+	user     api.User
+	metadata map[string]string
 }
 
-func NewControlStream(session *session, str *smux.Stream) api.ControlStream {
-	cs := common.NewControlStream(str, session.server.logger)
+func NewControlStream(session *session, str io.ReadWriteCloser, user api.User, metadata map[string]string) api.ControlStream {
+	mh := common.NewMessageHandler(str, session.Logger())
 
 	s := &ctrlStream{
-		ControlStream: cs,
+		MessageHandler: mh,
 
 		session: session,
 		stream:  str,
+		logger:  session.Logger(),
+
+		user:     user,
+		metadata: metadata,
 	}
 
-	cs.AddMessageHandler(api.AddPortMessageType, s.addPort)
-	cs.AddMessageHandler(api.PongMessageType, s.pong)
+	mh.AddMessageHandler(api.RequestPortMessageType, s.requestPort)
+	mh.AddMessageHandler(api.PongMessageType, s.pong)
 
 	go func() {
 		if err := s.keepalive(session.server.keepaliveTimeout); err != nil {
-			session.server.logger.Error(err, "keepalive error")
+			s.logger.Error(err, "keepalive error")
 		}
 	}()
 
 	return s
 }
 
+func (s *ctrlStream) GetMetadata() map[string]string {
+	return s.metadata
+}
+
+func (s *ctrlStream) GetUser() api.User {
+	return s.user
+}
+
 func (s *ctrlStream) Close() error {
 	if s.keepaliveTimer != nil {
 		stopped := s.keepaliveTimer.Stop()
-		s.session.server.logger.V(3).Info("stop keepalive timer", "stopped", stopped)
+		s.logger.V(3).Info("stop keepalive timer", "stopped", stopped)
 	}
 
-	return s.ControlStream.Close()
+	return s.MessageHandler.Close()
 }
 
 func (s *ctrlStream) keepalive(timeout time.Duration) error {
@@ -77,17 +93,19 @@ func (s *ctrlStream) keepalive(timeout time.Duration) error {
 		s.lastPong = time.Now()
 	}
 
-	s.session.server.logger.V(3).Info("send ping")
+	s.logger.V(3).Info("send ping")
 
 	s.keepaliveTimer = time.AfterFunc(time.Second*1, func() {
 		if err := s.keepalive(timeout); err != nil {
-			s.session.server.logger.Error(err, "keepalive error")
+			s.logger.Error(err, "keepalive error")
 		}
 	})
 
 	if time.Since(s.lastPong) > timeout {
-		s.session.server.logger.Info("ponged out", "timeout", timeout, "lastPont", s.lastPong)
-		s.Close()
+		s.logger.Info("ponged out", "timeout", timeout, "lastPont", s.lastPong)
+		if err := s.Close(); err != nil {
+			s.logger.Error(err, "error during stream close")
+		}
 
 		return nil
 	}
@@ -97,38 +115,35 @@ func (s *ctrlStream) keepalive(timeout time.Duration) error {
 	return err
 }
 
-func (s *ctrlStream) pong(msg []byte) error {
-	s.session.server.logger.V(3).Info("pong arrived")
+func (s *ctrlStream) pong(msg api.Message, params ...any) error {
+	s.logger.V(3).Info("pong arrived")
 
 	s.lastPong = time.Now()
 
 	return nil
 }
 
-func (s *ctrlStream) addPort(msg []byte) error {
-	var req api.AddPortRequestMessage
-	if err := json.Unmarshal(msg, &req); err != nil {
+func (s *ctrlStream) requestPort(msg api.Message, params ...any) error {
+	var req api.RequestPort
+	if err := msg.Decode(&req); err != nil {
 		return err
 	}
 
-	if req.ID == "" {
-		return nil
+	assignedPort, addPortErr := s.session.requestPort(req)
+	if addPortErr != nil {
+		addPortErr = errors.WrapIfWithDetails(addPortErr, "could not assign port", "portID", req.ID, "requestedPort", req.RequestedPort)
 	}
 
-	assignedPort := s.session.AddPort(req.ID, req.RequestedPort)
-	var addPortErr error
-	if assignedPort == 0 {
-		addPortErr = errors.NewWithDetails("could not assign port", "portID", req.ID, "requestedPort", req.RequestedPort)
-	}
-
-	_, _, err := api.SendMessage(s.stream, api.AddPortResponseMessageType, &api.AddPortResponseMessage{
+	_, _, err := api.SendMessage(s.stream, api.RequestPortMessageType, &api.RequestPortResponse{
 		Type:         "tcp",
 		ID:           req.ID,
+		Name:         req.Name,
 		AssignedPort: assignedPort,
 		Address: (&net.TCPAddr{
 			IP:   net.ParseIP("0.0.0.0"),
 			Port: assignedPort,
 		}).String(),
+		RequestedPort: req.RequestedPort,
 	})
 	if err != nil {
 		return errors.WrapIf(err, "could not send addPortResponse message")

@@ -15,210 +15,378 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"emperror.dev/errors"
+	"github.com/go-logr/logr"
 	"github.com/pborman/uuid"
-	"github.com/xtaci/smux"
+	"golang.ngrok.com/muxado"
 
 	"github.com/cisco-open/nasp/pkg/network/proxy"
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/nasp/pkg/network/tunnel/common"
 )
 
 type session struct {
+	common.MessageHandlerRegistry
+
 	server     *server
-	session    *smux.Session
+	session    muxado.Session
 	ctrlStream api.ControlStream
 
-	ports map[string]*port
+	id     string
+	logger logr.Logger
 
-	backChannels map[string]chan io.ReadWriteCloser
+	ports             sync.Map
+	backChannels      sync.Map
+	activeConnections uint32
 
-	mu  sync.Mutex
-	mu2 sync.RWMutex
+	ctx  context.Context
+	ctxc context.CancelFunc
 }
 
-func NewSession(srv *server, sess *smux.Session) *session {
-	return &session{
+func NewSession(srv *server, sess muxado.Session) *session {
+	id := uuid.New()
+
+	s := &session{
+		MessageHandlerRegistry: common.NewMessageHandlerRegistry(),
+
 		server:       srv,
 		session:      sess,
-		ports:        make(map[string]*port),
-		mu:           sync.Mutex{},
-		backChannels: make(map[string]chan io.ReadWriteCloser),
+		ports:        sync.Map{},
+		backChannels: sync.Map{},
+
+		id:     id,
+		logger: srv.logger.WithValues("remoteAddr", sess.RemoteAddr().String(), "sessionID", id),
 	}
+
+	s.AddMessageHandler(api.OpenControlStreamMessageType, s.openControlStream)
+	s.AddMessageHandler(api.OpenTCPStreamMessageType, s.openTCPStream)
+
+	return s
 }
 
-func (s *session) Handle() error {
-	for {
-		stream, err := s.session.AcceptStream()
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		if err != nil {
-			return errors.WrapIf(err, "could not accept stream")
-		}
+func (s *session) ID() string {
+	return s.id
+}
 
-		go func() {
-			if err := s.handleStream(stream); err != nil && !errors.Is(err, io.EOF) {
-				s.server.logger.Error(err, "error during session handling")
+func (s *session) Logger() logr.Logger {
+	return s.logger
+}
+
+func (s *session) Handle(ctx context.Context) error {
+	s.ctx, s.ctxc = context.WithCancel(ctx)
+
+	go func() {
+		t := time.NewTicker(time.Second * 1)
+		defer t.Stop()
+
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-t.C:
+				if s.ctrlStream != nil {
+					s.logger.V(1).Info("active connections", "count", atomic.LoadUint32(&s.activeConnections))
+				}
 			}
-		}()
+		}
+	}()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return nil
+		default:
+			stream, err := s.session.Accept()
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+			if errc, _ := muxado.GetError(errors.Cause(err)); errc == muxado.PeerEOF || errc == muxado.SessionClosed {
+				return nil
+			}
+			if err != nil {
+				return errors.WrapIf(err, "could not accept stream")
+			}
+
+			go func() {
+				if err := s.handleStream(stream); err != nil && !errors.Is(err, io.EOF) {
+					s.logger.Error(err, "error during session handling")
+				}
+			}()
+		}
 	}
 }
 
 func (s *session) Close() error {
-	s.server.logger.V(2).Info("close session")
-
-	s.mu.Lock()
-	for p, mp := range s.ports {
-		s.server.logger.V(2).Info("release port", "portID", mp.id, "assignedPort", mp.assignedPort)
-		s.server.portProvider.ReleasePort(mp.assignedPort)
-		if err := mp.Close(); err != nil {
-			s.server.logger.Error(err, "could not gracefully close managed port")
-		}
-		delete(s.ports, p)
+	if s.ctxc == nil {
+		return nil
 	}
-	s.mu.Unlock()
+
+	s.logger.V(2).Info("close session")
+
+	s.ports.Range(func(key, val any) bool {
+		if mp, ok := val.(*port); ok {
+			s.logger.V(2).Info("release port", "portID", mp.req.ID, "assignedPort", mp.assignedPort)
+			s.server.portProvider.ReleasePort(mp.assignedPort)
+			if err := mp.Close(); err != nil {
+				s.logger.Error(err, "could not gracefully close managed port")
+			}
+			s.ports.Delete(key)
+		}
+
+		return true
+	})
 
 	if s.ctrlStream != nil {
 		if err := s.ctrlStream.Close(); err != nil {
-			s.server.logger.Error(err, "could not close control stream")
+			s.logger.Error(err, "could not close control stream")
 		}
 	}
 
-	return s.session.Close()
+	s.ctxc()
+	s.ctxc = nil
+
+	err := s.session.Close()
+	errc, err := muxado.GetError(err)
+	if errc == muxado.SessionClosed {
+		err = nil
+	}
+
+	return err
 }
 
-func (s *session) handleStream(stream *smux.Stream) error {
-	s.server.logger.V(3).Info("handle stream", "id", stream.ID())
-
-	var msg api.Message
-	if err := json.NewDecoder(stream).Decode(&msg); err != nil {
-		return err
-	}
-
-	switch msg.Type { //nolint:exhaustive
-	case api.OpenControlStreamMessageType:
-		if s.ctrlStream != nil {
-			if _, _, err := api.SendMessage(stream, api.ErrCtrlStreamAlreadyExistsMessageType, nil); err != nil {
-				return errors.WrapIfWithDetails(err, "could not send message", "type", api.ErrCtrlStreamAlreadyExistsMessageType)
-			}
-
-			return errors.New("control stream already established")
-		}
-
-		if _, _, err := api.SendMessage(stream, api.StreamOpenedMessageType, nil); err != nil {
-			return errors.WrapIfWithDetails(err, "could not send message", "type", api.StreamOpenedMessageType)
-		}
-
-		s.ctrlStream = NewControlStream(s, stream)
-
-		return s.ctrlStream.Handle()
-	case api.OpenTCPStreamMessageType:
-		var m api.OpenTCPStreamMessage
-		if err := msg.Decode(&m); err != nil {
-			return errors.WrapIfWithDetails(err, "could not decode message", "type", api.OpenTCPStreamMessageType)
-		}
-
-		var ch chan io.ReadWriteCloser
-		var ok bool
-		s.mu2.Lock()
-		if ch, ok = s.backChannels[m.ID]; ok {
-			delete(s.backChannels, m.ID)
-		}
-		s.mu2.Unlock()
-
-		if !ok {
-			if _, _, err := api.SendMessage(stream, api.ErrInvalidStreamIDMessageType, nil); err != nil {
-				return errors.WrapIfWithDetails(err, "could not send message", "type", api.ErrInvalidStreamIDMessageType)
-			}
-
-			return errors.WithStack(api.ErrInvalidStreamID)
-		}
-
-		if _, _, err := api.SendMessage(stream, api.StreamOpenedMessageType, nil); err != nil {
-			return errors.WrapIfWithDetails(err, "could not send message", "type", api.StreamOpenedMessageType)
-		}
-
-		ch <- stream
-
-		return nil
-	default:
-		if _, _, err := api.SendMessage(stream, api.ErrInvalidStreamTypeMessageType, nil); err != nil {
-			return errors.WrapIfWithDetails(err, "could not send message", "type", api.ErrInvalidStreamTypeMessageType)
-		}
-
-		return errors.WithStack(api.ErrInvalidStreamType)
-	}
-}
-
-func (s *session) AddPort(id string, requestedPort int) int {
+func (s *session) requestPort(req api.RequestPort) (int, error) {
 	var assignedPort int
 
-	if requestedPort > 0 {
-		if s.server.portProvider.GetPort(requestedPort) {
-			assignedPort = requestedPort
+	logger := s.logger.WithValues("portID", req.ID, "requestedPort", req.RequestedPort)
+
+	logger.V(2).Info("request port")
+
+	if req.RequestedPort > 0 {
+		if s.server.portProvider.GetPort(req.RequestedPort) {
+			assignedPort = req.RequestedPort
+		}
+		if assignedPort == 0 {
+			return assignedPort, api.ErrRequestedPortNoAvail
 		}
 	} else {
 		assignedPort = s.server.portProvider.GetFreePort()
 	}
 
 	if assignedPort == 0 {
-		return 0
+		return 0, api.ErrFeePortNoAvail
 	}
 
-	s.server.logger.V(2).Info("get free port", "portID", id, "assignedPort", assignedPort)
+	logger.V(2).Info("port assigned", "assignedPort", assignedPort)
 
-	mp := NewPort(s, id, assignedPort)
+	mp := NewPort(s, req, assignedPort)
 
-	s.mu.Lock()
-	s.ports[id] = mp
-	s.mu.Unlock()
+	s.ports.Store(req.Name, mp)
+
+	l, err := mp.CreateListener()
+	if err != nil {
+		return 0, err
+	}
 
 	go func() {
-		if err := mp.Listen(); err != nil {
-			s.server.logger.Error(err, "could not listen")
+		if err := mp.Listen(l); err != nil {
+			s.logger.Error(err, "could not listen")
 		}
 	}()
 
-	return assignedPort
+	return assignedPort, nil
 }
 
 func (s *session) RequestConn(portID string, c net.Conn) error {
 	id := uuid.NewUUID().String()
-	_, _, err := api.SendMessage(s.ctrlStream, api.RequestConnectionMessageType, &api.RequestConnectionMessage{
+
+	logger := s.logger.WithValues("connectionID", id, "portID", portID, "remoteAddr", c.RemoteAddr().String())
+
+	ch := make(chan io.ReadWriteCloser)
+	s.backChannels.Store(id, ch)
+
+	logger.V(2).Info("request connection")
+
+	m, _, err := api.SendMessage(s.ctrlStream, api.RequestConnectionMessageType, &api.ConnectionRequest{
 		PortID:        portID,
 		Identifier:    id,
 		RemoteAddress: c.RemoteAddr().String(),
 		LocalAddress:  c.LocalAddr().String(),
 	})
 	if err != nil {
-		return errors.WrapIfWithDetails(err, "could not send message", "type", api.RequestConnectionMessageType)
+		s.backChannels.Delete(id)
+
+		return errors.WrapIfWithDetails(err, "could not send message", "type", m.Type)
 	}
-
-	ch := make(chan io.ReadWriteCloser, 1)
-
-	s.mu2.Lock()
-	s.backChannels[id] = ch
-	s.mu2.Unlock()
 
 	var tcpStream io.ReadWriteCloser
 
 	select {
 	case tcpStream = <-ch:
 	case <-time.After(s.server.sessionTimeout):
-		s.mu2.Lock()
-		delete(s.backChannels, id)
-		s.mu2.Unlock()
+		s.backChannels.Delete(id)
 
 		return errors.WithStackIf(api.ErrSessionTimeout)
 	}
 
-	go proxy.New(c, tcpStream).Start()
+	go func() {
+		atomic.AddUint32(&s.activeConnections, 1)
+		logger.V(2).Info("start proxying")
+		defer func() {
+			logger.V(2).Info("proxying stopped")
+			logger.V(1).Info("stream closed")
+			atomic.AddUint32(&s.activeConnections, ^uint32(0))
+		}()
+
+		proxy.New(c, tcpStream).Start()
+	}()
 
 	return err
+}
+
+func (s *session) handleStream(stream io.ReadWriteCloser) error {
+	s.logger.V(3).Info("handle stream")
+
+	var msg api.Message
+	if err := json.NewDecoder(stream).Decode(&msg); err != nil {
+		// close stream in case of json decode error
+		if err := s.Close(); err != nil {
+			s.logger.Error(err, "error during stream close")
+		}
+		return err
+	}
+
+	if err := s.HandleMessage(msg, stream); err != nil {
+		if s.ctrlStream == nil {
+			if err := s.Close(); err != nil {
+				s.logger.Error(err, "error during stream close")
+			}
+		}
+		if errors.Cause(err).Error() != "stream closed" && errors.Cause(err).Error() != "session closed" {
+			s.logger.Error(err, "error during message handling", append([]interface{}{"type", msg.Type}, errors.GetDetails(err)...)...)
+		}
+	}
+
+	return nil
+}
+
+func (s *session) openTCPStream(msg api.Message, params ...any) error {
+	var m api.OpenTCPStreamRequest
+	if err := msg.Decode(&m); err != nil {
+		if err := s.Close(); err != nil {
+			s.logger.Error(err, "error during stream close")
+		}
+
+		return errors.WrapIfWithDetails(err, "could not decode message", "type", api.OpenTCPStreamMessageType)
+	}
+
+	logger := s.logger.WithValues("connectionID", m.ID)
+
+	logger.V(1).Info("open tcp stream")
+
+	var stream io.ReadWriteCloser
+	if p0, ok := params[0].(io.ReadWriteCloser); ok {
+		stream = p0
+	} else {
+		return errors.WrapIf(api.ErrInvalidParam, "could not open tcp stream")
+	}
+
+	var ch chan io.ReadWriteCloser
+	var ok bool
+
+	if rch, found := s.backChannels.LoadAndDelete(m.ID); found {
+		ch, ok = rch.(chan io.ReadWriteCloser)
+	}
+
+	response := api.OpenTCPStreamResponse{}
+
+	if !ok {
+		response.SetError(api.ErrInvalidStreamIDErrorType, api.ErrInvalidStreamID)
+
+		if m, _, err := api.SendMessage(stream, api.OpenTCPStreamMessageType, response); err != nil {
+			return errors.WrapIfWithDetails(err, "could not send response", "type", m.Type)
+		}
+
+		logger.Error(response.Error, "miafasz")
+
+		return errors.WithStack(response.Error)
+	}
+
+	if m, _, err := api.SendMessage(stream, api.OpenTCPStreamMessageType, response); err != nil {
+		return errors.WrapIfWithDetails(err, "could not send response", "type", m.Type)
+	}
+
+	ch <- stream
+
+	logger.V(1).Info("tcp stream opened")
+
+	return nil
+}
+
+func (s *session) openControlStream(msg api.Message, params ...any) error {
+	var m api.OpenControlStreamRequest
+	if err := msg.Decode(&m); err != nil {
+		if err := s.Close(); err != nil {
+			s.logger.Error(err, "error during stream close")
+		}
+
+		return errors.WrapIfWithDetails(err, "could not decode message", "type", api.OpenControlStreamMessageType)
+	}
+
+	s.logger.V(1).Info("open control stream")
+
+	var stream io.ReadWriteCloser
+	if p0, ok := params[0].(io.ReadWriteCloser); ok {
+		stream = p0
+	} else {
+		return errors.WrapIf(api.ErrInvalidParam, "could not open control stream")
+	}
+
+	response := api.OpenControlStreamResponse{}
+
+	if s.ctrlStream != nil {
+		response.SetError(api.ErrCtrlStreamAlreadyExistsErrorType, api.ErrCtrlStreamAlreadyExists)
+	}
+
+	var authError error
+	var user api.User
+	if response.Error == nil && s.server.authenticator != nil {
+		ok, u, err := s.server.authenticator.Authenticate(context.Background(), m.BearerToken)
+		if err != nil {
+			authError = errors.WrapIfWithDetails(err, "could not authenticate", "type", api.OpenControlStreamMessageType)
+		} else if !ok {
+			authError = errors.WrapIfWithDetails(err, "auth failed", "type", api.OpenControlStreamMessageType)
+		}
+
+		user = u
+	}
+
+	if authError != nil {
+		response.SetError(api.ErrAuthenticationFailureErrorType, authError)
+	}
+
+	if m, _, err := api.SendMessage(stream, api.OpenControlStreamMessageType, response); err != nil {
+		return errors.WrapIfWithDetails(err, "could not send message", "type", m.Type)
+	}
+
+	if response.Error != nil {
+		if err := s.Close(); err != nil {
+			s.logger.Error(err, "error during stream close")
+		}
+
+		return response.Error
+	}
+
+	s.logger.Info("control stream opened")
+
+	s.ctrlStream = NewControlStream(s, stream, user, m.Metadata)
+
+	return s.ctrlStream.Handle()
 }

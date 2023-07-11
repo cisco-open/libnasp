@@ -49,7 +49,7 @@ func GetBaseContext(id string) api.Context {
 
 func NewContext(rootID string) api.Context {
 	c := &context{
-		PropertyHolder: dotn.New(),
+		PropertyHolder: dotn.NewConcurrent(),
 
 		id:              1,
 		latestContextID: 1,

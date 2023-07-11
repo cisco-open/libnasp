@@ -1,0 +1,8 @@
+apiVersion: v2
+name: bifrost
+description: network connection tunneling using TCP multiplexing
+home: https://eti.cisco.com/
+
+type: application
+version: 0.0.1
+appVersion: "0.0.1"

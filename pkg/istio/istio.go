@@ -34,16 +34,21 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/banzaicloud/operator-tools/pkg/utils"
 	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero"
+	"github.com/cisco-open/nasp/components/bifrost/pkg/k8s"
 	"github.com/cisco-open/nasp/pkg/ca"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
 	"github.com/cisco-open/nasp/pkg/environment"
 	"github.com/cisco-open/nasp/pkg/istio/discovery"
 	"github.com/cisco-open/nasp/pkg/istio/filters"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
+	"github.com/cisco-open/nasp/pkg/k8s/labels"
 	k8slabels "github.com/cisco-open/nasp/pkg/k8s/labels"
 	"github.com/cisco-open/nasp/pkg/network"
 	"github.com/cisco-open/nasp/pkg/network/listener"
+	tapi "github.com/cisco-open/nasp/pkg/network/tunnel/api"
+	tclient "github.com/cisco-open/nasp/pkg/network/tunnel/client"
 	"github.com/cisco-open/nasp/pkg/proxywasm"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 	pwgrpc "github.com/cisco-open/nasp/pkg/proxywasm/grpc"
@@ -51,6 +56,10 @@ import (
 	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
 	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
 )
+
+var DefaultNetDialer = &net.Dialer{
+	Timeout: time.Second * 10,
+}
 
 var DefaultIstioIntegrationHandlerConfig = IstioIntegrationHandlerConfig{
 	Enabled:        true,
@@ -120,6 +129,11 @@ type IstioIntegrationHandlerConfig struct {
 	ClientFilters       []api.WasmPluginConfig
 	IstioCAConfigGetter IstioCAConfigGetterFunc
 	DefaultWASMRuntime  string
+
+	BifrostAddress              string
+	ExposeMetricsThroughBifrost *bool
+
+	NetDialer *net.Dialer
 }
 
 type PushgatewayConfig struct {
@@ -159,6 +173,16 @@ func (c *IstioIntegrationHandlerConfig) SetDefaults() {
 	if c.DefaultWASMRuntime == "" {
 		c.DefaultWASMRuntime = defaultWASMRuntime
 	}
+	if c.BifrostAddress == "" {
+		c.BifrostAddress = os.Getenv("BIFROST_ADDRESS")
+	}
+	if c.ExposeMetricsThroughBifrost == nil {
+		c.ExposeMetricsThroughBifrost = utils.BoolPointer(true)
+	}
+
+	if c.NetDialer == nil {
+		c.NetDialer = DefaultNetDialer
+	}
 }
 
 type istioIntegrationHandler struct {
@@ -172,15 +196,18 @@ type istioIntegrationHandler struct {
 	environment   *environment.IstioEnvironment
 
 	discoveryClient discovery.DiscoveryClient
+	tunnelClient    tapi.Client
 }
 
 type IstioIntegrationHandler interface {
 	Run(context.Context) error
 	GetGRPCDialOptions() ([]grpc.DialOption, error)
+	ServeHTTP(ctx context.Context, ln net.Listener, listenAddress string, handler http.Handler) error
 	ListenAndServe(ctx context.Context, listenAddress string, handler http.Handler) error
 	GetHTTPTransport(transport http.RoundTripper) (http.RoundTripper, error)
 	GetTCPListener(l net.Listener) (net.Listener, error)
-	GetTCPDialer() (itcp.Dialer, error)
+	GetVirtualTCPListener(requestedPort int, targetPort int, name string) (net.Listener, error)
+	GetTCPDialer(d *net.Dialer) (itcp.Dialer, error)
 	GetDiscoveryClient() discovery.DiscoveryClient
 }
 
@@ -232,6 +259,11 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 		}
 
 		e.Labels[k8slabels.NASPMonitoringPathLabel] = base64.RawURLEncoding.EncodeToString([]byte(config.MetricsPath))
+	}
+
+	// turn off auto registration for now if bifrost is used
+	if config.BifrostAddress != "" {
+		delete(e.AdditionalMetadata, "AUTO_REGISTER_GROUP")
 	}
 
 	baseContext.Set("node", e.GetNodePropertiesFromEnvironment())
@@ -322,6 +354,15 @@ func (h *istioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOption, error
 }
 
 func (h *istioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddress string, handler http.Handler) error {
+	ln, err := net.Listen("tcp", listenAddress)
+	if err != nil {
+		return err
+	}
+
+	return h.ServeHTTP(ctx, ln, listenAddress, handler)
+}
+
+func (h *istioIntegrationHandler) ServeHTTP(ctx context.Context, ln net.Listener, listenAddress string, handler http.Handler) error {
 	filters := h.config.ServerFilters
 	if len(filters) == 0 {
 		filters = h.defaultServerFilters()
@@ -344,7 +385,7 @@ func (h *istioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 	certPool.AppendCertsFromPEM(h.caClient.GetCAPem())
 
 	tlsConfig := &tls.Config{
-		ClientAuth: tls.RequestClientCert,
+		ClientAuth: tls.RequireAnyClientCert,
 		GetCertificate: func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
 			cert, err := h.caClient.GetCertificate("", time.Hour*24)
 			if err != nil {
@@ -359,11 +400,6 @@ func (h *istioIntegrationHandler) ListenAndServe(ctx context.Context, listenAddr
 			"http/1.1",
 			"http/1.0",
 		},
-	}
-
-	ln, err := net.Listen("tcp", listenAddress)
-	if err != nil {
-		return err
 	}
 
 	go func() {
@@ -402,6 +438,36 @@ func (h *istioIntegrationHandler) Run(ctx context.Context) error {
 		return err
 	}
 
+	if h.config.BifrostAddress != "" {
+		dialer, err := h.GetTCPDialer(nil)
+		if err != nil {
+			return errors.WrapIf(err, "could not get NASP tcp dialer")
+		}
+
+		envLabels := h.environment.GetLabels()
+		envLabels[k8s.ClientServiceNameLabel] = labels.IstioCanonicalServiceName(h.environment.Labels, h.environment.WorkloadName)
+
+		options := []tclient.ClientOption{
+			tclient.ClientWithDialer(dialer),
+			tclient.ClientWithLogger(h.logger.WithName("bifrost-client")),
+			tclient.ClientWithMetadata(envLabels),
+		}
+
+		if getter, ok := h.caClient.(interface {
+			GetConfig() istio_ca.IstioCAClientConfig
+		}); ok {
+			options = append(options, tclient.ClientWithBearerToken(string(getter.GetConfig().Token)))
+		}
+
+		h.tunnelClient = tclient.NewClient(h.config.BifrostAddress, options...)
+
+		go func() {
+			if err := h.tunnelClient.Connect(ctx); err != nil {
+				h.logger.Error(err, "bifrost client could not stop gracefully")
+			}
+		}()
+	}
+
 	if h.config.PushgatewayConfig == nil {
 		go h.RunMetricsServer(ctx)
 	} else {
@@ -414,12 +480,49 @@ func (h *istioIntegrationHandler) Run(ctx context.Context) error {
 	return nil
 }
 
+func (h *istioIntegrationHandler) GetVirtualTCPListener(requestedPort int, targetPort int, name string) (net.Listener, error) {
+	if h.tunnelClient == nil {
+		return nil, errors.New("bifrost client is not initialized")
+	}
+
+	opts := &tclient.ManagedPortOptions{}
+	opts.SetRequestedPort(requestedPort)
+	opts.SetTargetPort(targetPort)
+	opts.SetName(name)
+
+	return h.tunnelClient.GetTCPListener(opts)
+}
+
 func (h *istioIntegrationHandler) RunMetricsServer(ctx context.Context) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(h.config.MetricsPath, h.metricHandler.HTTPHandler().ServeHTTP)
 	s := http.Server{Addr: h.config.MetricsAddress, Handler: mux, ReadHeaderTimeout: time.Second * 60}
+
+	ln := listener.NewMultiListener()
+	if s.Addr != "" {
+		tcpln, err := net.Listen("tcp", s.Addr)
+		if err != nil {
+			h.logger.Error(err, "could not listen on tcp port")
+		} else {
+			if err := ln.AddListener(tcpln); err != nil {
+				h.logger.Error(err, "could not add tcp listener")
+			}
+		}
+	}
+	if h.config.BifrostAddress != "" && utils.PointerToBool(h.config.ExposeMetricsThroughBifrost) {
+		if l, err := h.GetVirtualTCPListener(0, 16090, "http-metrics"); err != nil {
+			h.logger.Error(err, "could not create virtual listener")
+		} else {
+			if err := ln.AddListener(l); err != nil {
+				h.logger.Error(err, "could not add virtual listener")
+			}
+		}
+	}
+
 	go func() {
-		_ = s.ListenAndServe()
+		if err := h.ServeHTTP(ctx, ln, s.Addr, mux); err != nil {
+			h.logger.Error(err, "error during serving http")
+		}
 	}()
 
 	<-ctx.Done()
@@ -561,7 +664,11 @@ func (h *istioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, 
 	return tcp.WrapListener(l, streamHandler), nil
 }
 
-func (h *istioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error) {
+func (h *istioIntegrationHandler) GetTCPDialer(dialer *net.Dialer) (itcp.Dialer, error) {
+	if dialer == nil {
+		dialer = h.config.NetDialer
+	}
+
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(h.caClient.GetCAPem())
 
@@ -587,7 +694,7 @@ func (h *istioIntegrationHandler) GetTCPDialer() (itcp.Dialer, error) {
 		return nil, errors.Wrap(err, "could not get stream handler")
 	}
 
-	return itcp.NewTCPDialer(streamHandler, tlsConfig, h.discoveryClient), nil
+	return itcp.NewTCPDialer(streamHandler, tlsConfig, h.discoveryClient, dialer), nil
 }
 
 func (h *istioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConfig {

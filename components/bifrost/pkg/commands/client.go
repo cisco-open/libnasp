@@ -26,10 +26,11 @@ import (
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/klog/v2"
 
+	"github.com/cisco-open/nasp/components/bifrost/pkg/k8s"
 	"github.com/cisco-open/nasp/pkg/istio"
-	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
 	"github.com/cisco-open/nasp/pkg/network/proxy"
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 	"github.com/cisco-open/nasp/pkg/network/tunnel/client"
@@ -40,10 +41,6 @@ var ErrLocalAddressNotSpecified = errors.New("at least one local address must be
 var addrRegex = regexp.MustCompile(`^((\d+):)?(.*):(\d+)$`)
 
 func NewClientCommand() *cobra.Command {
-	var serverAddress string
-	localAddresses := []string{}
-	var naspSupportEnabled bool
-
 	logger := klog.Background()
 
 	cmd := &cobra.Command{
@@ -53,100 +50,168 @@ func NewClientCommand() *cobra.Command {
 			cmd.SilenceErrors = true
 			cmd.SilenceUsage = true
 
+			localAddresses := viper.GetStringSlice("local-address")
+			serverAddress := viper.GetString("server-address")
+			naspEnabled := viper.GetBool("with-nasp")
+			directClient := !viper.GetBool("with-nasp-bifrost")
+			authToken := viper.GetString("auth-token")
+			k8sServiceName := viper.GetString("k8s-service-name")
+			labels := viper.GetStringMapString("label")
+
 			if len(localAddresses) == 0 {
 				return ErrLocalAddressNotSpecified
 			}
 
-			options := []client.ClientOption{client.ClientWithLogger(logger)}
+			ctx := context.Background()
 
-			var dialer itcp.Dialer
-			dialer = &net.Dialer{
-				Timeout: time.Second * 5,
+			netDialer := &net.Dialer{
+				Timeout: time.Second * 10,
 			}
 
-			if naspSupportEnabled {
+			var tclient TunnelClient
+			var dialer api.Dialer = netDialer
+
+			if naspEnabled {
 				istioConfig := istio.DefaultIstioIntegrationHandlerConfig
+				if !directClient {
+					istioConfig.BifrostAddress = serverAddress
+				}
+				istioConfig.NetDialer = netDialer
 				ih, err := istio.NewIstioIntegrationHandler(&istioConfig, logger)
 				if err != nil {
 					return errors.WrapIf(err, "could not instantiate NASP istio integration handler")
 				}
-				dialer, err = ih.GetTCPDialer()
+				tclient = ih
+
+				if err := ih.Run(ctx); err != nil {
+					return errors.WrapIf(err, "could not run istio integration handler")
+				}
+
+				dialer, err = ih.GetTCPDialer(netDialer)
 				if err != nil {
 					return errors.WrapIf(err, "could not get NASP tcp dialer")
 				}
 			}
 
-			options = append(options, client.ClientWithDialer(dialer))
-
-			c := client.NewClient(serverAddress, options...)
-			go func() {
-				if err := c.Connect(context.Background()); err != nil {
-					panic(err)
+			if !naspEnabled || directClient {
+				opts := []client.ClientOption{
+					client.ClientWithLogger(logger),
+					client.ClientWithDialer(dialer),
 				}
-			}()
-
-			wg := sync.WaitGroup{}
-
-			for k, addr := range localAddresses {
-				var requestedPort int
-				v := addrRegex.FindStringSubmatch(addr)
-				if len(v) < 5 {
-					logger.Info("invalid local address", "address", addr)
-					continue
-				}
-				if v, err := strconv.Atoi(v[2]); err == nil {
-					requestedPort = v
-				}
-				addr = fmt.Sprintf("%s:%s", v[3], v[4])
-				tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
-				if err != nil {
-					return err
+				if authToken != "" {
+					opts = append(opts, client.ClientWithBearerToken(authToken))
 				}
 
-				name := fmt.Sprintf("port-%d", k+1)
-
-				l, err := c.AddTCPPort(name, requestedPort)
-				if err != nil {
-					return err
+				if k8sServiceName != "" {
+					labels[k8s.ClientServiceNameLabel] = k8sServiceName
 				}
 
-				wg.Add(1)
-				go func(logger logr.Logger) {
-					logger.Info("start proxying", "destination", tcpAddr.String())
-					defer func() {
-						logger.Info("proxying stopped")
-						wg.Done()
-					}()
-					(&proxyclient{
-						Listener: l,
+				opts = append(opts, client.ClientWithMetadata(labels))
 
-						logger:  logger,
-						tcpAddr: tcpAddr,
-					}).Run()
-				}(logger.WithName(name))
+				c := client.NewClient(serverAddress, opts...)
+				go func() {
+					if err := c.Connect(context.Background()); err != nil {
+						panic(err)
+					}
+				}()
+
+				tclient = &tunnelClient{
+					client: c,
+				}
 			}
 
-			wg.Wait()
-
-			return nil
+			return runProxies(ctx, localAddresses, dialer, tclient, logger)
 		},
 	}
 
-	cmd.Flags().StringVarP(&serverAddress, "server-address", "s", "127.0.0.1:8001", "Server address")
-	cmd.Flags().StringSliceVarP(&localAddresses, "local-address", "l", []string{}, "Local address to expose")
-	cmd.Flags().BoolVar(&naspSupportEnabled, "with-nasp-support", false, "Enables NASP support")
+	cmd.Flags().StringP("server-address", "s", "127.0.0.1:8001", "Server address")
+	cmd.Flags().StringSliceP("local-address", "l", []string{}, "Local address to expose")
+	cmd.Flags().Bool("with-nasp", false, "Whether to use Nasp")
+	cmd.Flags().Bool("with-nasp-bifrost", true, "Whether to use Nasp internal bifrost client or direct client")
+	cmd.Flags().String("auth-token", "", "Bifrost authentication token")
+	cmd.Flags().String("k8s-service-name", "", "K8s service name")
+	cmd.Flags().StringToString("label", nil, "Labels associated with the workload")
+
+	if err := viper.BindPFlags(cmd.Flags()); err != nil {
+		panic(err)
+	}
 
 	return cmd
+}
+
+func runProxies(ctx context.Context, localAddresses []string, dialer api.Dialer, tclient TunnelClient, logger logr.Logger) error {
+	wg := sync.WaitGroup{}
+
+	for k, addr := range localAddresses {
+		var requestedPort int
+		var targetPort int
+		v := addrRegex.FindStringSubmatch(addr)
+		if len(v) < 5 {
+			logger.Info("invalid local address", "address", addr)
+			continue
+		}
+		if v, err := strconv.Atoi(v[2]); err == nil {
+			requestedPort = v
+		}
+		if v, err := strconv.Atoi(v[4]); err == nil {
+			targetPort = v
+		}
+		addr = fmt.Sprintf("%s:%s", v[3], v[4])
+		tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
+		if err != nil {
+			return err
+		}
+
+		name := fmt.Sprintf("port-%d", k+1)
+
+		l, err := tclient.GetVirtualTCPListener(requestedPort, targetPort, name)
+		if err != nil {
+			return err
+		}
+
+		wg.Add(1)
+		go func(logger logr.Logger) {
+			logger.Info("start proxy", "destination", tcpAddr.String())
+			defer func() {
+				logger.Info("proxying stopped")
+				wg.Done()
+			}()
+			(&proxyclient{
+				Listener: l,
+
+				dialer:  dialer,
+				logger:  logger,
+				tcpAddr: tcpAddr,
+			}).Run(ctx)
+		}(logger.WithName(name))
+	}
+
+	wg.Wait()
+
+	return nil
+}
+
+type TunnelClient interface {
+	GetVirtualTCPListener(requestedPort int, targetPort int, name string) (net.Listener, error)
+}
+
+type tunnelClient struct {
+	client api.Client
+}
+
+func (c *tunnelClient) GetVirtualTCPListener(requestedPort int, targetPort int, name string) (net.Listener, error) {
+	return c.client.GetTCPListener((&client.ManagedPortOptions{}).SetRequestedPort(requestedPort).SetTargetPort(targetPort).SetName(name))
 }
 
 type proxyclient struct {
 	net.Listener
 
+	dialer  api.Dialer
 	logger  logr.Logger
 	tcpAddr *net.TCPAddr
 }
 
-func (p *proxyclient) Run() {
+func (p *proxyclient) Run(ctx context.Context) {
 	for {
 		rconn, err := p.Listener.Accept()
 		if err != nil {
@@ -157,7 +222,7 @@ func (p *proxyclient) Run() {
 			continue
 		}
 
-		lconn, err := net.DialTCP("tcp", nil, p.tcpAddr)
+		lconn, err := p.dialer.DialContext(ctx, "tcp", p.tcpAddr.String())
 		if err != nil {
 			p.logger.Error(err, "could not dial")
 			rconn.Close()

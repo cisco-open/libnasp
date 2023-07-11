@@ -24,18 +24,36 @@ import (
 type proxy struct {
 	lconn, rconn io.ReadWriteCloser
 
-	lclosed, rclosed bool
+	mu     sync.Mutex
+	closel sync.Once
+	closer sync.Once
 
-	mu sync.Mutex
+	bufferSize int
 }
 
-func New(lconn, rconn io.ReadWriteCloser) *proxy {
-	return &proxy{
+type ProxyOption func(*proxy)
+
+func WithBufferSize(size int) ProxyOption {
+	return func(p *proxy) {
+		p.bufferSize = size
+	}
+}
+
+func New(lconn, rconn io.ReadWriteCloser, options ...ProxyOption) *proxy {
+	p := &proxy{
 		lconn: lconn,
 		rconn: rconn,
 
 		mu: sync.Mutex{},
+
+		bufferSize: 4096,
 	}
+
+	for _, option := range options {
+		option(p)
+	}
+
+	return p
 }
 
 func (p *proxy) Start() {
@@ -43,62 +61,41 @@ func (p *proxy) Start() {
 	wg.Add(2)
 
 	go func() {
-		_ = p.proxy(&wg, p.lconn, p.rconn)
-		_ = p.closeConnections()
+		defer wg.Done()
+		_ = p.proxy(p.lconn, p.rconn)
+
+		p.closer.Do(func() {
+			_ = p.close(p.rconn)
+		})
 	}()
 
 	go func() {
-		_ = p.proxy(&wg, p.rconn, p.lconn)
-		_ = p.closeConnections()
+		defer wg.Done()
+		_ = p.proxy(p.rconn, p.lconn)
+
+		p.closel.Do(func() {
+			_ = p.close(p.lconn)
+		})
 	}()
 
 	wg.Wait()
 }
 
-func (p *proxy) closeConnections() error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if !p.lclosed {
-		if err := p.lconn.Close(); err != nil {
-			return err
-		}
-		p.lclosed = true
+func (p *proxy) close(conn io.ReadWriteCloser) error {
+	if d, ok := conn.(interface {
+		CloseWrite() error
+	}); ok {
+		return d.CloseWrite()
 	}
 
-	if !p.rclosed {
-		if err := p.rconn.Close(); err != nil {
-			return err
-		}
-		p.rclosed = true
-	}
-
-	return nil
+	return conn.Close()
 }
 
-func (p *proxy) proxy(wg *sync.WaitGroup, src, dst io.ReadWriteCloser) error {
-	defer wg.Done()
-
-	err := p.copy(src, dst)
+func (p *proxy) proxy(src, dst io.ReadWriteCloser) error {
+	_, err := io.CopyBuffer(dst, src, make([]byte, p.bufferSize))
 	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
 		return err
 	}
 
 	return nil
-}
-
-func (p *proxy) copy(src, dst io.ReadWriter) error {
-	buff := make([]byte, 0xffff)
-	for {
-		n, err := src.Read(buff)
-		if err != nil {
-			return err
-		}
-		b := buff[:n]
-
-		_, err = dst.Write(b)
-		if err != nil {
-			return err
-		}
-	}
 }

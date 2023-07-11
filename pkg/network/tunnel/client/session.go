@@ -20,18 +20,18 @@ import (
 	"net"
 
 	"emperror.dev/errors"
-	"github.com/xtaci/smux"
+	"golang.ngrok.com/muxado"
 
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 )
 
 type session struct {
-	session *smux.Session
+	session muxado.Session
 	client  *client
 	stream  api.ControlStream
 }
 
-func NewSession(client *client, sess *smux.Session) api.Session {
+func NewSession(client *client, sess muxado.Session) api.Session {
 	return &session{
 		session: sess,
 		client:  client,
@@ -62,33 +62,55 @@ func (s *session) GetControlStream() io.ReadWriter {
 	return s.stream
 }
 
+type buffered struct {
+	net.Conn
+
+	reader io.Reader
+}
+
+func (bd *buffered) Read(b []byte) (n int, err error) {
+	return bd.reader.Read(b)
+}
+
 func (s *session) OpenTCPStream(id string) (net.Conn, error) {
 	stream, err := s.session.OpenStream()
 	if err != nil {
 		return nil, errors.WrapIf(err, "could not open stream")
 	}
 
-	if _, _, err := api.SendMessage(stream, api.OpenTCPStreamMessageType, api.OpenTCPStreamMessage{
+	if _, _, err := api.SendMessage(stream, api.OpenTCPStreamMessageType, api.OpenTCPStreamRequest{
 		ID: id,
 	}); err != nil {
 		return nil, errors.WrapIfWithDetails(err, "could not send message", "type", api.OpenTCPStreamMessageType)
 	}
 
 	var msg api.Message
-	if err := json.NewDecoder(stream).Decode(&msg); err != nil {
+	decoder := json.NewDecoder(stream)
+	if err := decoder.Decode(&msg); err != nil {
 		return nil, errors.WrapIf(err, "could not decode message")
 	}
 
-	switch msg.Type { //nolint:exhaustive
-	case api.ErrInvalidStreamIDMessageType:
-		stream.Close()
+	if msg.Type == api.OpenTCPStreamMessageType {
+		var resp api.OpenTCPStreamResponse
+		if err := msg.Decode(&resp); err != nil {
+			return nil, err
+		}
 
-		return nil, errors.WithStack(api.ErrInvalidStreamID)
-	case api.StreamOpenedMessageType:
-		return stream, nil
-	default:
-		return nil, errors.WithDetails(api.ErrInvalidMessageType, "type", msg.Type)
+		if resp.Error != nil {
+			if err := stream.Close(); err != nil {
+				s.client.logger.Error(err, "error during stream close")
+			}
+
+			return nil, errors.WithStack(resp.Error)
+		}
+
+		return &buffered{
+			Conn:   stream,
+			reader: io.MultiReader(decoder.Buffered(), stream),
+		}, nil
 	}
+
+	return nil, errors.WithDetails(api.ErrInvalidMessageType, "type", msg.Type)
 }
 
 func (s *session) createControlStream() error {
@@ -97,23 +119,36 @@ func (s *session) createControlStream() error {
 		return errors.WrapIf(err, "could not open stream")
 	}
 
-	_, _, err = api.SendMessage(rawStream, api.OpenControlStreamMessageType, nil)
-	if err != nil {
+	if _, _, err = api.SendMessage(rawStream, api.OpenControlStreamMessageType, api.OpenControlStreamRequest{
+		Metadata:    s.client.metadata,
+		BearerToken: s.client.bearerToken,
+	}); err != nil {
 		return errors.WrapIfWithDetails(err, "could not send message", "type", api.OpenControlStreamMessageType)
 	}
 
 	var msg api.Message
-	if err := json.NewDecoder(rawStream).Decode(&msg); err != nil {
+	decoder := json.NewDecoder(rawStream)
+	if err := decoder.Decode(&msg); err != nil {
 		return errors.WrapIf(err, "could not decode message")
 	}
 
-	switch msg.Type { //nolint:exhaustive
-	case api.StreamOpenedMessageType:
-	default:
-		return errors.WithStackIf(api.ErrCtrlInvalidResponse)
+	if msg.Type == api.OpenControlStreamMessageType {
+		var resp api.OpenControlStreamResponse
+		if err := msg.Decode(&resp); err != nil {
+			return err
+		}
+
+		if resp.ErrorMessage != "" {
+			return errors.New(resp.ErrorMessage)
+		}
+
+		s.stream = NewControlStream(s.client, &buffered{
+			Conn:   rawStream,
+			reader: io.MultiReader(decoder.Buffered(), rawStream),
+		})
+
+		return nil
 	}
 
-	s.stream = NewControlStream(s.client, rawStream)
-
-	return nil
+	return errors.WithStackIf(api.ErrCtrlInvalidResponse)
 }

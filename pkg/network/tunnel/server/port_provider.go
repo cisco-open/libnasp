@@ -22,8 +22,6 @@ import (
 	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
 )
 
-var ErrInvalidPortRange = errors.New("invalid port range")
-
 type portProvider struct {
 	portMin int
 	portMax int
@@ -34,7 +32,7 @@ type portProvider struct {
 
 func NewPortProvider(portMin, portMax int) (api.PortProvider, error) {
 	if portMin > portMax {
-		return nil, errors.WithStackIf(ErrInvalidPortRange)
+		return nil, errors.WithStackIf(api.ErrInvalidPortRange)
 	}
 
 	return &portProvider{

@@ -19,6 +19,8 @@ WORKDIR /go/src/components/echo-server
 # Copy the go modules manifests
 COPY ./components/echo-server/go.mod /go/src/components/echo-server/go.mod
 COPY ./components/echo-server/go.sum /go/src/components/echo-server/go.sum
+COPY ./components/bifrost/go.mod /go/src/components/bifrost/go.mod
+COPY ./components/bifrost/go.sum /go/src/components/bifrost/go.sum
 COPY ./go.mod /go/src/go.mod
 COPY ./go.sum /go/src/go.sum
 

@@ -12,41 +12,27 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-package listener
+package auth
 
-import (
-	"net"
-	"strings"
-)
-
-type addr struct {
-	net  string
-	addr string
+type k8sUser struct {
+	uid      string
+	name     string
+	groups   []string
+	metadata map[string]string
 }
 
-func (a addr) Network() string {
-	return a.net
+func (u *k8sUser) UID() string {
+	return u.uid
 }
 
-func (a addr) String() string {
-	return a.addr
+func (u *k8sUser) Name() string {
+	return u.name
 }
 
-func (l *multipleListeners) Addr() net.Addr {
-	networks := make([]string, 0)
-	addresses := make([]string, 0)
+func (u *k8sUser) Groups() []string {
+	return u.groups
+}
 
-	l.listeners.Range(func(k, v any) bool {
-		if l, ok := v.(net.Listener); ok {
-			networks = append(networks, l.Addr().Network())
-			addresses = append(addresses, l.Addr().String())
-		}
-
-		return true
-	})
-
-	return addr{
-		net:  strings.Join(networks, ","),
-		addr: strings.Join(addresses, ","),
-	}
+func (u *k8sUser) Metadata() map[string]string {
+	return u.metadata
 }

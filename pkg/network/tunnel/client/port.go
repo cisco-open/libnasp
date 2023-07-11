@@ -24,7 +24,7 @@ var _ net.Listener = &managedPort{}
 
 type managedPort struct {
 	id            string
-	requestedPort int
+	options       api.ManagedPortOptions
 	remoteAddress string
 
 	connChan chan net.Conn
@@ -32,13 +32,57 @@ type managedPort struct {
 	initialized bool
 }
 
-func NewManagedPort(id string, requestedPort int) *managedPort {
-	return &managedPort{
-		id:            id,
-		requestedPort: requestedPort,
+type ManagedPortOptions struct {
+	name          string
+	requestedPort int
+	targetPort    int
+}
 
-		connChan: make(chan net.Conn, 1),
+func (o *ManagedPortOptions) SetTargetPort(port int) api.ManagedPortOptions {
+	o.targetPort = port
+
+	return o
+}
+
+func (o *ManagedPortOptions) GetTargetPort() int {
+	return o.targetPort
+}
+
+func (o *ManagedPortOptions) SetRequestedPort(port int) api.ManagedPortOptions {
+	o.requestedPort = port
+
+	return o
+}
+
+func (o *ManagedPortOptions) GetRequestedPort() int {
+	return o.requestedPort
+}
+
+func (o *ManagedPortOptions) SetName(name string) api.ManagedPortOptions {
+	o.name = name
+
+	return o
+}
+
+func (o *ManagedPortOptions) GetName() string {
+	return o.name
+}
+
+func NewManagedPort(id string, options api.ManagedPortOptions) *managedPort {
+	return &managedPort{
+		id:      id,
+		options: options,
+
+		connChan: make(chan net.Conn),
 	}
+}
+
+func (p *managedPort) ID() string {
+	return p.id
+}
+
+func (p *managedPort) GetConnChannel() chan<- net.Conn {
+	return p.connChan
 }
 
 func (p *managedPort) Accept() (net.Conn, error) {
@@ -69,6 +113,6 @@ func (p *managedPort) Addr() net.Addr {
 	}
 
 	return &net.TCPAddr{
-		Port: p.requestedPort,
+		Port: p.options.GetRequestedPort(),
 	}
 }

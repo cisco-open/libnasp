@@ -20,44 +20,44 @@ import (
 	"github.com/gohobby/deepcopy"
 )
 
-type ConcurrentMap struct {
+type concurrentStore struct {
 	data  store
 	mlock *sync.RWMutex
 }
 
-func New() *ConcurrentMap {
-	return &ConcurrentMap{
+func NewConcurrent() *concurrentStore {
+	return &concurrentStore{
 		mlock: new(sync.RWMutex),
 		data:  store{},
 	}
 }
 
-func NewWithData(data map[string]interface{}) *ConcurrentMap {
-	m := New()
+func NewConcurrentWithData(data map[string]interface{}) *concurrentStore {
+	m := NewConcurrent()
 	m.data = store(data)
 
 	return m
 }
 
-func (mm *ConcurrentMap) Set(key string, value interface{}) {
+func (mm *concurrentStore) Set(key string, value interface{}) {
 	mm.mlock.Lock()
 	mm.data.Set(key, value)
 	mm.mlock.Unlock()
 }
 
-func (mm *ConcurrentMap) Reset(data store) {
+func (mm *concurrentStore) Reset(data store) {
 	mm.mlock.Lock()
 	mm.data = data
 	mm.mlock.Unlock()
 }
 
-func (mm *ConcurrentMap) Get(key string) (interface{}, bool) {
+func (mm *concurrentStore) Get(key string) (interface{}, bool) {
 	mm.mlock.RLock()
 	r, ok := mm.data.Get(key)
 	mm.mlock.RUnlock()
 	return r, ok
 }
 
-func (mm *ConcurrentMap) Clone() *ConcurrentMap {
-	return NewWithData(deepcopy.Map(mm.data.Convert()).Clone())
+func (mm *concurrentStore) Clone() *concurrentStore {
+	return NewConcurrentWithData(deepcopy.Map(mm.data.Convert()).Clone())
 }

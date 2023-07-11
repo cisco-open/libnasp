@@ -558,12 +558,11 @@ type TCPDialer struct {
 }
 
 func NewTCPDialer() (*TCPDialer, error) {
-	dialer, err := integrationHandler.iih.GetTCPDialer()
+	dialer, err := integrationHandler.iih.GetTCPDialer(nil)
 	if err != nil {
 		integrationHandler.cancel()
 		return nil, err
 	}
-	// dialer := &net.Dialer{}
 
 	return &TCPDialer{
 		dialer: dialer,

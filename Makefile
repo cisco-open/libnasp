@@ -58,3 +58,9 @@ tcp-metadata-exchange-filter:	## build the tcp-metadata-exchange-filter
 	rustup target add wasm32-unknown-unknown
 	cargo build --target wasm32-unknown-unknown --release
 	cp target/wasm32-unknown-unknown/release/wasm_tcp_metadata.wasm pkg/istio/filters/tcp-metadata-exchange-filter.wasm
+
+.PHONY: tcp-metadata-exchange-filter-shrinked
+tcp-metadata-exchange-filter-shrinked: ## build the smaller version of tcp-metadata-exchange-filter 
+	rustup target add wasm32-unknown-unknown
+	cargo +nightly build -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort -j1 --release --target wasm32-unknown-unknown
+	cp target/wasm32-unknown-unknown/release/wasm_tcp_metadata.wasm pkg/istio/filters/tcp-metadata-exchange-filter.wasm
