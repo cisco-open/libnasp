@@ -16,6 +16,7 @@ package verify
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
@@ -87,4 +88,17 @@ func GetSANTypeFromSAN(san string) SANType {
 	}
 
 	return DNSSANType
+}
+
+func SetCertVerifierToTLSConfig(getter CertVerifierConfigGetter, tlsConfig *tls.Config) {
+	tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		config := getter.GetCertVerifierConfig()
+		if config.Roots == nil {
+			config.Roots = tlsConfig.RootCAs
+		}
+
+		_, err := NewCertVerifier(config).VerifyCertificate(rawCerts)
+
+		return err
+	}
 }

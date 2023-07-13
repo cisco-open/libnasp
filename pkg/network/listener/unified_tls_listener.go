@@ -73,6 +73,7 @@ type UnifiedListener interface {
 
 	SetTLSMode(mode TLSMode)
 	SetTLSClientAuthMode(mode tls.ClientAuthType)
+	GetTLSConfig() *tls.Config
 }
 
 type unifiedListener struct {
@@ -124,6 +125,10 @@ func (l *unifiedListener) SetTLSMode(mode TLSMode) {
 
 func (l *unifiedListener) SetTLSClientAuthMode(mode tls.ClientAuthType) {
 	l.tlsConfig.ClientAuth = mode
+}
+
+func (l *unifiedListener) GetTLSConfig() *tls.Config {
+	return l.tlsConfig
 }
 
 func (l *unifiedListener) Accept() (net.Conn, error) {

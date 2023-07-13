@@ -18,16 +18,17 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"fmt"
-	"strings"
 	"time"
 
 	"emperror.dev/errors"
-
-	"github.com/cisco-open/nasp/pkg/util"
 )
 
 type CertVerifier interface {
 	VerifyCertificate(chain [][]byte) ([]*x509.Certificate, error)
+}
+
+type CertVerifierConfigGetter interface {
+	GetCertVerifierConfig() *CertVerifierConfig
 }
 
 type CertVerifierConfig struct {
@@ -79,43 +80,6 @@ type CertVerifierConfig struct {
 	MatchTypedSAN []SANMatcher
 }
 
-type SANType string
-
-const (
-	EmailSANType SANType = "EMAIL"
-	DNSSANType   SANType = "DNS"
-	URISANType   SANType = "URI"
-	IPSANType    SANType = "IP"
-)
-
-type SANMatcher struct {
-	Type    SANType
-	Matcher util.StringMatcher
-}
-
-func (m SANMatcher) String() string {
-	return fmt.Sprintf("%s:%s", m.Type, m.Matcher)
-}
-
-func NewSANMatcherFromString(match string) (SANMatcher, error) {
-	p := strings.SplitN(match, ":", 2)
-	sanType := SANType(p[0])
-
-	switch sanType {
-	case EmailSANType, DNSSANType, URISANType, IPSANType:
-		if matcher, err := util.NewStringMatcherFromString(p[1]); err != nil {
-			return SANMatcher{}, err
-		} else {
-			return SANMatcher{
-				Type:    sanType,
-				Matcher: matcher,
-			}, nil
-		}
-	}
-
-	return SANMatcher{}, errors.NewWithDetails("invalid SAN matcher type", "type", p[0])
-}
-
 type certVerifier struct {
 	config *CertVerifierConfig
 }
@@ -148,6 +112,44 @@ func (v *certVerifier) VerifyCertificate(chain [][]byte) ([]*x509.Certificate, e
 	}
 
 	return chains[0], nil
+}
+
+func (c CertVerifierConfig) String() string {
+	var ret string
+
+	if c.Time != nil {
+		ret += fmt.Sprintf("Time: %s\n", c.Time().String())
+	}
+
+	trustedRootsCount := 0
+	if c.Roots != nil {
+		trustedRootsCount = len(c.Roots.Subjects())
+	}
+
+	ret += fmt.Sprintf("Trusted root CA count: %d\nTrust system roots: %t\n", trustedRootsCount, c.TrustSystemRoots)
+
+	if len(c.MatchCertificateHash) > 0 {
+		ret += "Match certificate hashes:\n"
+		for _, hash := range c.MatchCertificateHash {
+			ret += fmt.Sprintf("- %s\n", hash)
+		}
+	}
+
+	if len(c.MatchSPKIHash) > 0 {
+		ret += "Match SPKI hashes:\n"
+		for _, hash := range c.MatchSPKIHash {
+			ret += fmt.Sprintf("- %s\n", hash)
+		}
+	}
+
+	if len(c.MatchTypedSAN) > 0 {
+		ret += "Match SANs:\n"
+		for _, sanMatcher := range c.MatchTypedSAN {
+			ret += fmt.Sprintf("- %s\n", sanMatcher)
+		}
+	}
+
+	return ret
 }
 
 func (v *certVerifier) verify(chain [][]byte) ([][]*x509.Certificate, error) {
