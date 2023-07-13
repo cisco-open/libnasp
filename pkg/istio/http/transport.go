@@ -36,6 +36,7 @@ type istioHTTPRequestTransport struct {
 func NewIstioHTTPRequestTransport(transport http.RoundTripper, tlsConfig *tls.Config, discoveryClient discovery.DiscoveryClient, logger logr.Logger) http.RoundTripper {
 	return &istioHTTPRequestTransport{
 		transport:       transport,
+		tlsConfig:       tlsConfig,
 		discoveryClient: discoveryClient,
 		logger:          logger,
 	}
