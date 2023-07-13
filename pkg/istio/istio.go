@@ -464,7 +464,7 @@ func (h *istioIntegrationHandler) ServeHTTP(ctx context.Context, ln net.Listener
 	tlsConfig := &tls.Config{
 		ClientAuth: tls.RequestClientCert,
 		GetCertificate: func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			cert, err := h.caClient.GetCertificate("", time.Hour*24)
+			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), h.environment.GetSecretTTL())
 			if err != nil {
 				return nil, err
 			}
@@ -722,7 +722,7 @@ func (h *istioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, 
 	tlsConfig := &tls.Config{
 		ClientAuth: tls.RequestClientCert,
 		GetCertificate: func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), time.Duration(168)*time.Hour)
+			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), h.environment.GetSecretTTL())
 			if err != nil {
 				return nil, err
 			}
