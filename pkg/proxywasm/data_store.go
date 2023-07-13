@@ -66,7 +66,7 @@ func (s *urlDataSource) Get() ([]byte, error) {
 		return s.bytes, nil
 	}
 
-	resp, err := s.httpGetter.Get(s.url) //nolint:noctx
+	resp, err := s.httpGetter.Get(s.url)
 	if err != nil {
 		return nil, errors.WrapIfWithDetails(err, "could not parse url", "url", s.url)
 	}

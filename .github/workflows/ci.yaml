@@ -16,6 +16,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Install CA certificates
+        run: |
+          sudo apt-get -y install ca-certificates
+        
       - name: Check out code
         uses: actions/checkout@v3
 
