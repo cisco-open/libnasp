@@ -24,6 +24,7 @@ import (
 	"github.com/cisco-open/nasp/pkg/network/pool"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
 	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
+	"github.com/cisco-open/nasp/pkg/tls/verify"
 )
 
 type Dialer interface {
@@ -58,6 +59,7 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 		if prop.UseTLS() {
 			tlsConfig = d.tlsConfig.Clone()
 			tlsConfig.ServerName = prop.ServerName()
+			verify.SetCertVerifierToTLSConfig(prop, tlsConfig)
 		}
 		if endpointAddr, err := prop.Address(); err != nil {
 			return nil, err
@@ -66,20 +68,14 @@ func (d *tcpDialer) DialContext(ctx context.Context, _net string, address string
 		}
 	}
 
-	useTLS := tlsConfig != nil
-
 	opts := []network.DialerOption{
 		network.DialerWithConnectionOptions(network.ConnectionWithCloserWrapper(d.discoveryClient.NewConnectionCloseWrapper())),
 		network.DialerWithDialerWrapper(d.discoveryClient.NewDialWrapper()),
 		network.DialerWithNetDialer(d.dialer),
+		network.DialerWithTLSConfig(tlsConfig),
 	}
 
-	var connectionDialer network.ConnectionDialer
-	if useTLS {
-		connectionDialer = network.NewDialerWithTLSConfig(tlsConfig, opts...)
-	} else {
-		connectionDialer = network.NewDialer(opts...)
-	}
+	connectionDialer := network.NewDialer(opts...)
 
 	f := func() (net.Conn, error) {
 		var conn net.Conn

@@ -17,18 +17,15 @@ package grpc
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/cisco-open/nasp/pkg/ca"
 	"github.com/cisco-open/nasp/pkg/istio/discovery"
 	"github.com/cisco-open/nasp/pkg/network"
 	"github.com/cisco-open/nasp/pkg/proxywasm/api"
@@ -38,7 +35,7 @@ import (
 type GRPCDialer struct {
 	http.MiddlewareHandler
 
-	caClient        ca.Client
+	tlsConfig       *tls.Config
 	streamHandler   api.StreamHandler
 	discoveryClient discovery.DiscoveryClient
 	logger          logr.Logger
@@ -46,11 +43,11 @@ type GRPCDialer struct {
 	connectionState network.ConnectionState
 }
 
-func NewGRPCDialer(caClient ca.Client, streamHandler api.StreamHandler, discoveryClient discovery.DiscoveryClient, logger logr.Logger) *GRPCDialer {
+func NewGRPCDialer(streamHandler api.StreamHandler, tlsConfig *tls.Config, discoveryClient discovery.DiscoveryClient, logger logr.Logger) *GRPCDialer {
 	dialer := GRPCDialer{
 		MiddlewareHandler: http.NewMiddlewareHandler(),
 
-		caClient:        caClient,
+		tlsConfig:       tlsConfig,
 		streamHandler:   streamHandler,
 		discoveryClient: discoveryClient,
 		logger:          logger,
@@ -60,7 +57,7 @@ func NewGRPCDialer(caClient ca.Client, streamHandler api.StreamHandler, discover
 }
 
 func (g *GRPCDialer) Dial(ctx context.Context, addr string) (net.Conn, error) {
-	tlsConfig := g.GetTLSConfig()
+	tlsConfig := g.tlsConfig.Clone()
 
 	if prop, _ := g.discoveryClient.GetHTTPClientPropertiesByHost(ctx, addr); prop != nil {
 		g.logger.V(3).Info("discovered overrides", "overrides", prop)
@@ -153,26 +150,4 @@ func (g *GRPCDialer) RequestInterceptor(ctx context.Context, method string, req,
 	g.logger.Info("intercepted reply", "method", method, "reply", reply)
 
 	return nil
-}
-
-func (g *GRPCDialer) GetTLSConfig() *tls.Config {
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(g.caClient.GetCAPem())
-
-	return &tls.Config{
-		GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			cert, err := g.caClient.GetCertificate("", time.Duration(168)*time.Hour)
-			if err != nil {
-				return nil, err
-			}
-
-			return cert.GetTLSCertificate(), nil
-		},
-		RootCAs:            certPool,
-		InsecureSkipVerify: true,
-		NextProtos: []string{
-			"istio-h2",
-			"h2",
-		},
-	}
 }

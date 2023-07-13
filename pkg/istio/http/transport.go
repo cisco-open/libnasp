@@ -12,33 +12,30 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 
-package istio
+package http
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/go-logr/logr"
 
-	"github.com/cisco-open/nasp/pkg/ca"
 	"github.com/cisco-open/nasp/pkg/istio/discovery"
 	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/nasp/pkg/tls/verify"
 )
 
 type istioHTTPRequestTransport struct {
 	transport       http.RoundTripper
-	caClient        ca.Client
+	tlsConfig       *tls.Config
 	discoveryClient discovery.DiscoveryClient
 	logger          logr.Logger
 }
 
-func NewIstioHTTPRequestTransport(transport http.RoundTripper, caClient ca.Client, discoveryClient discovery.DiscoveryClient, logger logr.Logger) http.RoundTripper {
+func NewIstioHTTPRequestTransport(transport http.RoundTripper, tlsConfig *tls.Config, discoveryClient discovery.DiscoveryClient, logger logr.Logger) http.RoundTripper {
 	return &istioHTTPRequestTransport{
 		transport:       transport,
-		caClient:        caClient,
 		discoveryClient: discoveryClient,
 		logger:          logger,
 	}
@@ -57,47 +54,24 @@ func (t *istioHTTPRequestTransport) RoundTrip(req *http.Request) (*http.Response
 		}
 
 		if prop.UseTLS() {
-			tlsConfig = t.getTLSconfig()
+			tlsConfig = t.tlsConfig
 			tlsConfig.ServerName = prop.ServerName()
 			req.URL.Scheme = "https"
 			if !strings.Contains(req.URL.Host, ":") {
 				req.URL.Host += ":80"
 			}
-			tlsConfig.NextProtos = []string{
-				"istio-http/1.1",
-				"istio",
-				"http/1.1",
-			}
+			verify.SetCertVerifierToTLSConfig(prop, tlsConfig)
 		}
 	}
-
-	opts := []network.DialerOption{
-		network.DialerWithConnectionOptions(network.ConnectionWithCloserWrapper(t.discoveryClient.NewConnectionCloseWrapper())),
-		network.DialerWithDialerWrapper(t.discoveryClient.NewDialWrapper()),
-	}
-
-	dialer := network.NewDialerWithTLSConfig(tlsConfig, opts...)
 
 	t.discoveryClient.IncrementActiveRequestsCount(req.URL.Host)
 	defer t.discoveryClient.DecrementActiveRequestsCount(req.URL.Host)
 
-	return network.WrapHTTPTransport(t.transport, dialer).RoundTrip(req)
-}
-
-func (t *istioHTTPRequestTransport) getTLSconfig() *tls.Config {
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(t.caClient.GetCAPem())
-
-	return &tls.Config{
-		GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			cert, err := t.caClient.GetCertificate("", time.Duration(168)*time.Hour)
-			if err != nil {
-				return nil, err
-			}
-
-			return cert.GetTLSCertificate(), nil
-		},
-		RootCAs:            certPool,
-		InsecureSkipVerify: true,
+	dialerOpts := []network.DialerOption{
+		network.DialerWithConnectionOptions(network.ConnectionWithCloserWrapper(t.discoveryClient.NewConnectionCloseWrapper())),
+		network.DialerWithDialerWrapper(t.discoveryClient.NewDialWrapper()),
+		network.DialerWithTLSConfig(tlsConfig),
 	}
+
+	return network.WrapHTTPTransport(t.transport, network.NewDialer(dialerOpts...)).RoundTrip(req)
 }
