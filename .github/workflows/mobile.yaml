@@ -24,12 +24,9 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Setup gomobile
-        working-directory: /tmp
+        working-directory: experimental/java
         run: |
-          git clone -b plainjava https://github.com/bonifaido/mobile.git
-          cd mobile
-          go install ./cmd/gomobile
-          go install ./cmd/gobind
+          make install-gomobile
 
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1

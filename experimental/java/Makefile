@@ -7,8 +7,8 @@ java:
 	gomobile bind -target java/arm64,java/amd64 -v -o repo/nasp/nasp/0.0.0/nasp-0.0.0-$(OS).jar
 
 install-gomobile:
-	cd $$HOME && git clone -b plainjava https://github.com/bonifaido/mobile.git
-	cd $$HOME/mobile && go install ./cmd/gomobile && go install ./cmd/gobind
+	git clone -b plainjava https://github.com/bonifaido/mobile.git $$GOPATH/gomobile-bonifaido
+	cd $$GOPATH/gomobile-bonifaido && go install ./cmd/gomobile && go install ./cmd/gobind
 
 install-linux-dependencies:
 	sudo apt update
