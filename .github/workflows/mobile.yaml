@@ -23,16 +23,16 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+
       - name: Setup gomobile
         working-directory: experimental/java
         run: |
           make install-gomobile
-
-      # - name: Setup upterm session
-      #   uses: lhotari/action-upterm@v1
-      #   with:
-      #     ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-      #     limit-access-to-actor: true
 
       - name: Build plain java library
         working-directory: experimental/java
