@@ -135,29 +135,44 @@ func (c *wrappedConn) read(b []byte) (int, error) {
 		c.internalBuffer = append(c.internalBuffer, make([]byte, diff)...)
 	}
 
-	// read from the underlying reader
-	n, err := c.Conn.Read(c.internalBuffer)
-	c.setConnectionState()
-	if n == 0 { // return if there is no more data
-		return n, err
-	}
-	if err != nil && !errors.Is(err, io.EOF) { // or got a non-EOF error
-		return n, err
-	}
+	done := false
+	dataLength := 0
+	endOfStream := false
 
-	n, err = c.readBuffer.Write(c.internalBuffer[:n])
-	if err != nil {
-		return n, err
-	}
+	var netErr error
+	var n int
 
-	switch c.stream.Direction() {
-	case api.ListenerDirectionOutbound:
-		if err := c.stream.HandleUpstreamData(c, n); err != nil {
-			return 0, err
+	for !done {
+		// read from the underlying reader
+		n, netErr = c.Conn.Read(c.internalBuffer)
+		c.setConnectionState()
+
+		if netErr != nil && !errors.Is(netErr, io.EOF) { // or got a non-EOF error
+			return x, netErr
 		}
-	case api.ListenerDirectionUnspecified, api.ListenerDirectionInbound:
-		if err := c.stream.HandleDownstreamData(c, n); err != nil {
-			return 0, err
+
+		endOfStream = errors.Is(netErr, io.EOF)
+		if n > 0 {
+			n, err = c.readBuffer.Write(c.internalBuffer[:n])
+			if err != nil {
+				return x, err
+			}
+			dataLength += n
+		}
+
+		switch c.stream.Direction() {
+		case api.ListenerDirectionOutbound:
+			if done, err = c.stream.HandleUpstreamData(c, dataLength, endOfStream); err != nil {
+				return x, err
+			}
+		case api.ListenerDirectionUnspecified, api.ListenerDirectionInbound:
+			if done, err = c.stream.HandleDownstreamData(c, dataLength, endOfStream); err != nil {
+				return x, err
+			}
+		}
+
+		if endOfStream || netErr != nil {
+			done = true
 		}
 	}
 
@@ -168,12 +183,12 @@ func (c *wrappedConn) read(b []byte) (int, error) {
 
 	// do not return eof on readbuffer here
 	if n, err := c.readBuffer.Read(b[x:]); err != nil && !errors.Is(err, io.EOF) {
-		return n, err
+		return x + n, err
 	} else {
 		x += n
 	}
 
-	return x, err
+	return x, netErr
 }
 
 func (c *wrappedConn) Write(b []byte) (int, error) {
@@ -191,14 +206,19 @@ func (c *wrappedConn) Write(b []byte) (int, error) {
 		return n, err
 	}
 
+	done := false
 	if c.stream.Direction() == api.ListenerDirectionOutbound {
-		if err := c.stream.HandleDownstreamData(c, n); err != nil {
-			return 0, err
+		if done, err = c.stream.HandleDownstreamData(c, n, false); err != nil {
+			return n, err
 		}
 	} else {
-		if err := c.stream.HandleUpstreamData(c, n); err != nil {
-			return 0, err
+		if done, err = c.stream.HandleUpstreamData(c, n, false); err != nil {
+			return n, err
 		}
+	}
+
+	if !done {
+		return n, nil
 	}
 
 	for {

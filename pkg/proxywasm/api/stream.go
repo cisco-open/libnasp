@@ -51,8 +51,8 @@ type Stream interface {
 
 	HandleTCPNewConnection(conn net.Conn) error
 	HandleTCPCloseConnection(conn net.Conn) error
-	HandleDownstreamData(conn net.Conn, n int) error
-	HandleUpstreamData(conn net.Conn, n int) error
+	HandleDownstreamData(conn net.Conn, n int, endOfStream bool) (bool, error)
+	HandleUpstreamData(conn net.Conn, n int, endOfStream bool) (bool, error)
 }
 
 type HTTPResponse interface {
