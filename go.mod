@@ -1,6 +1,6 @@
 module github.com/cisco-open/nasp
 
-go 1.18
+go 1.20
 
 replace (
 	github.com/cisco-open/nasp/components/bifrost => ./components/bifrost
