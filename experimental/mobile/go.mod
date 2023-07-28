@@ -1,6 +1,6 @@
 module github.com/cisco/nasp/mobile
 
-go 1.19
+go 1.20
 
 replace (
 	github.com/cisco-open/nasp => ../..
