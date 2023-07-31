@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sethvargo/go-envconfig"
 )
@@ -36,6 +37,7 @@ type IstioEnvironment struct {
 	PlatformMetadata  map[string]string `env:"PLATFORM_METADATA"`
 	Network           string            `env:"NETWORK"`
 	SearchDomains     []string          `env:"SEARCH_DOMAINS"`
+	SecretTTL         time.Duration     `env:"SECRET_TTL"`
 
 	AdditionalMetadata map[string]string `env:"ADDITIONAL_METADATA"`
 
@@ -137,6 +139,14 @@ func (e *IstioEnvironment) GetSearchDomains() []string {
 	}
 
 	return e.SearchDomains
+}
+
+func (e *IstioEnvironment) GetSecretTTL() time.Duration {
+	if e.SecretTTL == 0 {
+		e.SecretTTL = time.Hour * 24
+	}
+
+	return e.SecretTTL
 }
 
 func (e *IstioEnvironment) Override(otherEnv IstioEnvironment) {

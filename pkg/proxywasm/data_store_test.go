@@ -15,7 +15,9 @@
 package proxywasm_test
 
 import (
-	"encoding/base64"
+	"bytes"
+	"io"
+	"net/http"
 	"os"
 	"testing"
 
@@ -24,14 +26,25 @@ import (
 	"github.com/cisco-open/nasp/pkg/proxywasm"
 )
 
+type testHTTPGetter struct {
+	content *bytes.Buffer
+}
+
+func (g *testHTTPGetter) Get(url string) (resp *http.Response, err error) {
+	return &http.Response{
+		Body: io.NopCloser(g.content),
+	}, nil
+}
+
 func TestURLDataSourceTest(t *testing.T) {
 	t.Parallel()
 
 	assert := assert.New(t)
 
 	param := []byte("wasm content")
-	b64 := base64.URLEncoding.EncodeToString(param)
-	ds := proxywasm.NewURLDataSource("https://httpbin.org/base64/" + b64)
+	ds := proxywasm.NewURLDataSource("", proxywasm.URLDataSourceWithHTTPGetter(&testHTTPGetter{
+		content: bytes.NewBuffer(param),
+	}))
 	content, err := ds.Get()
 
 	assert.NoError(err)

@@ -22,22 +22,42 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net"
 	"net/url"
-	"strings"
 	"time"
 
 	"emperror.dev/errors"
+	"go.uber.org/atomic"
 
 	"github.com/cisco-open/nasp/pkg/ca"
+	"github.com/cisco-open/nasp/pkg/tls/verify"
 )
 
-type selfsigned struct {
-	keySize int
+type SelfsignedCAClient interface {
+	ca.Client
 
-	ca           *x509.Certificate
-	caPrivKey    *rsa.PrivateKey
-	caPrivKeyPEM []byte
-	caPEM        []byte
+	GetCertificateWithSigner(subject pkix.Name, SANs []string, ttl time.Duration, signer *Certificate) (*Certificate, error)
+	CreateIntermediateCA(subject pkix.Name) (*Certificate, error)
+	CreateCertificate(template *x509.Certificate, parent *Certificate) (*Certificate, error)
+}
+
+type selfsigned struct {
+	caSubject pkix.Name
+	keySize   int
+
+	serial *atomic.Int64
+
+	ca *Certificate
+}
+
+type Certificate struct {
+	Certificate    *x509.Certificate
+	CertificateDER []byte
+	CertificatePEM []byte
+	PrivateKey     *rsa.PrivateKey
+	PrivateKeyPEM  []byte
+	PublicKey      *rsa.PublicKey
+	PublicKeyPEM   []byte
 }
 
 type ClientOption func(c *selfsigned)
@@ -48,11 +68,20 @@ func WithKeySize(keySize int) ClientOption {
 	}
 }
 
-func NewSelfSignedCAClient(opts ...ClientOption) (ca.Client, error) {
-	c := &selfsigned{
-		keySize: 2048,
+func WithCASubject(subject pkix.Name) ClientOption {
+	return func(c *selfsigned) {
+		c.caSubject = subject
 	}
-	if err := c.createCACert(); err != nil {
+}
+
+func NewSelfSignedCAClient(opts ...ClientOption) (SelfsignedCAClient, error) {
+	c := &selfsigned{
+		caSubject: pkix.Name{},
+		serial:    atomic.NewInt64(0),
+		keySize:   2048,
+	}
+
+	if err := c.createRootCA(); err != nil {
 		return nil, errors.WrapIf(err, "could not create client")
 	}
 
@@ -63,10 +92,75 @@ func NewSelfSignedCAClient(opts ...ClientOption) (ca.Client, error) {
 	return c, nil
 }
 
-func (c *selfsigned) createCACert() (err error) {
-	c.ca = &x509.Certificate{
-		SerialNumber:          big.NewInt(2022),
-		Subject:               pkix.Name{},
+func (c *selfsigned) GetCAEndpoint() string {
+	return ""
+}
+
+func (c *selfsigned) GetCAPem() []byte {
+	return c.ca.CertificatePEM
+}
+
+func (c *selfsigned) GetCertificateWithSigner(subject pkix.Name, sans []string, ttl time.Duration, signer *Certificate) (*Certificate, error) {
+	template := &x509.Certificate{
+		SerialNumber: c.getNextSerial(),
+		Subject:      subject,
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(ttl),
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		IsCA:         false,
+	}
+
+	for _, san := range sans {
+		sanType := verify.GetSANTypeFromSAN(san)
+		switch sanType {
+		case verify.URISANType:
+			u, err := url.Parse(san)
+			if err != nil {
+				return nil, errors.WrapIfWithDetails(err, "could not parse URL", "url", san)
+			}
+			template.URIs = []*url.URL{u}
+		case verify.EmailSANType:
+			template.EmailAddresses = append(template.EmailAddresses, san)
+			continue
+		case verify.IPSANType:
+			if ip := net.ParseIP(san); ip != nil {
+				template.IPAddresses = append(template.IPAddresses, ip)
+			}
+		case verify.DNSSANType:
+			template.DNSNames = append(template.DNSNames, san)
+		}
+	}
+
+	if signer == nil {
+		signer = c.ca
+	}
+
+	return c.CreateCertificate(template, signer)
+}
+
+func (c *selfsigned) GetCertificate(hostname string, ttl time.Duration) (ca.Certificate, error) {
+	cert, err := c.GetCertificateWithSigner(pkix.Name{}, []string{hostname}, ttl, nil)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	tlsCertificate, err := tls.X509KeyPair(cert.CertificatePEM, cert.PrivateKeyPEM)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not get tls certiciate from PEMs")
+	}
+
+	return &ca.CertificateContainer{
+		PrivateKeyPEM:  cert.PrivateKeyPEM,
+		CertificatePEM: cert.CertificatePEM,
+		TLSCertificate: &tlsCertificate,
+	}, nil
+}
+
+func (c *selfsigned) CreateIntermediateCA(subject pkix.Name) (*Certificate, error) {
+	template := &x509.Certificate{
+		SerialNumber:          c.getNextSerial(),
+		Subject:               subject,
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(10, 0, 0),
 		IsCA:                  true,
@@ -75,104 +169,73 @@ func (c *selfsigned) createCACert() (err error) {
 		BasicConstraintsValid: true,
 	}
 
-	c.caPrivKey, err = rsa.GenerateKey(rand.Reader, c.keySize)
-	if err != nil {
-		return errors.WrapIf(err, "could not generate RSA key for the CA")
+	return c.CreateCertificate(template, c.ca)
+}
+
+func (c *selfsigned) createRootCA() (err error) {
+	template := &x509.Certificate{
+		SerialNumber: c.getNextSerial(),
+		Subject: pkix.Name{
+			CommonName: "ACME CA",
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
 	}
 
-	c.caPrivKeyPEM = pem.EncodeToMemory(&pem.Block{
+	c.ca, err = c.CreateCertificate(template, nil)
+
+	return err
+}
+
+func (c *selfsigned) CreateCertificate(template *x509.Certificate, parent *Certificate) (*Certificate, error) {
+	cert := &Certificate{}
+
+	var err error
+	cert.PrivateKey, err = rsa.GenerateKey(rand.Reader, c.keySize)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not generate RSA key for the CA")
+	}
+	cert.PublicKey = &cert.PrivateKey.PublicKey
+
+	if parent == nil {
+		parent = cert
+		parent.Certificate = template
+	}
+
+	cert.CertificateDER, err = x509.CreateCertificate(rand.Reader, template, parent.Certificate, cert.PublicKey, parent.PrivateKey)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not create CA certificate")
+	}
+
+	cert.Certificate, err = x509.ParseCertificate(cert.CertificateDER)
+	if err != nil {
+		return nil, errors.WrapIf(err, "could not parse created certificate")
+	}
+
+	cert.PrivateKeyPEM = pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(c.caPrivKey),
+		Bytes: x509.MarshalPKCS1PrivateKey(cert.PrivateKey),
 	})
 
-	caBytes, err := x509.CreateCertificate(rand.Reader, c.ca, c.ca, &c.caPrivKey.PublicKey, c.caPrivKey)
-	if err != nil {
-		return errors.WrapIf(err, "could not create CA certificate")
-	}
+	cert.PublicKeyPEM = pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PUBLIC KEY",
+		Bytes: x509.MarshalPKCS1PublicKey(cert.PublicKey),
+	})
 
-	c.caPEM = pem.EncodeToMemory(&pem.Block{
+	cert.CertificatePEM = pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
-		Bytes: caBytes,
+		Bytes: cert.CertificateDER,
 	})
-
-	return nil
-}
-
-func (c *selfsigned) GetCAEndpoint() string {
-	return ""
-}
-
-func (c *selfsigned) GetCAPem() []byte {
-	return c.caPEM
-}
-
-func (c *selfsigned) GetCertificate(hostname string, ttl time.Duration) (ca.Certificate, error) {
-	serialNum, err := c.genSerialNum()
-	if err != nil {
-		return nil, errors.WrapIf(err, "could not generate serial number")
-	}
-
-	x509cert := &x509.Certificate{
-		SerialNumber: serialNum,
-		Subject:      pkix.Name{},
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(ttl),
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		IsCA:         false,
-	}
-
-	if strings.Contains(hostname, "://") {
-		u, err := url.Parse(hostname)
-		if err != nil {
-			return nil, errors.WrapIfWithDetails(err, "could not parse URL", "url", hostname)
-		}
-		x509cert.URIs = []*url.URL{u}
-	} else {
-		x509cert.DNSNames = []string{hostname}
-	}
-
-	certPrivKey, err := rsa.GenerateKey(rand.Reader, c.keySize)
-	if err != nil {
-		return nil, errors.WrapIf(err, "could not generate RSA key for the certificate")
-	}
-
-	certPrivKeyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
-	})
-
-	certBytes, err := x509.CreateCertificate(rand.Reader, x509cert, c.ca, &certPrivKey.PublicKey, c.caPrivKey)
-	if err != nil {
-		return nil, errors.WrapIf(err, "could not create certificate")
-	}
-
-	certPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certBytes,
-	})
-
-	tlsCertificate, err := tls.X509KeyPair(certPEM, certPrivKeyPEM)
-	if err != nil {
-		return nil, errors.WrapIf(err, "could not get tls certiciate from PEMs")
-	}
-
-	cert := &ca.CertificateContainer{
-		PrivateKeyPEM:  certPrivKeyPEM,
-		CertificatePEM: certPEM,
-		TLSCertificate: &tlsCertificate,
-	}
 
 	return cert, nil
 }
 
-func (c *selfsigned) genSerialNum() (*big.Int, error) {
-	serialNumLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+func (c *selfsigned) getNextSerial() *big.Int {
+	c.serial.Add(1)
 
-	serialNum, err := rand.Int(rand.Reader, serialNumLimit)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return serialNum, nil
+	return big.NewInt(c.serial.Load())
 }

@@ -75,3 +75,8 @@ jobs:
           make run-client
         env:
           CLIENT_REQUEST_URL: "http://echo.testing:80"
+
+      - name: Run simple go tcp client (istioctl)
+        working-directory: examples/tcp
+        run: |
+          make run-client
