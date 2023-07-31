@@ -42,6 +42,7 @@ import (
 	"github.com/cisco-open/nasp/pkg/environment"
 	"github.com/cisco-open/nasp/pkg/istio/discovery"
 	"github.com/cisco-open/nasp/pkg/istio/filters"
+	ihttp "github.com/cisco-open/nasp/pkg/istio/http"
 	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
 	"github.com/cisco-open/nasp/pkg/k8s/labels"
 	k8slabels "github.com/cisco-open/nasp/pkg/k8s/labels"
@@ -55,6 +56,7 @@ import (
 	pwhttp "github.com/cisco-open/nasp/pkg/proxywasm/http"
 	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
 	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
+	"github.com/cisco-open/nasp/pkg/tls/verify"
 )
 
 var DefaultNetDialer = &net.Dialer{
@@ -286,8 +288,6 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 
 	s.pluginManager = proxywasm.NewWasmPluginManager(vms, baseContext, logger)
 
-	s.discoveryClient = discovery.NewXDSDiscoveryClient(e, s.caClient, s.logger.WithName("xds-discovery"))
-
 	if config.PushgatewayConfig != nil {
 		if config.PushgatewayConfig.Address == "" {
 			return nil, errors.New("if Pushgateway is enabled then the PushgatewayConfig.Address config is required")
@@ -313,6 +313,42 @@ func NewIstioIntegrationHandler(config *IstioIntegrationHandlerConfig, logger lo
 }
 
 func (h *istioIntegrationHandler) GetDiscoveryClient() discovery.DiscoveryClient {
+	if h.discoveryClient != nil {
+		return h.discoveryClient
+	}
+
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(h.caClient.GetCAPem())
+
+	tlsConfig := &tls.Config{
+		GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), h.environment.GetSecretTTL())
+			if err != nil {
+				return nil, err
+			}
+
+			return cert.GetTLSCertificate(), nil
+		},
+		RootCAs:            certPool,
+		InsecureSkipVerify: true,
+		VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+			config := &verify.CertVerifierConfig{
+				Roots: certPool,
+			}
+
+			_, err := verify.NewCertVerifier(config).VerifyCertificate(rawCerts)
+
+			return err
+		},
+	}
+
+	h.discoveryClient = discovery.NewXDSDiscoveryClient(
+		h.caClient.GetCAEndpoint(),
+		h.environment,
+		discovery.XDSDiscoveryClientWithLogger(h.logger.WithName("xds-discovery")),
+		discovery.XDSDiscoveryClientWithTLSConfig(tlsConfig),
+	)
+
 	return h.discoveryClient
 }
 
@@ -326,8 +362,29 @@ func (h *istioIntegrationHandler) GetHTTPTransport(transport http.RoundTripper) 
 		return nil, errors.Wrap(err, "could not get stream handler")
 	}
 
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(h.caClient.GetCAPem())
+
+	tlsConfig := &tls.Config{
+		GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), h.environment.GetSecretTTL())
+			if err != nil {
+				return nil, err
+			}
+
+			return cert.GetTLSCertificate(), nil
+		},
+		NextProtos: []string{
+			"istio-http/1.1",
+			"istio",
+			"http/1.1",
+		},
+		RootCAs:            certPool,
+		InsecureSkipVerify: true,
+	}
+
 	logger := h.logger.WithName("http-transport")
-	tp := NewIstioHTTPRequestTransport(transport, h.caClient, h.discoveryClient, logger)
+	tp := ihttp.NewIstioHTTPRequestTransport(transport, tlsConfig, h.GetDiscoveryClient(), logger)
 	httpTransport := pwhttp.NewHTTPTransport(tp, streamHandler, logger)
 
 	httpTransport.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
@@ -342,7 +399,27 @@ func (h *istioIntegrationHandler) GetGRPCDialOptions() ([]grpc.DialOption, error
 		return nil, errors.Wrap(err, "could not get stream handler")
 	}
 
-	grpcDialer := pwgrpc.NewGRPCDialer(h.caClient, streamHandler, h.discoveryClient, h.logger)
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(h.caClient.GetCAPem())
+
+	tlsConfig := &tls.Config{
+		GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), h.environment.GetSecretTTL())
+			if err != nil {
+				return nil, err
+			}
+
+			return cert.GetTLSCertificate(), nil
+		},
+		RootCAs:            certPool,
+		InsecureSkipVerify: true,
+		NextProtos: []string{
+			"istio-h2",
+			"h2",
+		},
+	}
+
+	grpcDialer := pwgrpc.NewGRPCDialer(streamHandler, tlsConfig, h.GetDiscoveryClient(), h.logger)
 	grpcDialer.AddMiddleware(middleware.NewEnvoyHTTPHandlerMiddleware())
 	grpcDialer.AddMiddleware(NewIstioHTTPHandlerMiddleware())
 
@@ -385,9 +462,9 @@ func (h *istioIntegrationHandler) ServeHTTP(ctx context.Context, ln net.Listener
 	certPool.AppendCertsFromPEM(h.caClient.GetCAPem())
 
 	tlsConfig := &tls.Config{
-		ClientAuth: tls.RequireAnyClientCert,
+		ClientAuth: tls.RequestClientCert,
 		GetCertificate: func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			cert, err := h.caClient.GetCertificate("", time.Hour*24)
+			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), h.environment.GetSecretTTL())
 			if err != nil {
 				return nil, err
 			}
@@ -402,39 +479,44 @@ func (h *istioIntegrationHandler) ServeHTTP(ctx context.Context, ln net.Listener
 		},
 	}
 
-	go func() {
-		_, err = h.discoveryClient.GetListenerProperties(ctx, listenAddress, func(lp discovery.ListenerProperties) {
-			h.logger.Info("got new listener properties", "address", listenAddress, "properties", lp)
-			ul := server.GetUnifiedListener()
-			if ul == nil {
-				return
-			}
-
-			if lp.UseTLS() {
-				if lp.Permissive() {
-					ul.SetTLSMode(listener.TLSModePermissive)
-				} else {
-					ul.SetTLSMode(listener.TLSModeStrict)
-				}
-			} else {
-				ul.SetTLSMode(listener.TLSModeDisabled)
-			}
-			if lp.IsClientCertificateRequired() {
-				ul.SetTLSClientAuthMode(tls.RequireAnyClientCert)
-			} else {
-				ul.SetTLSClientAuthMode(tls.RequestClientCert)
-			}
-		})
-		if err != nil {
-			h.logger.Error(err, "could not find listener properties", "address", listenAddress)
-		}
-	}()
+	go h.updateUnifiedListener(ctx, listenAddress, func() listener.UnifiedListener {
+		return server.GetUnifiedListener()
+	})
 
 	return server.ServeWithTLSConfig(ln, tlsConfig)
 }
 
+func (h *istioIntegrationHandler) updateUnifiedListener(ctx context.Context, listenAddress string, ulGetter func() listener.UnifiedListener) {
+	if _, err := h.GetDiscoveryClient().GetListenerProperties(ctx, listenAddress, func(lp discovery.ListenerProperties) {
+		h.logger.Info("got new listener properties", "address", listenAddress, "properties", lp)
+
+		ul := ulGetter()
+		if ul == nil {
+			return
+		}
+
+		tlsMode := listener.TLSModeDisabled
+		if lp.UseTLS() && lp.Permissive() {
+			tlsMode = listener.TLSModePermissive
+		} else if lp.UseTLS() {
+			tlsMode = listener.TLSModeStrict
+		}
+		ul.SetTLSMode(tlsMode)
+
+		tlsClientAuthMode := tls.RequestClientCert
+		if lp.IsClientCertificateRequired() {
+			tlsClientAuthMode = tls.RequireAnyClientCert
+		}
+		ul.SetTLSClientAuthMode(tlsClientAuthMode)
+
+		verify.SetCertVerifierToTLSConfig(lp, ul.GetTLSConfig())
+	}); err != nil {
+		h.logger.Error(err, "could not find listener properties", "address", listenAddress)
+	}
+}
+
 func (h *istioIntegrationHandler) Run(ctx context.Context) error {
-	if err := h.discoveryClient.Connect(ctx); err != nil {
+	if err := h.GetDiscoveryClient().Connect(ctx); err != nil {
 		return err
 	}
 
@@ -640,7 +722,7 @@ func (h *istioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, 
 	tlsConfig := &tls.Config{
 		ClientAuth: tls.RequestClientCert,
 		GetCertificate: func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), time.Duration(168)*time.Hour)
+			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), h.environment.GetSecretTTL())
 			if err != nil {
 				return nil, err
 			}
@@ -655,13 +737,17 @@ func (h *istioIntegrationHandler) GetTCPListener(l net.Listener) (net.Listener, 
 		},
 	}
 
-	l = listener.NewUnifiedListener(l, network.WrapTLSConfig(tlsConfig), listener.TLSModePermissive,
+	ul := listener.NewUnifiedListener(l, network.WrapTLSConfig(tlsConfig), listener.TLSModePermissive,
 		listener.UnifiedListenerWithTLSConnectionCreator(network.CreateTLSServerConn),
 		listener.UnifiedListenerWithConnectionWrapper(func(c net.Conn) net.Conn {
 			return network.WrapConnection(c)
 		}))
 
-	return tcp.WrapListener(l, streamHandler), nil
+	go h.updateUnifiedListener(context.TODO(), l.Addr().String(), func() listener.UnifiedListener {
+		return ul
+	})
+
+	return tcp.WrapListener(ul, streamHandler), nil
 }
 
 func (h *istioIntegrationHandler) GetTCPDialer(dialer *net.Dialer) (itcp.Dialer, error) {
@@ -674,7 +760,7 @@ func (h *istioIntegrationHandler) GetTCPDialer(dialer *net.Dialer) (itcp.Dialer,
 
 	tlsConfig := &tls.Config{
 		GetClientCertificate: func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), time.Duration(168)*time.Hour)
+			cert, err := h.caClient.GetCertificate(h.environment.GetSpiffeID(), h.environment.GetSecretTTL())
 			if err != nil {
 				return nil, err
 			}
@@ -694,7 +780,7 @@ func (h *istioIntegrationHandler) GetTCPDialer(dialer *net.Dialer) (itcp.Dialer,
 		return nil, errors.Wrap(err, "could not get stream handler")
 	}
 
-	return itcp.NewTCPDialer(streamHandler, tlsConfig, h.discoveryClient, dialer), nil
+	return itcp.NewTCPDialer(streamHandler, tlsConfig, h.GetDiscoveryClient(), dialer), nil
 }
 
 func (h *istioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConfig {

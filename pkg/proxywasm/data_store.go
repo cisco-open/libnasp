@@ -31,14 +31,34 @@ type dataSource struct {
 }
 
 type urlDataSource struct {
-	bytes []byte
-	url   string
+	bytes      []byte
+	url        string
+	httpGetter HTTPGetter
 }
 
-func NewURLDataSource(url string) api.DataSource {
-	return &urlDataSource{
-		url: url,
+type HTTPGetter interface {
+	Get(url string) (resp *http.Response, err error)
+}
+
+type URLDataSourceOption func(*urlDataSource)
+
+func URLDataSourceWithHTTPGetter(getter HTTPGetter) URLDataSourceOption {
+	return func(s *urlDataSource) {
+		s.httpGetter = getter
 	}
+}
+
+func NewURLDataSource(url string, opts ...URLDataSourceOption) api.DataSource {
+	s := &urlDataSource{
+		url:        url,
+		httpGetter: http.DefaultClient,
+	}
+
+	for _, f := range opts {
+		f(s)
+	}
+
+	return s
 }
 
 func (s *urlDataSource) Get() ([]byte, error) {
@@ -46,7 +66,7 @@ func (s *urlDataSource) Get() ([]byte, error) {
 		return s.bytes, nil
 	}
 
-	resp, err := http.DefaultClient.Get(s.url) //nolint:noctx
+	resp, err := s.httpGetter.Get(s.url)
 	if err != nil {
 		return nil, errors.WrapIfWithDetails(err, "could not parse url", "url", s.url)
 	}

@@ -16,10 +16,11 @@ package discovery
 
 import (
 	"context"
-
 	"net"
 
 	"github.com/go-logr/logr"
+
+	"github.com/cisco-open/nasp/pkg/tls/verify"
 )
 
 type DiscoveryClient interface {
@@ -34,7 +35,7 @@ type DiscoveryClient interface {
 }
 
 type ClientDiscoveryClient interface {
-	GetHTTPClientPropertiesByHost(ctx context.Context, address string, callbacks ...func(HTTPClientProperties)) (HTTPClientProperties, error)
+	GetHTTPClientPropertiesByHost(ctx context.Context, address string, callbacks ...func(ClientProperties)) (ClientProperties, error)
 	GetTCPClientPropertiesByHost(ctx context.Context, address string, callbacks ...func(ClientProperties)) (ClientProperties, error)
 
 	IncrementActiveRequestsCount(address string)
@@ -50,6 +51,7 @@ type ListenerProperties interface {
 	Permissive() bool
 	IsClientCertificateRequired() bool
 	Metadata() map[string]interface{}
+	GetCertVerifierConfig() *verify.CertVerifierConfig
 }
 
 type ClientProperties interface {
@@ -58,9 +60,5 @@ type ClientProperties interface {
 	Permissive() bool
 	ServerName() string
 	Metadata() map[string]interface{}
-}
-
-type HTTPClientProperties interface {
-	ClientProperties
-	ServerName() string
+	GetCertVerifierConfig() *verify.CertVerifierConfig
 }

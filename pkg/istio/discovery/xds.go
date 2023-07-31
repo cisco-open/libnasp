@@ -17,12 +17,9 @@ package discovery
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"net"
 	"sync"
 	"time"
-
-	adsconfig "github.com/cisco-open/nasp/pkg/ads/config"
 
 	"emperror.dev/errors"
 	"github.com/cenkalti/backoff/v4"
@@ -30,14 +27,15 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/cisco-open/nasp/pkg/ads"
-	"github.com/cisco-open/nasp/pkg/ca"
+	adsconfig "github.com/cisco-open/nasp/pkg/ads/config"
 	"github.com/cisco-open/nasp/pkg/environment"
 )
 
 type xdsDiscoveryClient struct {
+	address     string
 	environment *environment.IstioEnvironment
-	caClient    ca.Client
 	logger      logr.Logger
+	tlsConfig   *tls.Config
 
 	xdsClient ads.Client
 
@@ -61,16 +59,36 @@ type httpClientPropertiesContext struct {
 	context.Context
 }
 
-func NewXDSDiscoveryClient(environment *environment.IstioEnvironment, caClient ca.Client, logger logr.Logger) DiscoveryClient {
-	return &xdsDiscoveryClient{
+type XDSDiscoveryClientOption func(*xdsDiscoveryClient)
+
+func XDSDiscoveryClientWithLogger(logger logr.Logger) XDSDiscoveryClientOption {
+	return func(c *xdsDiscoveryClient) {
+		c.logger = logger
+	}
+}
+
+func XDSDiscoveryClientWithTLSConfig(config *tls.Config) XDSDiscoveryClientOption {
+	return func(c *xdsDiscoveryClient) {
+		c.tlsConfig = config
+	}
+}
+
+func NewXDSDiscoveryClient(address string, environment *environment.IstioEnvironment, opts ...XDSDiscoveryClientOption) DiscoveryClient {
+	c := &xdsDiscoveryClient{
+		address:     address,
 		environment: environment,
-		caClient:    caClient,
-		logger:      logger,
+		logger:      logr.Discard(),
 
 		listenerPropertiesContexts:   map[string]*listenerPropertiesContext{},
 		tcpClientPropertiesContexts:  map[string]*clientPropertiesContext{},
 		httpClientPropertiesContexts: map[string]*httpClientPropertiesContext{},
 	}
+
+	for _, o := range opts {
+		o(c)
+	}
+
+	return c
 }
 
 func (d *xdsDiscoveryClient) ResolveHost(hostName string) ([]net.IP, error) {
@@ -80,23 +98,10 @@ func (d *xdsDiscoveryClient) ResolveHost(hostName string) ([]net.IP, error) {
 func (d *xdsDiscoveryClient) Connect(ctx context.Context) error {
 	ctx = logr.NewContext(ctx, d.logger)
 
-	d.logger.Info("get certificate")
-	cert, err := d.caClient.GetCertificate(d.environment.GetSpiffeID(), time.Hour*24)
+	addr, err := net.ResolveTCPAddr("tcp", d.address)
 	if err != nil {
 		return err
 	}
-
-	addr, err := net.ResolveTCPAddr("tcp", d.caClient.GetCAEndpoint())
-	if err != nil {
-		return err
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates:       []tls.Certificate{*cert.GetTLSCertificate()},
-		RootCAs:            x509.NewCertPool(),
-		InsecureSkipVerify: true,
-	}
-	tlsConfig.RootCAs.AppendCertsFromPEM(d.caClient.GetCAPem())
 
 	md, err := structpb.NewStruct(d.environment.GetNodePropertiesFromEnvironment()["metadata"].(map[string]interface{}))
 	if err != nil {
@@ -112,7 +117,7 @@ func (d *xdsDiscoveryClient) Connect(ctx context.Context) error {
 		},
 		ManagementServerAddress: addr,
 		ClusterID:               d.environment.ClusterID,
-		TLSConfig:               tlsConfig,
+		TLSConfig:               d.tlsConfig,
 		SearchDomains:           d.environment.SearchDomains,
 	}
 
@@ -226,7 +231,7 @@ func (d *xdsDiscoveryClient) GetTCPClientPropertiesByHost(ctx context.Context, a
 	return nil, errors.New("could not find tcp client properties")
 }
 
-func (d *xdsDiscoveryClient) GetHTTPClientPropertiesByHost(ctx context.Context, address string, callbacks ...func(HTTPClientProperties)) (HTTPClientProperties, error) {
+func (d *xdsDiscoveryClient) GetHTTPClientPropertiesByHost(ctx context.Context, address string, callbacks ...func(ClientProperties)) (ClientProperties, error) {
 	if d.xdsClient == nil {
 		return nil, errors.New("xds client is not connected")
 	}

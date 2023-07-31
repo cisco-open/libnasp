@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/cisco-open/nasp/pkg/ads/config"
+	"github.com/cisco-open/nasp/pkg/tls/verify"
 )
 
 // HostNotFoundError is returned when the given host name is not found in Istio's NDS
@@ -109,6 +110,9 @@ type ListenerProperties interface {
 
 	// Metadata returns the metadata associated with this listener
 	Metadata() map[string]interface{}
+
+	// GetCertVerifierConfig returns certificate verifier config
+	GetCertVerifierConfig() *verify.CertVerifierConfig
 }
 
 // ClientPropertiesResponse contains the result for the API call
@@ -137,6 +141,9 @@ type ClientProperties interface {
 
 	// Metadata returns the metadata associated with the target service
 	Metadata() map[string]interface{}
+
+	// GetCertVerifierConfig returns certificate verifier config
+	GetCertVerifierConfig() *verify.CertVerifierConfig
 }
 
 // HTTPClientPropertiesResponse contains the result for the API call
