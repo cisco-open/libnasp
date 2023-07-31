@@ -36,9 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
 
-	"github.com/banzaicloud/operator-tools/pkg/reconciler"
-
 	"github.com/cisco-open/nasp/components/heimdall/pkg/predicates"
+	"github.com/cisco-open/operator-tools/pkg/reconciler"
 )
 
 type ConfigMapReconciler struct {

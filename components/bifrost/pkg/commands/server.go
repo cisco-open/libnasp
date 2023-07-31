@@ -209,6 +209,7 @@ func startEndpointsManager(ctx context.Context, kubeconfig *rest.Config, logger 
 	}
 
 	rec := (&controllers.EndpointsReconciler{
+		Cache:  mgr.GetCache(),
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		Logger: logger,
