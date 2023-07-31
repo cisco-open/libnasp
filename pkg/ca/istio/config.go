@@ -391,7 +391,12 @@ func GetIstioTokenFromPod(config *rest.Config, scheme *runtime.Scheme, name, nam
 		Kind:    "Pod",
 	}
 
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, config, serializer.NewCodecFactory(scheme))
+	httpClient, err := rest.HTTPClientFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, config, serializer.NewCodecFactory(scheme), httpClient)
 	if err != nil {
 		return nil, err
 	}

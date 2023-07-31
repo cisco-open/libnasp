@@ -34,7 +34,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/banzaicloud/operator-tools/pkg/utils"
 	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero"
 	"github.com/cisco-open/nasp/components/bifrost/pkg/k8s"
 	"github.com/cisco-open/nasp/pkg/ca"
@@ -57,6 +56,7 @@ import (
 	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
 	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
 	"github.com/cisco-open/nasp/pkg/tls/verify"
+	"github.com/cisco-open/operator-tools/pkg/utils"
 )
 
 var DefaultNetDialer = &net.Dialer{

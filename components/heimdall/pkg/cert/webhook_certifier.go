@@ -238,7 +238,7 @@ func (certifier *WebhookCertifier) startWebhookConfigurationInformer() error {
 		return err
 	}
 
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldConfig, newConfig interface{}) {
 			var config runtimeclient.Object
 			var ok bool
@@ -274,6 +274,11 @@ func (certifier *WebhookCertifier) startWebhookConfigurationInformer() error {
 			}
 		},
 	})
+	if err != nil {
+		logger.Error(errors.WrapIf(err, "could not add event handler"), "starting webhook configuration informer failed")
+
+		return err
+	}
 
 	logger.Info("started webhook configuration informer successfully")
 
