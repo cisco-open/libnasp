@@ -18,8 +18,12 @@ package tcp_test
 import (
 	"bytes"
 	"context"
+
+	//nolint:gosec
+	"crypto/md5"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -27,7 +31,10 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/nettest"
+
+	"github.com/cisco-open/nasp/pkg/proxywasm/testdata"
 
 	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero"
 	"github.com/cisco-open/nasp/pkg/environment"
@@ -119,8 +126,19 @@ func pipemaker() nettest.MakePipe {
 	}
 }
 
-var clientSH = getstream("wazero", "clientStream")
-var serverSH = getstream("wazero", "serverStream")
+var tcpMetadatExchangeFilter = api.WasmPluginConfig{
+	Name:   "tcp-metadata-exchange",
+	RootID: "tcp-metadata-exchange",
+	VMConfig: api.WasmVMConfig{
+		ID:   "",
+		Code: proxywasm.NewFileDataSource(filters.Filters, "tcp-metadata-exchange-filter.wasm"),
+	},
+	Configuration: api.JsonnableMap{},
+	InstanceCount: 1,
+}
+
+var clientSH = getstream("wazero", "clientStream", tcpMetadatExchangeFilter)
+var serverSH = getstream("wazero", "serverStream", tcpMetadatExchangeFilter)
 
 func wrappedpipemaker() nettest.MakePipe {
 	return func() (c1, c2 net.Conn, stop func(), err error) {
@@ -151,7 +169,8 @@ func wrappedpipemaker() nettest.MakePipe {
 	}
 }
 
-func getstream(runtime string, prefix string) api.StreamHandler {
+//nolint:unparam
+func getstream(runtime string, prefix string, wasmPluginConfigs ...api.WasmPluginConfig) api.StreamHandler {
 	for _, env := range []string{
 		prefix + "_NASP_TYPE=sidecar",
 		fmt.Sprintf("%s_NASP_POD_NAME=%s-alpine-efefefef-f5wwf", prefix, prefix),
@@ -175,7 +194,7 @@ func getstream(runtime string, prefix string) api.StreamHandler {
 	logger := logr.Discard()
 
 	runtimeCreators := proxywasm.NewRuntimeCreatorStore()
-	runtimeCreators.Set("wazero", func() api.WasmRuntime {
+	runtimeCreators.Set(runtime, func() api.WasmRuntime {
 		return wazero.NewVM(context.Background(), wazero.VMWithLogger(logger))
 	})
 	baseContext := proxywasm.GetBaseContext(prefix)
@@ -183,24 +202,85 @@ func getstream(runtime string, prefix string) api.StreamHandler {
 
 	vms := proxywasm.NewVMStore(runtimeCreators, logger)
 	pm := proxywasm.NewWasmPluginManager(vms, baseContext, logger)
-	sh, err := proxywasm.NewStreamHandler(pm,
-		[]api.WasmPluginConfig{
-			{
-				Name:   "tcp-metadata-exchange",
-				RootID: "tcp-metadata-exchange",
-				VMConfig: api.WasmVMConfig{
-					Runtime: runtime,
-					ID:      "",
-					Code:    proxywasm.NewFileDataSource(filters.Filters, "tcp-metadata-exchange-filter.wasm"),
-				},
-				Configuration: api.JsonnableMap{},
-				InstanceCount: 1,
-			},
-		},
-	)
+	for i := range wasmPluginConfigs {
+		wasmPluginConfigs[i].VMConfig.Runtime = runtime
+	}
+	sh, err := proxywasm.NewStreamHandler(pm, wasmPluginConfigs)
 	if err != nil {
 		panic(err)
 	}
 
 	return sh
+}
+
+func TestWrappedNetConnWithDataChunks(t *testing.T) {
+	t.Parallel()
+
+	requiredDataSize := 10
+	filter := api.WasmPluginConfig{
+		Name:   "tcp-multichunk-test-filter",
+		RootID: "tcp-multichunk-test-filter",
+		VMConfig: api.WasmVMConfig{
+			ID:   "",
+			Code: proxywasm.NewFileDataSource(testdata.Filters, "multichunk.wasm"),
+		},
+		Configuration: api.JsonnableMap{
+			"req_data_size": requiredDataSize,
+		},
+		InstanceCount: 1,
+	}
+	serverStreamHandler := getstream("wazero", "serverStream", filter)
+	serverStream, err := serverStreamHandler.NewStream(api.ListenerDirectionInbound)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	serverStream.Set("upstream.negotiated_protocol", "istio-peer-exchange")
+
+	clientStreamHandler := getstream("wazero", "clientStream")
+	clientStream, err := clientStreamHandler.NewStream(api.ListenerDirectionOutbound)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	clientStream.Set("upstream.negotiated_protocol", "istio-peer-exchange")
+
+	c1, c2 := net.Pipe()
+	c1 = tcp.NewWrappedConn(c1, clientStream)
+	c2 = tcp.NewWrappedConn(c2, serverStream)
+
+	defer c1.Close()
+	defer c2.Close()
+
+	input := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+
+	//nolint:errcheck
+	go func() {
+		c1.Write(input[0:3])
+		c1.Write(input[3:6])
+		c1.Write(input[6:9])
+		c1.Write(input[9:])
+	}()
+
+	// we expect the original bytes followed by the chunk count and the MD5 checksum of the original first `requiredDataSize` bytes
+	// note: the md5 checksum is 16 bytes long
+	var b [32]byte // 15 input bytes + 1 byte for chunk count + 16 bytes MD5 checksum
+	n, err := c2.Read(b[:])
+	if err != nil && !errors.Is(err, io.EOF) {
+		t.Error(err)
+		return
+	}
+
+	if n != len(b) {
+		t.Error("expected to receive 32 bytes but got only", n)
+		return
+	}
+
+	//nolint:gosec
+	checkSum := md5.Sum(input[:requiredDataSize])
+	expected := input
+
+	expected = append(expected, 4) // 4 chunks written
+	expected = append(expected, checkSum[:]...)
+	assert.Equal(t, expected, b[:], "expected to receive original 15 bytes followed by sent data chunks count and the MD5 checksum of the first 10 bytes which is 16 bytes long")
 }
