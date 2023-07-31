@@ -36,11 +36,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/banzaicloud/operator-tools/pkg/reconciler"
 	"github.com/cisco-open/nasp/components/heimdall/pkg/predicates"
 	"github.com/cisco-open/nasp/components/heimdall/pkg/server"
 	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
 	k8slabels "github.com/cisco-open/nasp/pkg/k8s/labels"
+	"github.com/cisco-open/operator-tools/pkg/reconciler"
 )
 
 type IstioWorkloadGroupReconciler struct {

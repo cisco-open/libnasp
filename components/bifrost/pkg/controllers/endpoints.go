@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlBuilder "sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -35,10 +36,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
 
-	"github.com/banzaicloud/operator-tools/pkg/reconciler"
-
 	"github.com/cisco-open/nasp/components/bifrost/pkg/k8s"
 	"github.com/cisco-open/nasp/components/heimdall/pkg/predicates"
+	"github.com/cisco-open/operator-tools/pkg/reconciler"
 )
 
 var (
@@ -50,6 +50,7 @@ var (
 type EndpointsReconciler struct {
 	client.Client
 
+	Cache  cache.Cache
 	Scheme *runtime.Scheme
 	Logger logr.Logger
 
@@ -148,14 +149,13 @@ func (r *EndpointsReconciler) SetupWithManager(mgr ctrl.Manager) (err error) {
 		return err
 	}
 
-	if err := r.ctrl.Watch(&source.Kind{
-		Type: &corev1.Endpoints{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Endpoints",
-				APIVersion: corev1.SchemeGroupVersion.String(),
-			},
+	if err := r.ctrl.Watch(source.Kind(r.Cache, &corev1.Endpoints{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Endpoints",
+			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
-	}, &handler.EnqueueRequestForObject{}, lsp); err != nil {
+	},
+	), &handler.EnqueueRequestForObject{}, lsp); err != nil {
 		return err
 	}
 
