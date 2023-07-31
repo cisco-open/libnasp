@@ -16,7 +16,11 @@
 package main
 
 import (
+	//nolint:gosec
 	"crypto/md5"
+
+	"errors"
+
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm/types"
 	"github.com/tidwall/gjson"
@@ -49,7 +53,7 @@ type pluginContext struct {
 
 func (ctx *pluginContext) OnPluginStart(pluginConfigurationSize int) types.OnPluginStartStatus {
 	pluginConfig, err := proxywasm.GetPluginConfiguration()
-	if err != nil && err != types.ErrorStatusNotFound {
+	if err != nil && !errors.Is(err, types.ErrorStatusNotFound) {
 		proxywasm.LogCriticalf("error reading plugin configuration: %v", err)
 		return types.OnPluginStartStatusFailed
 	}
@@ -97,13 +101,14 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 	}
 
 	data, err := proxywasm.GetDownstreamData(0, int(ctx.reqDataSize))
-	if err != nil && err != types.ErrorStatusNotFound {
+	if err != nil && !errors.Is(err, types.ErrorStatusNotFound) {
 		proxywasm.LogCriticalf("failed to get downstream data: %v", err)
 		return types.ActionContinue
 	}
 
 	proxywasm.LogInfof(">>>>>> downstream data received >>>>>>\n%s", string(data))
 
+	//nolint:gosec
 	checkSum := md5.Sum(data)
 	var b []byte
 	b = append(b, byte(ctx.counter))
