@@ -222,7 +222,7 @@ func (c *wrappedConn) Write(b []byte) (int, error) {
 	}
 
 	for {
-		n1, err := io.Copy(c.Conn, io.LimitReader(c.writeBuffer, int64(internalWriteBufferSize)))
+		n1, err := c.writeBuffer.(*bytes.Buffer).WriteTo(c.Conn)
 		if err != nil {
 			return 0, err
 		}
