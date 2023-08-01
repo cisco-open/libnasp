@@ -176,7 +176,10 @@ func (c *channelPool) Get() (net.Conn, error) {
 			return nil, errors.WrapIf(err, "could not create new connection with factory")
 		}
 
-		return c.wrapConn(conn), nil
+		wc := c.wrapConn(conn)
+		wc.Acquire()
+
+		return wc, nil
 	}
 }
 
@@ -194,12 +197,17 @@ func (c *channelPool) Put(conn net.Conn) error {
 
 	c.removeClosedConnections()
 
-	if c.IsClosed() {
-		// pool is closed, close passed connection
-		return conn.Close()
+	var wc Connection
+	if conn, ok := conn.(Connection); ok {
+		wc = conn
+	} else {
+		wc = c.wrapConn(conn)
 	}
 
-	wc := c.wrapConn(conn)
+	if c.IsClosed() {
+		// pool is closed, close passed connection
+		return wc.Discard()
+	}
 
 	// put the resource back into the pool. If the pool is full, this will
 	// block and the default case will be executed.
@@ -207,11 +215,13 @@ func (c *channelPool) Put(conn net.Conn) error {
 	case c.conns <- wc:
 		c.logger.Info("put connection back to the pool")
 		wc.Release()
+
 		return nil
 	default:
 		// pool is full, close passed connection
 		c.logger.Info("pool is full, close connection")
-		return conn.Close()
+
+		return wc.Discard()
 	}
 }
 

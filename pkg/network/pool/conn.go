@@ -15,8 +15,11 @@
 package pool
 
 import (
+	"errors"
 	"net"
+	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -30,7 +33,8 @@ type poolConnection struct {
 	idleTimer   *time.Timer
 
 	failed bool
-	closed bool
+	closed atomic.Bool
+	used   atomic.Bool
 }
 
 // Close puts the given connects back to the pool instead of closing it.
@@ -39,7 +43,7 @@ func (c *poolConnection) Close() error {
 		return c.Discard()
 	}
 
-	return c.pool.Put(c.Conn)
+	return c.pool.Put(c)
 }
 
 func (c *poolConnection) NetConn() net.Conn {
@@ -48,6 +52,18 @@ func (c *poolConnection) NetConn() net.Conn {
 
 func (c *poolConnection) Read(b []byte) (n int, err error) {
 	n, err = c.Conn.Read(b)
+
+	// return closed error instead of timeout
+	// if timeout is caused by closing connection
+	// and release it back to the pool
+	if errors.Is(err, os.ErrDeadlineExceeded) && !c.used.Load() {
+		if e, ok := err.(*net.OpError); ok {
+			e.Err = net.ErrClosed
+		}
+
+		return
+	}
+
 	if err != nil {
 		c.failed = true
 	}
@@ -62,18 +78,20 @@ func (c *poolConnection) Discard() error {
 	}
 
 	c.stopIdleTimer()
-	c.closed = true
+	c.closed.Store(true)
 
 	return c.Conn.Close()
 }
 
 // IsClosed checks whether the connection is closed already.
 func (c *poolConnection) IsClosed() bool {
-	return c.closed
+	return c.closed.Load()
 }
 
 // Acquire is used to signal when the connection is served from the connection pool.
 func (c *poolConnection) Acquire() {
+	c.used.Store(true)
+
 	// set deadline to zero
 	_ = c.Conn.SetDeadline(time.Time{})
 
@@ -82,6 +100,8 @@ func (c *poolConnection) Acquire() {
 
 // Release is used to signal when the connection is put back into the connection pool.
 func (c *poolConnection) Release() {
+	c.used.Store(false)
+
 	if c.idleTimeout > 0 {
 		c.setIdleTimer(c.idleTimeout)
 	}
