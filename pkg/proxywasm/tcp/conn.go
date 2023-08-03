@@ -39,9 +39,9 @@ type wrappedConn struct {
 
 	stream api.Stream
 
-	readCacheBuffer api.IoBuffer
-	readBuffer      api.IoBuffer
-	writeBuffer     api.IoBuffer
+	readCacheBuffer bytes.Buffer
+	readBuffer      bytes.Buffer
+	writeBuffer     bytes.Buffer
 	internalBuffer  []byte
 
 	connectionInfoSet atomic.Bool
@@ -56,19 +56,16 @@ func NewWrappedConn(conn net.Conn, stream api.Stream) net.Conn {
 	c := &wrappedConn{
 		Conn: conn,
 
-		stream:          stream,
-		readCacheBuffer: new(bytes.Buffer),
-		readBuffer:      new(bytes.Buffer),
-		writeBuffer:     new(bytes.Buffer),
-		internalBuffer:  make([]byte, internalBufferSize),
+		stream:         stream,
+		internalBuffer: make([]byte, internalBufferSize),
 	}
 
 	if stream.Direction() == api.ListenerDirectionOutbound {
-		proxywasm.UpstreamDataProperty(stream).Set(c.readBuffer)
-		proxywasm.DownstreamDataProperty(stream).Set(c.writeBuffer)
+		proxywasm.UpstreamDataProperty(stream).Set(&c.readBuffer)
+		proxywasm.DownstreamDataProperty(stream).Set(&c.writeBuffer)
 	} else {
-		proxywasm.DownstreamDataProperty(stream).Set(c.readBuffer)
-		proxywasm.UpstreamDataProperty(stream).Set(c.writeBuffer)
+		proxywasm.DownstreamDataProperty(stream).Set(&c.readBuffer)
+		proxywasm.UpstreamDataProperty(stream).Set(&c.writeBuffer)
 	}
 
 	return c
@@ -131,8 +128,8 @@ func (c *wrappedConn) read(b []byte) (int, error) {
 		return x, nil
 	}
 
-	if diff := cap(b) - cap(c.internalBuffer); diff > 0 {
-		c.internalBuffer = append(c.internalBuffer, make([]byte, diff)...)
+	if cap(c.internalBuffer) < cap(b) {
+		c.internalBuffer = make([]byte, len(b))
 	}
 
 	done := false
@@ -178,7 +175,7 @@ func (c *wrappedConn) read(b []byte) (int, error) {
 
 	defer func() {
 		// put the read data to the read buffer
-		_, _ = io.Copy(c.readCacheBuffer, c.readBuffer)
+		_, _ = c.readBuffer.WriteTo(&c.readCacheBuffer)
 	}()
 
 	// do not return eof on readbuffer here
@@ -222,12 +219,13 @@ func (c *wrappedConn) Write(b []byte) (int, error) {
 	}
 
 	for {
-		n1, err := io.Copy(c.Conn, io.LimitReader(c.writeBuffer, int64(internalWriteBufferSize)))
+		data := c.writeBuffer.Next(internalWriteBufferSize)
+		if len(data) == 0 {
+			return n, nil
+		}
+		_, err = c.Conn.Write(data)
 		if err != nil {
 			return 0, err
-		}
-		if n1 == 0 {
-			return n, nil
 		}
 	}
 }

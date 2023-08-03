@@ -21,19 +21,16 @@ import (
 	"github.com/go-logr/logr"
 )
 
-var ConnectionStateTrackerLogger logr.Logger = logr.Discard()
+var discardLogger = logr.Discard()
+var ConnectionStateTrackerLogger logr.Logger = discardLogger
 
 type connectionStateTracker struct {
-	logger logr.Logger
-
 	connectionState            ConnectionState
 	connWithTLSConnectionState ConnWithTLSConnectionState
 }
 
 func ConnectionStateFromNetConn(conn net.Conn) (ConnectionState, bool) {
-	t := &connectionStateTracker{
-		logger: ConnectionStateTrackerLogger,
-	}
+	t := &connectionStateTracker{}
 
 	state := t.getConnectionState(conn)
 
@@ -45,7 +42,9 @@ func ConnectionStateFromNetConn(conn net.Conn) (ConnectionState, bool) {
 }
 
 func (t *connectionStateTracker) getTLSConnection(c net.Conn) net.Conn {
-	t.logger.Info("check connection", "type", fmt.Sprintf("%T", c))
+	if ConnectionStateTrackerLogger != discardLogger {
+		ConnectionStateTrackerLogger.Info("check connection", "type", fmt.Sprintf("%T", c))
+	}
 
 	if _, ok := c.(ConnWithTLSConnectionState); ok {
 		return c
@@ -65,7 +64,9 @@ func (t *connectionStateTracker) getTLSConnection(c net.Conn) net.Conn {
 }
 
 func (t *connectionStateTracker) getConnectionState(c net.Conn) ConnectionState {
-	t.logger.Info("check connection", "type", fmt.Sprintf("%T", c))
+	if ConnectionStateTrackerLogger != discardLogger {
+		ConnectionStateTrackerLogger.Info("check connection", "type", fmt.Sprintf("%T", c))
+	}
 
 	if c, ok := c.(ConnWithTLSConnectionState); ok {
 		t.connWithTLSConnectionState = c

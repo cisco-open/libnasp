@@ -31,7 +31,8 @@ import (
 type HostFunctions struct {
 	pwapi.ImportsHandler
 
-	logger logr.Logger
+	logger           logr.Logger
+	wasmFilterLogger logr.Logger
 
 	properties api.PropertyHolder
 	metrics    api.MetricHandler
@@ -42,6 +43,7 @@ type HostFunctionsOption func(hf *HostFunctions)
 func SetHostFunctionsLogger(logger logr.Logger) HostFunctionsOption {
 	return func(hf *HostFunctions) {
 		hf.logger = logger
+		hf.wasmFilterLogger = hf.logger.WithName("wasm filter")
 	}
 }
 
@@ -64,6 +66,7 @@ func NewHostFunctions(properties api.PropertyHolder, options ...HostFunctionsOpt
 
 	if hf.logger == (logr.Logger{}) {
 		hf.logger = klog.Background()
+		hf.wasmFilterLogger = hf.logger.WithName("wasm filter")
 	}
 
 	return hf
@@ -91,7 +94,7 @@ func (f *HostFunctions) Log(level pwapi.LogLevel, msg string) pwapi.WasmResult {
 		logLevel = 2 - int(level)
 	}
 
-	f.Logger().V(logLevel).WithName("wasm filter").Info(msg, "level", level)
+	f.wasmFilterLogger.V(logLevel).Info(msg, "level", level)
 
 	return pwapi.WasmResultOk
 }

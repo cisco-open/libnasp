@@ -180,9 +180,7 @@ func (c *connection) setTLSConnectionState() {
 		return
 	}
 
-	t := &connectionStateTracker{
-		logger: ConnectionStateTrackerLogger,
-	}
+	t := &connectionStateTracker{}
 
 	tlsConn := t.getTLSConnection(c)
 	if tlsConn != nil {
