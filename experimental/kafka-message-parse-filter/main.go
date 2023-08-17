@@ -16,6 +16,7 @@ package main
 
 import (
 	"encoding/binary"
+	"errors"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm/types"
 	"strconv"
@@ -81,7 +82,7 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 	}
 
 	kafkaMessage, err := proxywasm.GetDownstreamData(4, int(kafkaMessageLength))
-	if err != nil && err != types.ErrorStatusNotFound {
+	if err != nil && !errors.Is(err, types.ErrorStatusNotFound) {
 		proxywasm.LogCriticalf("failed to get downstream data: %v", err)
 		return types.ActionContinue
 	}
@@ -92,6 +93,8 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 
 	proxywasm.LogInfof(">>>>>> kafka message parsed, kafka message contents >>>>>>\n%s", kafkaRequest.String())
 	proxywasm.LogInfof(">>>>>> kafka message parsed error, error >>>>>>\n%s", err.Error())
+
+	kafkaRequest.Release()
 
 	return types.ActionContinue
 }
