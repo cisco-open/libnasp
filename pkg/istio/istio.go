@@ -808,12 +808,12 @@ func (h *istioIntegrationHandler) defaultTCPClientFilters() []api.WasmPluginConf
 			InstanceCount: 1,
 		},
 		{
-			Name:   "kafka-message-parser",
-			RootID: "kafka-message-parser",
+			Name:   "kafka_msg_trace_filter",
+			RootID: "kafka_msg_trace_filter",
 			VMConfig: api.WasmVMConfig{
 				Runtime: h.config.DefaultWASMRuntime,
 				ID:      "",
-				Code:    proxywasm.NewFileDataSource(filters.Filters, "kafka-message-parser.wasm"),
+				Code:    proxywasm.NewFileDataSource(filters.Filters, "kafka_msg_trace_filter.wasm"),
 			},
 			Configuration: api.JsonnableMap{},
 			InstanceCount: 1,
@@ -846,12 +846,12 @@ func (h *istioIntegrationHandler) defaultTCPServerFilters() []api.WasmPluginConf
 			InstanceCount: 1,
 		},
 		{
-			Name:   "kafka-message-parser",
-			RootID: "kafka-message-parser",
+			Name:   "kafka_msg_trace_filter",
+			RootID: "kafka_msg_trace_filter",
 			VMConfig: api.WasmVMConfig{
 				Runtime: h.config.DefaultWASMRuntime,
 				ID:      "",
-				Code:    proxywasm.NewFileDataSource(filters.Filters, "kafka-message-parser.wasm"),
+				Code:    proxywasm.NewFileDataSource(filters.Filters, "kafka_msg_trace_filter.wasm"),
 			},
 			Configuration: api.JsonnableMap{},
 			InstanceCount: 1,
