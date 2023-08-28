@@ -11,6 +11,7 @@ github.com/klauspost/compress v1.16.5 h1:IFV2oUNUzZaz+XyusxpLzpzS8Pt5rh0Z16For/d
 github.com/klauspost/compress v1.16.5/go.mod h1:ntbaceVETuRiXiv4DpjP66DpAtAGkEQskQzEyD//IeE=
 github.com/pierrec/lz4/v4 v4.1.17 h1:kV4Ip+/hUBC+8T6+2EgburRtkE9ef4nbY3f4dFhGjMc=
 github.com/pierrec/lz4/v4 v4.1.17/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFuRQyBid4=
+github.com/pierrec/lz4/v4 v4.1.18/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFuRQyBid4=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
@@ -23,6 +24,8 @@ github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/stretchr/testify v1.8.2 h1:+h33VjcLVPDHtOdpUCuF+7gSuG3yGIftsP1YvFihtJ8=
 github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
+github.com/tetratelabs/proxy-wasm-go-sdk v0.22.0 h1:kS7BvMKN+FiptV4pfwiNX8e3q14evxAWkhYbxt8EI1M=
+github.com/tetratelabs/proxy-wasm-go-sdk v0.22.0/go.mod h1:qkW5MBz2jch2u8bS59wws65WC+Gtx3x0aPUX5JL7CXI=
 github.com/tetratelabs/wazero v1.0.1 h1:xyWBoGyMjYekG3mEQ/W7xm9E05S89kJ/at696d/9yuc=
 github.com/tetratelabs/wazero v1.0.1/go.mod h1:wYx2gNRg8/WihJfSDxA1TIL8H+GkfLYm+bIfbblu9VQ=
 go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
@@ -36,3 +39,7 @@ gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 wwwin-github.cisco.com/eti/kafka-protocol-go v0.0.0-20230705090120-80b8ffe3e9a4 h1:/yu2IuB66phGYB6UzEk6FxRUlJpG3yVIUJZAwc1uuEE=
 wwwin-github.cisco.com/eti/kafka-protocol-go v0.0.0-20230705090120-80b8ffe3e9a4/go.mod h1:3UnzS5BEJ5rqKRA31+9P9LJysvHt6wVT6iffl6MAyGU=
+wwwin-github.cisco.com/eti/kafka-protocol-go/pkg v0.0.0-20230822085341-cdbc4c42c585 h1:bgFRvwMeI9L5L/KpFP7jeCsVbe8I0ywJOUBljt9YS/Y=
+wwwin-github.cisco.com/eti/kafka-protocol-go/pkg v0.0.0-20230822085341-cdbc4c42c585/go.mod h1:YjsQsvkkb6QHg2IHAHSjXzxucpDsGZuqaqgHrDtBpC0=
+wwwin-github.cisco.com/eti/kafka-protocol-go/pkg v0.0.0-20230828084202-d11dfe56292b h1:nZDZ1Kx3MM/Zif5JimVcDnF/43tUlSlqtQ9S/JHyd0k=
+wwwin-github.cisco.com/eti/kafka-protocol-go/pkg v0.0.0-20230828084202-d11dfe56292b/go.mod h1:YjsQsvkkb6QHg2IHAHSjXzxucpDsGZuqaqgHrDtBpC0=

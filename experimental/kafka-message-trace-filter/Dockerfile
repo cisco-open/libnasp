@@ -1,4 +1,4 @@
-# Copyright (c) 2021 Cisco and/or its affiliates. All rights reserved.
+# Copyright (c) 2023 Cisco and/or its affiliates. All rights reserved.
 ARG BASE_IMAGE=istio/proxyv2
 ARG BASE_IMAGE_TAG=1.15.3
 
