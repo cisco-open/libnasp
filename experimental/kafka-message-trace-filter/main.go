@@ -21,12 +21,12 @@ import (
 	"errors"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm/types"
+	//_ "github.com/wasilibs/nottinygc"
 	"io"
 	"strconv"
 	"strings"
 	"wwwin-github.cisco.com/eti/kafka-protocol-go/pkg/request"
 	"wwwin-github.cisco.com/eti/kafka-protocol-go/pkg/response"
-	//_ "github.com/wasilibs/nottinygc"
 )
 
 const kafkaMsgSizeBytesLen = 4 // kafka messages size is represented on 4 bytes
