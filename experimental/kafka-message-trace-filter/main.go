@@ -19,14 +19,14 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/request"
+	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/response"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm/types"
 	//_ "github.com/wasilibs/nottinygc"
 	"io"
 	"strconv"
 	"strings"
-	"wwwin-github.cisco.com/eti/kafka-protocol-go/pkg/request"
-	"wwwin-github.cisco.com/eti/kafka-protocol-go/pkg/response"
 )
 
 const kafkaMsgSizeBytesLen = 4 // kafka messages size is represented on 4 bytes

@@ -1,5 +1,7 @@
 emperror.dev/errors v0.8.1 h1:UavXZ5cSX/4u9iyvH6aDcuGkVjeexUGJ7Ij7G4VfQT0=
 emperror.dev/errors v0.8.1/go.mod h1:YcRvLPh626Ubn2xqtoprejnA5nFha+TJ+2vew48kWuE=
+github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230830140910-e7228b105db8 h1:cfUXX7T+y+eMQJHI69Te+8tumUZnVw93TcGESCVYDhw=
+github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230830140910-e7228b105db8/go.mod h1:bvjdbNkILn+YZ+4uSRg1tGAcixAxFgWnfWozJAMFFuw=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -25,5 +27,3 @@ go.uber.org/multierr v1.6.0/go.mod h1:cdWPpRnG4AhwMwsgIHip0KRBQjJy5kYEpYjJxpXp9i
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
-wwwin-github.cisco.com/eti/kafka-protocol-go/pkg v0.0.0-20230828084202-d11dfe56292b h1:nZDZ1Kx3MM/Zif5JimVcDnF/43tUlSlqtQ9S/JHyd0k=
-wwwin-github.cisco.com/eti/kafka-protocol-go/pkg v0.0.0-20230828084202-d11dfe56292b/go.mod h1:YjsQsvkkb6QHg2IHAHSjXzxucpDsGZuqaqgHrDtBpC0=
