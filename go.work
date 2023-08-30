@@ -10,4 +10,6 @@ use (
 	./experimental/java
 	./experimental/mobile
 	./pkg/proxywasm/testdata/filters
+	components/kafka-protocol-go/pkg
+	components/kafka-protocol-go
 )
