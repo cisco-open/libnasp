@@ -1,0 +1,91 @@
+run:
+  skip-dirs:
+    - .gen
+    - ".*~"
+  skip-files:
+    - ".*zz_.*\\.go$"
+
+linters:
+  enable-all: true
+  disable:
+    - lll
+    - gochecknoinits
+    - gochecknoglobals
+    - godot
+    - godox
+    - wsl
+    - dupl
+    - wrapcheck
+    - forbidigo
+    - varnamelen
+    - ireturn
+    - gci
+    - containedctx
+    - contextcheck
+    - testpackage
+    - musttag
+
+    - gomoddirectives
+
+    # special cases only
+    - exhaustivestruct
+
+    # deprecated
+    - maligned
+    - interfacer
+    - golint
+    - scopelint
+    - ifshort
+    - deadcode
+    - structcheck
+    - varcheck
+    - nosnakecase
+
+    # cosmetics
+    - tagliatelle
+    - nonamedreturns
+    - nlreturn
+    - exhaustruct
+    - gomnd
+    - revive
+    - stylecheck
+    - nilnil
+    - logrlint
+    - gofumpt
+
+    # generics
+    - rowserrcheck
+    - sqlclosecheck
+    - wastedassign
+
+linters-settings:
+  gomnd:
+    settings:
+      mnd:
+        checks: [case, operation, return, assign]
+  gocognit:
+    min-complexity: 50
+  cyclop:
+    max-complexity: 40
+  golint:
+    min-confidence: 0.1
+  gocyclo:
+    min-complexity: 40
+  goimports:
+    local-prefixes: github.com/cisco-open,wwwin-github.cisco.com
+  gocritic:
+    disabled-checks:
+      - ifElseChain
+  gosec:
+    excludes:
+      - G402
+      - G112
+  funlen:
+    lines: 100 # default: 60
+    statements: 64 # default: 40
+
+issues:
+  exclude-rules:
+    - linters:
+        - staticcheck
+      text: "SA1019:"
