@@ -89,6 +89,7 @@ type networkContext struct {
 	types.DefaultTcpContext
 
 	contextID uint32
+	// direction is the direction of the traffic that flows through this filter
 	direction trafficDirection
 
 	// incompleteDownstreamData holds downstream data fragment of a Kafka message that
@@ -103,14 +104,20 @@ type networkContext struct {
 	// outputUpstreamData holds the resulting upstream data produced by the filter
 	outputUpstreamData bytes.Buffer
 
+	// requestHandlerState is the state of the handler that handles kafka requests
 	requestHandlerState state
-	requestMessageSize  int32
+	// requestMessageSize caches the kafka request message size that is currently being processed
+	requestMessageSize int32
 
+	// responseHandlerState is the state of the handler that handles kafka responses
 	responseHandlerState state
-	responseMessageSize  int32
+	// responseMessageSize caches the kafka response message size that is currently being processed
+	responseMessageSize int32
 
+	// inFlightRequests is a queue which tracks the Kafka requests which we are waiting a Kafka response for
 	inFlightRequests []requestReference
-	r                int
+	// r is the current read position in inFlightRequests
+	r int
 }
 
 type requestReference struct {
@@ -119,6 +126,8 @@ type requestReference struct {
 	requestApiVersion    int16
 }
 
+// OnNewConnection is called when the Tcp connection is established between downstream and upstream.
+// It initializes the request and response handlers, resets the in flight request queue and upstream/downstream internal buffers
 func (ctx *networkContext) OnNewConnection() types.Action {
 	proxywasm.LogDebug("new connection!")
 
@@ -133,6 +142,10 @@ func (ctx *networkContext) OnNewConnection() types.Action {
 	return types.ActionContinue
 }
 
+// OnDownstreamData is called when a data frame arrives from the downstream connection.
+// It waits until enough downstream data is buffered by host for processing kafka messages.
+// It processes only complete kafka messages; incomplete kafka messages that follow complete kafka messages being
+// processed in the current run are cached until new downstream data is received that completes the incomplete kafka message
 func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) types.Action {
 	if ctx.requestHandlerState == failed || ctx.responseHandlerState == failed || ctx.direction == traffic_direction_unspecified {
 		// in failed status, can not do any further processing until new connection initiated
@@ -213,6 +226,10 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 	}
 }
 
+// OnUpstreamData is called when a data frame arrives from the upstream connection.
+// It waits until enough upstream data is buffered by host for processing kafka messages.
+// It processes only complete kafka messages; incomplete kafka messages that follow complete kafka messages being
+// processed in the current run are cached until new downstream data is received that completes the incomplete kafka message
 func (ctx *networkContext) OnUpstreamData(dataSize int, endOfStream bool) types.Action {
 	if ctx.requestHandlerState == failed || ctx.responseHandlerState == failed || ctx.direction == traffic_direction_unspecified {
 		// in failed status, can not do any further processing until new connection initiated
