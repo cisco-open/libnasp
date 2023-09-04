@@ -417,16 +417,15 @@ func (ctx *networkContext) handleDownstreamKafkaMessage(sizeAndMsgData []byte) e
 	var err error
 	switch ctx.direction {
 	case traffic_direction_inbound:
-		err = ctx.handleKafkaRequestMessage(sizeAndMsgData)
+		err = ctx.handleKafkaRequestMessage(sizeAndMsgData, &ctx.outputDownstreamData)
 	case traffic_direction_outbound:
-		err = ctx.handleKafkaResponseMessage(sizeAndMsgData)
+		err = ctx.handleKafkaResponseMessage(sizeAndMsgData, &ctx.outputDownstreamData)
 	}
 
 	if err != nil {
 		return err
 	}
 
-	ctx.outputDownstreamData.Write(sizeAndMsgData)
 	return nil
 }
 
@@ -434,20 +433,19 @@ func (ctx *networkContext) handleUpstreamKafkaMessage(sizeAndMsgData []byte) err
 	var err error
 	switch ctx.direction {
 	case traffic_direction_inbound:
-		err = ctx.handleKafkaResponseMessage(sizeAndMsgData)
+		err = ctx.handleKafkaResponseMessage(sizeAndMsgData, &ctx.outputUpstreamData)
 	case traffic_direction_outbound:
-		err = ctx.handleKafkaRequestMessage(sizeAndMsgData)
+		err = ctx.handleKafkaRequestMessage(sizeAndMsgData, &ctx.outputUpstreamData)
 	}
 
 	if err != nil {
 		return err
 	}
-	ctx.outputUpstreamData.Write(sizeAndMsgData)
 
 	return nil
 }
 
-func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte) error {
+func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte, outputData *bytes.Buffer) error {
 	req, err := request.Parse(sizeAndMsgData[kafkaMsgSizeBytesLen:])
 	if err != nil {
 		return errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't parse Kafka request message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " ")))
@@ -457,10 +455,13 @@ func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte) erro
 	ctx.log(logLevelDebug, strings.Join([]string{"processed Kafka request message:", req.String()}, " "))
 	ctx.enqueueInFlightRequest(req.HeaderData().RequestApiKey(), req.HeaderData().RequestApiVersion(), req.HeaderData().CorrelationId())
 
+	// NOTE: in case the original message is altered than pass back the serialized changed message
+	outputData.Write(sizeAndMsgData)
+
 	return nil
 }
 
-func (ctx *networkContext) handleKafkaResponseMessage(sizeAndMsgData []byte) error {
+func (ctx *networkContext) handleKafkaResponseMessage(sizeAndMsgData []byte, outputData *bytes.Buffer) error {
 	if len(ctx.inFlightRequests) == 0 {
 		ctx.log(logLevelWarn, strings.Join([]string{"received Kafka response message while there are no in-flight requests"}, " "))
 		return nil // skip as there is no req to match this response to
@@ -474,6 +475,9 @@ func (ctx *networkContext) handleKafkaResponseMessage(sizeAndMsgData []byte) err
 	defer resp.Release()
 
 	ctx.log(logLevelDebug, strings.Join([]string{"processed Kafka response message:", resp.String()}, " "))
+
+	// NOTE: in case the original message is altered than pass back the serialized changed message
+	outputData.Write(sizeAndMsgData)
 
 	return nil
 }
