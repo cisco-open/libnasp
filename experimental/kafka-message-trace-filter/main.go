@@ -31,6 +31,17 @@ import (
 
 const kafkaMsgSizeBytesLen = 4 // kafka messages size is represented on 4 bytes
 
+type logLevel uint8
+
+const (
+	logLevelTrace    logLevel = 0
+	logLevelDebug    logLevel = 1
+	logLevelInfo     logLevel = 2
+	logLevelWarn     logLevel = 3
+	logLevelError    logLevel = 4
+	logLevelCritical logLevel = 5
+)
+
 func main() {
 	proxywasm.SetVMContext(&vmContext{})
 }
@@ -89,6 +100,9 @@ type networkContext struct {
 	types.DefaultTcpContext
 
 	contextID uint32
+
+	connectionID uint64
+
 	// direction is the direction of the traffic that flows through this filter
 	direction trafficDirection
 
@@ -129,7 +143,6 @@ type requestReference struct {
 // OnNewConnection is called when the Tcp connection is established between downstream and upstream.
 // It initializes the request and response handlers, resets the in flight request queue and upstream/downstream internal buffers
 func (ctx *networkContext) OnNewConnection() types.Action {
-	proxywasm.LogDebug("new connection!")
 
 	ctx.resetRequestHandler()
 	ctx.resetResponseHandler()
@@ -138,6 +151,16 @@ func (ctx *networkContext) OnNewConnection() types.Action {
 
 	ctx.resetDownstreamBuffers()
 	ctx.resetUpstreamBuffers()
+
+	connectionIdBytes, err := proxywasm.GetProperty([]string{"connection_id"})
+	if err != nil {
+		proxywasm.LogCritical(strings.Join([]string{"couldn't get downstream connection id:", err.Error()}, " "))
+	}
+	if connectionIdBytes != nil {
+		ctx.connectionID = binary.LittleEndian.Uint64(connectionIdBytes)
+	}
+
+	proxywasm.LogDebug(strings.Join([]string{"new connection successfully established with connection id:", strconv.Itoa(int(ctx.connectionID))}, " "))
 
 	return types.ActionContinue
 }
@@ -163,7 +186,8 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 	// wait until downstream data is accumulated by host that is enough to process a kafka message
 	ready, err := ctx.downstreamKafkaMessageDataAvailable(dataSize)
 	if err != nil {
-		proxywasm.LogCritical(strings.Join([]string{"couldn't verify if the entire downstream Kafka message data has been received over the network due to:", err.Error()}, " "))
+		ctx.log(logLevelCritical, strings.Join([]string{"couldn't verify if the entire downstream Kafka message data has been received over the network due to:", err.Error()}, " "))
+
 		ctx.failDownstreamMessageHandler()
 		return types.ActionContinue
 	}
@@ -179,17 +203,22 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 
 	data, err := proxywasm.GetDownstreamData(0, dataSize)
 	if err != nil && !errors.Is(err, io.EOF) {
-		proxywasm.LogCritical(strings.Join([]string{"couldn't get downstream data bytes that holds kafka message due to:", err.Error()}, " "))
+		ctx.log(logLevelCritical, strings.Join([]string{"couldn't get downstream data bytes that holds kafka message due to:", err.Error()}, " "))
 		ctx.failDownstreamMessageHandler()
 		return types.ActionContinue
 	}
 	if len(data) < dataSize {
-		proxywasm.LogCritical(strings.Join([]string{"expected to read", strconv.Itoa(dataSize), "downstream data bytes but got only", strconv.Itoa(len(data))}, " "))
+		ctx.log(logLevelCritical, strings.Join([]string{"expected to read", strconv.Itoa(dataSize), "downstream data bytes but got only", strconv.Itoa(len(data))}, " "))
 		ctx.failDownstreamMessageHandler()
 		return types.ActionContinue
 	}
 
-	ctx.incompleteDownstreamData.Write(data)
+	n, _ := ctx.incompleteDownstreamData.Write(data) // Write never returns with error
+	if n < len(data) {
+		ctx.log(logLevelCritical, strings.Join([]string{"expected to write", strconv.Itoa(n), "downstream data bytes to internal buffer but wrote only", strconv.Itoa(len(data))}, " "))
+		ctx.failUpstreamMessageHandler()
+		return types.ActionContinue
+	}
 
 	// at this stage the host might have buffered bytes that cover more complete messages and an incomplete one thus
 	// we iterate through the complete ones and leave the incomplete one in the internal buffer
@@ -201,7 +230,7 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 
 		msgSize, err := kafkaMessageSize(ctx.incompleteDownstreamData.Bytes())
 		if err != nil {
-			proxywasm.LogCritical(strings.Join([]string{"couldn't retrieve kafka message size from downstream data due to:", err.Error()}, " "))
+			ctx.log(logLevelCritical, strings.Join([]string{"couldn't retrieve kafka message size from downstream data due to:", err.Error()}, " "))
 			ctx.failDownstreamMessageHandler()
 			return types.ActionContinue
 		}
@@ -214,12 +243,12 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 		sizeAndMsgData := ctx.incompleteDownstreamData.Next(completeDataSize)
 		err = ctx.handleDownstreamKafkaMessage(sizeAndMsgData)
 		if err != nil {
-			proxywasm.LogCritical(strings.Join([]string{"couldn't handle kafka request due to:", err.Error()}, " "))
+			ctx.log(logLevelCritical, strings.Join([]string{"couldn't handle kafka request due to:", err.Error()}, " "))
 			ctx.failDownstreamMessageHandler()
 
 			err = proxywasm.ReplaceDownstreamData(ctx.incompleteDownstreamData.Bytes())
 			if err != nil {
-				proxywasm.LogCritical(strings.Join([]string{"couldn't replace downstream data due to:", err.Error()}, " "))
+				ctx.log(logLevelCritical, strings.Join([]string{"couldn't replace downstream data due to:", err.Error()}, " "))
 			}
 			return types.ActionContinue
 		}
@@ -247,7 +276,7 @@ func (ctx *networkContext) OnUpstreamData(dataSize int, endOfStream bool) types.
 	// wait until upstream data is accumulated by host that is enough to process a kafka message
 	ready, err := ctx.upstreamKafkaMessageDataAvailable(dataSize)
 	if err != nil {
-		proxywasm.LogCritical(strings.Join([]string{"couldn't verify if the entire upstream Kafka message data has been received over the network due to:", err.Error()}, " "))
+		ctx.log(logLevelCritical, strings.Join([]string{"couldn't verify if the entire upstream Kafka message data has been received over the network due to:", err.Error()}, " "))
 		ctx.failUpstreamMessageHandler()
 		return types.ActionContinue
 	}
@@ -263,17 +292,22 @@ func (ctx *networkContext) OnUpstreamData(dataSize int, endOfStream bool) types.
 
 	data, err := proxywasm.GetUpstreamData(0, dataSize)
 	if err != nil && !errors.Is(err, io.EOF) {
-		proxywasm.LogCritical(strings.Join([]string{"couldn't get upstream data bytes that holds kafka message due to:", err.Error()}, " "))
+		ctx.log(logLevelCritical, strings.Join([]string{"couldn't get upstream data bytes that holds kafka message due to:", err.Error()}, " "))
 		ctx.failUpstreamMessageHandler()
 		return types.ActionContinue
 	}
 	if len(data) < dataSize {
-		proxywasm.LogCritical(strings.Join([]string{"expected to read", strconv.Itoa(dataSize), "upstream data bytes but got only", strconv.Itoa(len(data))}, " "))
+		ctx.log(logLevelCritical, strings.Join([]string{"expected to read", strconv.Itoa(dataSize), "upstream data bytes but got only", strconv.Itoa(len(data))}, " "))
 		ctx.failUpstreamMessageHandler()
 		return types.ActionContinue
 	}
 
-	ctx.incompleteUpstreamData.Write(data)
+	n, _ := ctx.incompleteUpstreamData.Write(data) // Write never returns with error
+	if n < len(data) {
+		ctx.log(logLevelCritical, strings.Join([]string{"expected to write", strconv.Itoa(n), "upstream data bytes to internal buffer but wrote only", strconv.Itoa(len(data))}, " "))
+		ctx.failUpstreamMessageHandler()
+		return types.ActionContinue
+	}
 
 	// at this stage the host might have buffered bytes that cover more complete messages and an incomplete one thus
 	// we iterate through the complete ones and leave the incomplete one in the internal buffer
@@ -285,7 +319,7 @@ func (ctx *networkContext) OnUpstreamData(dataSize int, endOfStream bool) types.
 
 		msgSize, err := kafkaMessageSize(ctx.incompleteUpstreamData.Bytes())
 		if err != nil {
-			proxywasm.LogCritical(strings.Join([]string{"couldn't retrieve kafka message size from upstream data due to:", err.Error()}, " "))
+			ctx.log(logLevelCritical, strings.Join([]string{"couldn't retrieve kafka message size from upstream data due to:", err.Error()}, " "))
 			ctx.failUpstreamMessageHandler()
 			return types.ActionContinue
 		}
@@ -298,12 +332,12 @@ func (ctx *networkContext) OnUpstreamData(dataSize int, endOfStream bool) types.
 		sizeAndMsgData := ctx.incompleteUpstreamData.Next(completeDataSize)
 		err = ctx.handleUpstreamKafkaMessage(sizeAndMsgData)
 		if err != nil {
-			proxywasm.LogCritical(strings.Join([]string{"couldn't handle kafka response due to:", err.Error()}, " "))
+			ctx.log(logLevelCritical, strings.Join([]string{"couldn't handle kafka response due to:", err.Error()}, " "))
 			ctx.failUpstreamMessageHandler()
 
 			err = proxywasm.ReplaceUpstreamData(ctx.incompleteUpstreamData.Bytes())
 			if err != nil {
-				proxywasm.LogCritical(strings.Join([]string{"couldn't replace upstream data due to:", err.Error()}, " "))
+				ctx.log(logLevelCritical, strings.Join([]string{"couldn't replace upstream data due to:", err.Error()}, " "))
 			}
 			return types.ActionContinue
 		}
@@ -416,12 +450,11 @@ func (ctx *networkContext) handleUpstreamKafkaMessage(sizeAndMsgData []byte) err
 func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte) error {
 	req, err := request.Parse(sizeAndMsgData[kafkaMsgSizeBytesLen:])
 	if err != nil {
-		return errors.New(strings.Join([]string{"couldn't parse Kafka request message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
+		return errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't parse Kafka request message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " ")))
 	}
 	defer req.Release()
 
-	proxywasm.LogDebug(strings.Join([]string{"processed Kafka request message:", req.HeaderData().String()}, " "))
-
+	ctx.log(logLevelDebug, strings.Join([]string{"processed Kafka request message:", req.String()}, " "))
 	ctx.enqueueInFlightRequest(req.HeaderData().RequestApiKey(), req.HeaderData().RequestApiVersion(), req.HeaderData().CorrelationId())
 
 	return nil
@@ -429,17 +462,18 @@ func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte) erro
 
 func (ctx *networkContext) handleKafkaResponseMessage(sizeAndMsgData []byte) error {
 	if len(ctx.inFlightRequests) == 0 {
+		ctx.log(logLevelWarn, strings.Join([]string{"received Kafka response message while there are no in-flight requests"}, " "))
 		return nil // skip as there is no req to match this response to
 	}
 	req := ctx.nextInFlightRequest()
 
 	resp, err := response.Parse(sizeAndMsgData[kafkaMsgSizeBytesLen:], req.requestApiKey, req.requestApiVersion, req.requestCorrelationId)
 	if err != nil {
-		return errors.New(strings.Join([]string{"couldn't parse Kafka response message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
+		return errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't parse Kafka response message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " ")))
 	}
 	defer resp.Release()
 
-	proxywasm.LogDebug(strings.Join([]string{"processed Kafka response message:", resp.String()}, " "))
+	ctx.log(logLevelDebug, strings.Join([]string{"processed Kafka response message:", resp.String()}, " "))
 
 	return nil
 }
@@ -448,7 +482,7 @@ func (ctx *networkContext) onCompleteDownstreamDataProcessingDone() {
 	// replace stream with complete part
 	err := proxywasm.ReplaceDownstreamData(ctx.outputDownstreamData.Bytes())
 	if err != nil {
-		proxywasm.LogCritical(strings.Join([]string{"couldn't replace downstream data due to:", err.Error()}, " "))
+		ctx.log(logLevelCritical, strings.Join([]string{"couldn't replace downstream data due to:", err.Error()}, " "))
 		ctx.failDownstreamMessageHandler()
 
 		return
@@ -462,7 +496,7 @@ func (ctx *networkContext) onCompleteUpstreamDataProcessingDone() {
 	// replace stream with complete part
 	err := proxywasm.ReplaceUpstreamData(ctx.outputUpstreamData.Bytes())
 	if err != nil {
-		proxywasm.LogCritical(strings.Join([]string{"couldn't replace upstream data due to:", err.Error()}, " "))
+		ctx.log(logLevelCritical, strings.Join([]string{"couldn't replace upstream data due to:", err.Error()}, " "))
 		ctx.failUpstreamMessageHandler()
 		return
 	}
@@ -496,27 +530,29 @@ func (ctx *networkContext) downstreamKafkaMessageDataAvailable(dataSize int) (bo
 	if cachedMessageSize == 0 {
 		// message size hasn't been received yet
 		if availableDataSize < kafkaMsgSizeBytesLen {
-			proxywasm.LogDebug(strings.Join([]string{strconv.Itoa(availableDataSize), "downstream data bytes available, waiting for more to process Kafka message size"}, " "))
+			ctx.log(logLevelDebug, strings.Join([]string{strconv.Itoa(availableDataSize), "downstream data bytes available, waiting for more to process Kafka message size"}, " "))
 			return false, nil // wait for more bytes as incomplete data together with newly received data doesn't have enough bytes to parse message size
 		}
 
 		cachedMessageSize, err = ctx.kafkaMessageSizeFromDownstreamData()
 		if err != nil {
-			proxywasm.LogCritical(strings.Join([]string{"couldn't retrieve kafka message size from downstream data due to:", err.Error()}, " "))
+			ctx.log(logLevelCritical, strings.Join([]string{"couldn't retrieve kafka message size from downstream data due to:", err.Error()}, " "))
 			return false, err
 		}
 
 		switch ctx.direction {
 		case traffic_direction_inbound:
+			ctx.log(logLevelDebug, strings.Join([]string{"received Kafka request message size from downstream:", strconv.Itoa(int(cachedMessageSize))}, " "))
 			ctx.requestMessageSize = cachedMessageSize
 		case traffic_direction_outbound:
+			ctx.log(logLevelDebug, strings.Join([]string{"received Kafka response message size from downstream:", strconv.Itoa(int(cachedMessageSize))}, " "))
 			ctx.responseMessageSize = cachedMessageSize
 		}
 	}
 
 	completeDataSize := int(kafkaMsgSizeBytesLen + cachedMessageSize) // the size is message size + message size
 	if availableDataSize < completeDataSize {
-		proxywasm.LogDebug(strings.Join([]string{"expected", strconv.Itoa(completeDataSize), "downstream data bytes to be available to process Kafka message(available:", strconv.Itoa(availableDataSize), "bytes)...waiting for more"}, " "))
+		ctx.log(logLevelDebug, strings.Join([]string{"expected", strconv.Itoa(completeDataSize), "downstream data bytes to be available to process Kafka message(available:", strconv.Itoa(availableDataSize), "bytes)...waiting for more"}, " "))
 		return false, nil // wait for more bytes as we haven't received all bytes needed to be able to parse the message
 	}
 
@@ -539,27 +575,29 @@ func (ctx *networkContext) upstreamKafkaMessageDataAvailable(dataSize int) (bool
 	if cachedMessageSize == 0 {
 		// message size hasn't been received yet
 		if availableDataSize < kafkaMsgSizeBytesLen {
-			proxywasm.LogDebug(strings.Join([]string{strconv.Itoa(availableDataSize), "downstream data bytes available, waiting for more to process Kafka message size"}, " "))
+			ctx.log(logLevelDebug, strings.Join([]string{strconv.Itoa(availableDataSize), "upstream data bytes available, waiting for more to process Kafka message size"}, " "))
 			return false, nil // wait for more bytes as incomplete data together with newly received data doesn't have enough bytes to parse message size
 		}
 
 		cachedMessageSize, err = ctx.kafkaMessageSizeFromUpstreamData()
 		if err != nil {
-			proxywasm.LogCritical(strings.Join([]string{"couldn't retrieve kafka message size from upstream data due to:", err.Error()}, " "))
+			ctx.log(logLevelCritical, strings.Join([]string{"couldn't retrieve kafka message size from upstream data due to:", err.Error()}, " "))
 			return false, err
 		}
 
 		switch ctx.direction {
 		case traffic_direction_inbound:
+			ctx.log(logLevelDebug, strings.Join([]string{"received Kafka response message size from upstream:", strconv.Itoa(int(cachedMessageSize))}, " "))
 			ctx.responseMessageSize = cachedMessageSize
 		case traffic_direction_outbound:
+			ctx.log(logLevelDebug, strings.Join([]string{"received Kafka request message size from upstream:", strconv.Itoa(int(cachedMessageSize))}, " "))
 			ctx.requestMessageSize = cachedMessageSize
 		}
 	}
 
 	completeDataSize := int(kafkaMsgSizeBytesLen + cachedMessageSize) // the size is message size + message size
 	if availableDataSize < completeDataSize {
-		proxywasm.LogDebug(strings.Join([]string{"expected", strconv.Itoa(completeDataSize), "upstream data bytes to be available to process Kafka message(available:", strconv.Itoa(availableDataSize), "bytes)...waiting for more"}, " "))
+		ctx.log(logLevelDebug, strings.Join([]string{"expected", strconv.Itoa(completeDataSize), "upstream data bytes to be available to process Kafka message(available:", strconv.Itoa(availableDataSize), "bytes)...waiting for more"}, " "))
 		return false, nil // wait for more bytes as we haven't received all bytes needed to be able to parse the message
 	}
 
@@ -616,7 +654,7 @@ func (ctx *networkContext) kafkaMessageSizeFromDownstreamData() (int32, error) {
 	if n < kafkaMsgSizeBytesLen {
 		b, err := proxywasm.GetDownstreamData(0, kafkaMsgSizeBytesLen-n)
 		if err != nil && !errors.Is(err, io.EOF) {
-			return 0, errors.New(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "downstream data bytes from host"}, " "))
+			return 0, errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "downstream data bytes from host"}, " ")))
 		}
 		m := copy(msgSizeBytes[n:], b)
 		n += m
@@ -624,7 +662,7 @@ func (ctx *networkContext) kafkaMessageSizeFromDownstreamData() (int32, error) {
 
 	size, err := kafkaMessageSize(msgSizeBytes[0:kafkaMsgSizeBytesLen])
 	if err != nil {
-		return 0, errors.New(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, ""))
+		return 0, errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, "")))
 	}
 
 	return size, nil
@@ -640,7 +678,7 @@ func (ctx *networkContext) kafkaMessageSizeFromUpstreamData() (int32, error) {
 	if n < kafkaMsgSizeBytesLen {
 		b, err := proxywasm.GetUpstreamData(0, kafkaMsgSizeBytesLen-n)
 		if err != nil && !errors.Is(err, io.EOF) {
-			return 0, errors.New(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "upstream data bytes from host"}, " "))
+			return 0, errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "upstream data bytes from host"}, " ")))
 		}
 		m := copy(msgSizeBytes[n:], b)
 		n += m
@@ -648,10 +686,69 @@ func (ctx *networkContext) kafkaMessageSizeFromUpstreamData() (int32, error) {
 
 	size, err := kafkaMessageSize(msgSizeBytes[0:kafkaMsgSizeBytesLen])
 	if err != nil {
-		return 0, errors.New(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, ""))
+		return 0, errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, "")))
 	}
 
 	return size, nil
+}
+
+func (ctx *networkContext) log(level logLevel, msg string) {
+	var logLine strings.Builder
+
+	if ctx.contextID > 0 {
+		logLine.WriteString("ctx_id: ")
+		logLine.WriteString(strconv.Itoa(int(ctx.contextID)))
+	}
+	if ctx.connectionID > 0 {
+		if logLine.Len() > 0 {
+			logLine.WriteRune('|')
+		}
+		logLine.WriteString("conn_id: ")
+		logLine.WriteString(strconv.Itoa(int(ctx.connectionID)))
+	}
+
+	if logLine.Len() > 0 {
+		logLine.WriteString(" - ")
+	}
+	logLine.WriteString(msg)
+
+	switch level {
+	case logLevelTrace:
+		proxywasm.LogTrace(logLine.String())
+	case logLevelDebug:
+		proxywasm.LogDebug(logLine.String())
+	case logLevelInfo:
+		proxywasm.LogInfo(logLine.String())
+	case logLevelWarn:
+		proxywasm.LogWarn(logLine.String())
+	case logLevelError:
+		proxywasm.LogError(logLine.String())
+	case logLevelCritical:
+		proxywasm.LogCritical(logLine.String())
+	}
+}
+
+func (ctx *networkContext) prependErrorContext(msg string) string {
+	var errMsg strings.Builder
+
+	if ctx.contextID > 0 {
+		errMsg.WriteString("ctx_id: ")
+		errMsg.WriteString(strconv.Itoa(int(ctx.contextID)))
+	}
+	if ctx.connectionID > 0 {
+		if errMsg.Len() > 0 {
+			errMsg.WriteRune('|')
+		}
+		errMsg.WriteString("conn_id: ")
+		errMsg.WriteString(strconv.Itoa(int(ctx.connectionID)))
+	}
+
+	if errMsg.Len() > 0 {
+		errMsg.WriteString(" - ")
+	}
+	errMsg.WriteString(msg)
+
+	return errMsg.String()
 }
 
 func kafkaMessageSize(msgSizeBytes []byte) (int32, error) {
