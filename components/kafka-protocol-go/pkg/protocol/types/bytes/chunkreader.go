@@ -238,9 +238,9 @@ func (c *ChunkReader) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		abs = c.size + offset
 		if c.cr != nil {
-			rebasedOffset = c.size - c.cr.Size() + offset
+			rebasedOffset = c.base + c.size - c.cr.Size() + offset
 		} else {
-			rebasedOffset = c.size - c.br.Size() + offset
+			rebasedOffset = c.base + c.size - c.br.Size() + offset
 		}
 	default:
 		return 0, errors.New("bytes.ChunkReader.Seek: invalid whence")
