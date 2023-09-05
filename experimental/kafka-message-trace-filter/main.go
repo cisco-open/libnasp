@@ -448,7 +448,7 @@ func (ctx *networkContext) handleUpstreamKafkaMessage(sizeAndMsgData []byte) err
 func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte, outputData *bytes.Buffer) error {
 	req, err := request.Parse(sizeAndMsgData[kafkaMsgSizeBytesLen:])
 	if err != nil {
-		return errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't parse Kafka request message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " ")))
+		return errors.New(strings.Join([]string{"couldn't parse Kafka request message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
 	}
 	defer req.Release()
 
@@ -470,7 +470,7 @@ func (ctx *networkContext) handleKafkaResponseMessage(sizeAndMsgData []byte, out
 
 	resp, err := response.Parse(sizeAndMsgData[kafkaMsgSizeBytesLen:], req.requestApiKey, req.requestApiVersion, req.requestCorrelationId)
 	if err != nil {
-		return errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't parse Kafka response message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " ")))
+		return errors.New(strings.Join([]string{"couldn't parse Kafka response message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
 	}
 	defer resp.Release()
 
@@ -540,8 +540,7 @@ func (ctx *networkContext) downstreamKafkaMessageDataAvailable(dataSize int) (bo
 
 		cachedMessageSize, err = ctx.kafkaMessageSizeFromDownstreamData()
 		if err != nil {
-			ctx.log(logLevelCritical, strings.Join([]string{"couldn't retrieve kafka message size from downstream data due to:", err.Error()}, " "))
-			return false, err
+			return false, errors.New(strings.Join([]string{"couldn't retrieve kafka message size from downstream data due to:", err.Error()}, " "))
 		}
 
 		switch ctx.direction {
@@ -585,8 +584,7 @@ func (ctx *networkContext) upstreamKafkaMessageDataAvailable(dataSize int) (bool
 
 		cachedMessageSize, err = ctx.kafkaMessageSizeFromUpstreamData()
 		if err != nil {
-			ctx.log(logLevelCritical, strings.Join([]string{"couldn't retrieve kafka message size from upstream data due to:", err.Error()}, " "))
-			return false, err
+			return false, errors.New(strings.Join([]string{"couldn't retrieve kafka message size from upstream data due to:", err.Error()}, " "))
 		}
 
 		switch ctx.direction {
@@ -658,7 +656,7 @@ func (ctx *networkContext) kafkaMessageSizeFromDownstreamData() (int32, error) {
 	if n < kafkaMsgSizeBytesLen {
 		b, err := proxywasm.GetDownstreamData(0, kafkaMsgSizeBytesLen-n)
 		if err != nil && !errors.Is(err, io.EOF) {
-			return 0, errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "downstream data bytes from host"}, " ")))
+			return 0, errors.New(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "downstream data bytes from host"}, " "))
 		}
 		m := copy(msgSizeBytes[n:], b)
 		n += m
@@ -666,7 +664,7 @@ func (ctx *networkContext) kafkaMessageSizeFromDownstreamData() (int32, error) {
 
 	size, err := kafkaMessageSize(msgSizeBytes[0:kafkaMsgSizeBytesLen])
 	if err != nil {
-		return 0, errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, "")))
+		return 0, errors.New(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, ""))
 	}
 
 	return size, nil
@@ -682,7 +680,7 @@ func (ctx *networkContext) kafkaMessageSizeFromUpstreamData() (int32, error) {
 	if n < kafkaMsgSizeBytesLen {
 		b, err := proxywasm.GetUpstreamData(0, kafkaMsgSizeBytesLen-n)
 		if err != nil && !errors.Is(err, io.EOF) {
-			return 0, errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "upstream data bytes from host"}, " ")))
+			return 0, errors.New(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "upstream data bytes from host"}, " "))
 		}
 		m := copy(msgSizeBytes[n:], b)
 		n += m
@@ -690,7 +688,7 @@ func (ctx *networkContext) kafkaMessageSizeFromUpstreamData() (int32, error) {
 
 	size, err := kafkaMessageSize(msgSizeBytes[0:kafkaMsgSizeBytesLen])
 	if err != nil {
-		return 0, errors.New(ctx.prependErrorContext(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, "")))
+		return 0, errors.New(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, ""))
 	}
 
 	return size, nil
