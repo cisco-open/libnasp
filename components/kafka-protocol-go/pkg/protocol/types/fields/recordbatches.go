@@ -17,6 +17,7 @@ package fields
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 	"strconv"
 	"strings"
 
@@ -128,15 +129,14 @@ func (b *RecordBatches) Read(r *typesbytes.ChunkReader) error {
 		if batchSize == 0 || r.Len() < batchSize {
 			// if next batch's size is zero or r has fewer bytes remaining the batchSize
 			// than we already processed the last complete record batch
+			if r.Len() < batchSize {
+				_, err = r.Seek(0, io.SeekEnd)
+				if err != nil {
+					return err
+				}
+			}
 			b.Complete()
 			return nil
-		}
-
-		if r.Len() < batchSize {
-			return errors.WrapIf(err, strings.Join([]string{"expected", strconv.Itoa(batchSize), "record batch bytes for item", strconv.Itoa(i), "but only got", strconv.Itoa(r.Len())}, " "))
-		}
-		if r.Len() < batchSize {
-			batchSize = r.Len()
 		}
 
 		var rb RecordBatch
