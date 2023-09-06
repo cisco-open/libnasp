@@ -698,14 +698,14 @@ func (ctx *networkContext) log(level logLevel, msg string) {
 	var logLine strings.Builder
 
 	if ctx.contextID > 0 {
-		logLine.WriteString("ctx_id: ")
+		logLine.WriteString("ctx_id:")
 		logLine.WriteString(strconv.Itoa(int(ctx.contextID)))
 	}
 	if ctx.connectionID > 0 {
 		if logLine.Len() > 0 {
 			logLine.WriteRune('|')
 		}
-		logLine.WriteString("conn_id: ")
+		logLine.WriteString("conn_id:")
 		logLine.WriteString(strconv.Itoa(int(ctx.connectionID)))
 	}
 
@@ -728,29 +728,6 @@ func (ctx *networkContext) log(level logLevel, msg string) {
 	case logLevelCritical:
 		proxywasm.LogCritical(logLine.String())
 	}
-}
-
-func (ctx *networkContext) prependErrorContext(msg string) string {
-	var errMsg strings.Builder
-
-	if ctx.contextID > 0 {
-		errMsg.WriteString("ctx_id: ")
-		errMsg.WriteString(strconv.Itoa(int(ctx.contextID)))
-	}
-	if ctx.connectionID > 0 {
-		if errMsg.Len() > 0 {
-			errMsg.WriteRune('|')
-		}
-		errMsg.WriteString("conn_id: ")
-		errMsg.WriteString(strconv.Itoa(int(ctx.connectionID)))
-	}
-
-	if errMsg.Len() > 0 {
-		errMsg.WriteString(" - ")
-	}
-	errMsg.WriteString(msg)
-
-	return errMsg.String()
 }
 
 func kafkaMessageSize(msgSizeBytes []byte) (int32, error) {

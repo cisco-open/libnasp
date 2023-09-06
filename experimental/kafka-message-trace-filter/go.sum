@@ -4,6 +4,8 @@ github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-2023083014091
 github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230830140910-e7228b105db8/go.mod h1:bvjdbNkILn+YZ+4uSRg1tGAcixAxFgWnfWozJAMFFuw=
 github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230830142202-43de73673acc h1:AQqwplpLzCffn3fmDm+oz0cqc/q8bwF2p5Rf9zG3T88=
 github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230830142202-43de73673acc/go.mod h1:aoFPwjMU9yMAGoX8G6WZtol6C18/1sQ+rSJaPwkpw5Q=
+github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230905170021-d5e11c256620 h1:8Z5uVYYshV4G4u7Q8PgUYwmHobrz7LKaVyXAwuQnd/s=
+github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230905170021-d5e11c256620/go.mod h1:aoFPwjMU9yMAGoX8G6WZtol6C18/1sQ+rSJaPwkpw5Q=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

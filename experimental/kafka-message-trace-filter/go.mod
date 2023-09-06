@@ -3,7 +3,7 @@ module github.com/cisco/nasp/kafka-message-trace-filter
 go 1.20
 
 require (
-	github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230830142202-43de73673acc
+	github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230905170021-d5e11c256620
 	github.com/tetratelabs/proxy-wasm-go-sdk v0.22.0
 )
 
