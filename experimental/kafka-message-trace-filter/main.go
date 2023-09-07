@@ -243,7 +243,7 @@ func (ctx *networkContext) OnDownstreamData(dataSize int, endOfStream bool) type
 		sizeAndMsgData := ctx.incompleteDownstreamData.Next(completeDataSize)
 		err = ctx.handleDownstreamKafkaMessage(sizeAndMsgData)
 		if err != nil {
-			ctx.log(logLevelCritical, strings.Join([]string{"couldn't handle kafka request due to:", err.Error()}, " "))
+			ctx.log(logLevelCritical, strings.Join([]string{"couldn't handle downstream kafka message due to:", err.Error()}, " "))
 			ctx.failDownstreamMessageHandler()
 
 			err = proxywasm.ReplaceDownstreamData(ctx.incompleteDownstreamData.Bytes())
@@ -332,7 +332,7 @@ func (ctx *networkContext) OnUpstreamData(dataSize int, endOfStream bool) types.
 		sizeAndMsgData := ctx.incompleteUpstreamData.Next(completeDataSize)
 		err = ctx.handleUpstreamKafkaMessage(sizeAndMsgData)
 		if err != nil {
-			ctx.log(logLevelCritical, strings.Join([]string{"couldn't handle kafka response due to:", err.Error()}, " "))
+			ctx.log(logLevelCritical, strings.Join([]string{"couldn't handle upstream kafka message due to:", err.Error()}, " "))
 			ctx.failUpstreamMessageHandler()
 
 			err = proxywasm.ReplaceUpstreamData(ctx.incompleteUpstreamData.Bytes())
@@ -558,6 +558,7 @@ func (ctx *networkContext) downstreamKafkaMessageDataAvailable(dataSize int) (bo
 		ctx.log(logLevelDebug, strings.Join([]string{"expected", strconv.Itoa(completeDataSize), "downstream data bytes to be available to process Kafka message(available:", strconv.Itoa(availableDataSize), "bytes)...waiting for more"}, " "))
 		return false, nil // wait for more bytes as we haven't received all bytes needed to be able to parse the message
 	}
+	ctx.log(logLevelDebug, strings.Join([]string{"expected", strconv.Itoa(completeDataSize), "downstream data bytes to be available to process Kafka message(available:", strconv.Itoa(availableDataSize), "bytes)"}, " "))
 
 	return true, nil
 }
@@ -602,6 +603,7 @@ func (ctx *networkContext) upstreamKafkaMessageDataAvailable(dataSize int) (bool
 		ctx.log(logLevelDebug, strings.Join([]string{"expected", strconv.Itoa(completeDataSize), "upstream data bytes to be available to process Kafka message(available:", strconv.Itoa(availableDataSize), "bytes)...waiting for more"}, " "))
 		return false, nil // wait for more bytes as we haven't received all bytes needed to be able to parse the message
 	}
+	ctx.log(logLevelDebug, strings.Join([]string{"expected", strconv.Itoa(completeDataSize), "upstream data bytes to be available to process Kafka message(available:", strconv.Itoa(availableDataSize), "bytes)"}, " "))
 
 	return true, nil
 }
