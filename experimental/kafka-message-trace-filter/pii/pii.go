@@ -3,7 +3,6 @@ package pii
 import (
 	"bytes"
 	"regexp"
-	"sync"
 )
 
 var patterns = map[string]string{
@@ -32,22 +31,10 @@ var patterns = map[string]string{
 // DetectPII searches `text` for common PII patterns and obfuscates them depending on the `obfuscate` parameter
 // the return boolean indicates whether a PII was found or not
 func DetectPII(text []byte, obfuscate bool) bool {
-	var wg sync.WaitGroup
-	ch := make(chan bool)
 	piiDetected := false
 
 	for secretType, pattern := range patterns {
-		wg.Add(1)
-		go detect(&wg, ch, secretType, pattern, text, obfuscate)
-	}
-
-	go func() {
-		wg.Wait()
-		close(ch)
-	}()
-
-	for result := range ch {
-		if result {
+		if detect(secretType, pattern, text, obfuscate) {
 			piiDetected = true
 		}
 	}
@@ -55,14 +42,11 @@ func DetectPII(text []byte, obfuscate bool) bool {
 	return piiDetected
 }
 
-func detect(wg *sync.WaitGroup, ch chan bool, secretType, pattern string, text []byte, obfuscate bool) {
-	defer wg.Done()
+func detect(secretType, pattern string, text []byte, obfuscate bool) bool {
 	r := regexp.MustCompile(pattern)
 	matches := r.FindAllIndex(text, -1)
 
 	if len(matches) > 0 {
-		ch <- true
-
 		if obfuscate {
 			for _, match := range matches {
 				start, end := match[0], match[1]
@@ -81,7 +65,8 @@ func detect(wg *sync.WaitGroup, ch chan bool, secretType, pattern string, text [
 				}
 			}
 		}
-	} else {
-		ch <- false
+		return true
 	}
+
+	return false
 }

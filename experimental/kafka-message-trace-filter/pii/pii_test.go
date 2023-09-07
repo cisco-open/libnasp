@@ -3,6 +3,7 @@ package pii
 import (
 	"testing"
 
+	goavro "github.com/linkedin/goavro/v2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -10,6 +11,7 @@ import (
 func TestDetect(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "DetectPII Suite")
+	t.Parallel()
 }
 
 var _ = Describe("DetectPII", func() {
@@ -102,4 +104,80 @@ var _ = Describe("DetectPII", func() {
 			Expect(string(text)).To(Equal("DATABASE_URL=*****************************"))
 		})
 	})
+
+	When("serializing and deserializing with Avro", func() {
+		It("Should detect PII in serialized Avro data", func() {
+			myData := TestStruct{Data: "My email is example@email.com."}
+			serializedData, err := serializeToAvro(myData)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(DetectPII(serializedData, false)).To(BeTrue())
+		})
+
+		It("Should detect and obfuscate PII in deserialized Avro data", func() {
+			myData := TestStruct{Data: "My email is example@email.com."}
+			serializedData, err := serializeToAvro(myData)
+			Expect(err).NotTo(HaveOccurred())
+
+			deserializedData, err := deserializeFromAvro(serializedData)
+			Expect(err).NotTo(HaveOccurred())
+
+			text := []byte(deserializedData.Data)
+			Expect(DetectPII(text, true)).To(BeTrue())
+			Expect(string(text)).To(Equal("My email is *****************."))
+		})
+	})
+
 })
+
+type TestStruct struct {
+	Data string
+}
+
+// Avro schema
+const schema = `
+{
+	"type": "record",
+	"name": "TestStruct",
+	"fields" : [
+		{"name": "Data", "type": "string"}
+	]
+}`
+
+func serializeToAvro(data TestStruct) ([]byte, error) {
+	codec, err := goavro.NewCodec(schema)
+	if err != nil {
+		return nil, err
+	}
+
+	textMap := map[string]interface{}{
+		"Data": data.Data,
+	}
+
+	var binary []byte
+	binary, err = codec.BinaryFromNative(nil, textMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return binary, nil
+}
+
+func deserializeFromAvro(data []byte) (TestStruct, error) {
+	codec, err := goavro.NewCodec(schema)
+	if err != nil {
+		return TestStruct{}, err
+	}
+
+	native, _, err := codec.NativeFromBinary(data)
+	if err != nil {
+		return TestStruct{}, err
+	}
+
+	nativeMap, ok := native.(map[string]interface{})
+	if !ok {
+		return TestStruct{}, err
+	}
+
+	return TestStruct{Data: nativeMap["Data"].(string)}, nil
+}
