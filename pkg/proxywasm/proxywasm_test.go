@@ -24,10 +24,10 @@ import (
 	"k8s.io/klog/v2/klogr"
 
 	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero"
-	"github.com/cisco-open/nasp/pkg/dotn"
-	"github.com/cisco-open/nasp/pkg/proxywasm"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
-	"github.com/cisco-open/nasp/pkg/proxywasm/testdata"
+	"github.com/cisco-open/libnasp/pkg/dotn"
+	"github.com/cisco-open/libnasp/pkg/proxywasm"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/testdata"
 )
 
 func TestProxyOnTickAndSetEffectiveContext(t *testing.T) {

@@ -19,7 +19,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cisco-open/nasp/pkg/istio/filters"
+	"github.com/cisco-open/libnasp/pkg/istio/filters"
 )
 
 func TestEmbed(t *testing.T) {

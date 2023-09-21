@@ -19,12 +19,12 @@ import (
 	"crypto/tls"
 	"net"
 
-	"github.com/cisco-open/nasp/pkg/istio/discovery"
-	"github.com/cisco-open/nasp/pkg/network"
-	"github.com/cisco-open/nasp/pkg/network/pool"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
-	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
-	"github.com/cisco-open/nasp/pkg/tls/verify"
+	"github.com/cisco-open/libnasp/pkg/istio/discovery"
+	"github.com/cisco-open/libnasp/pkg/network"
+	"github.com/cisco-open/libnasp/pkg/network/pool"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/tcp"
+	"github.com/cisco-open/libnasp/pkg/tls/verify"
 )
 
 type Dialer interface {

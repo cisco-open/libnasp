@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/pools"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/pools"
 
 	"emperror.dev/errors"
 )

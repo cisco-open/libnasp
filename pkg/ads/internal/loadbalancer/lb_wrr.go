@@ -18,7 +18,7 @@ import (
 	"math"
 	"net"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/endpoint"
 
 	envoy_config_endpoint_v3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 )

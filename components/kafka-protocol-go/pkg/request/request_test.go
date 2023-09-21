@@ -27,9 +27,9 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/assets/test"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/request"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/response"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/assets/test"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/request"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/response"
 )
 
 func TestParse(t *testing.T) {

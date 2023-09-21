@@ -17,7 +17,7 @@ package proxywasm
 import (
 	"encoding/binary"
 
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
 )
 
 type propertyHolderWrapper struct {

@@ -21,11 +21,11 @@ import (
 	"strings"
 
 	"emperror.dev/errors"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/pools"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/messages/describedelegationtoken/response/describeddelegationtoken"
-	typesbytes "github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/fields"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/varint"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/pools"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/messages/describedelegationtoken/response/describeddelegationtoken"
+	typesbytes "github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/fields"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/varint"
 )
 
 var describedDelegationTokenPrincipalType = fields.Context{

@@ -23,8 +23,8 @@ import (
 	envoy_config_endpoint_v3 "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	"github.com/golang/protobuf/ptypes/wrappers"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
-	"github.com/cisco-open/nasp/pkg/ads/internal/loadbalancer"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/endpoint"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/loadbalancer"
 )
 
 func Test_leastRequest_P2C_LoadBalancer_nextEndpoint(t *testing.T) {

@@ -20,14 +20,14 @@ import (
 
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/cisco-open/nasp/pkg/ads/config"
+	"github.com/cisco-open/libnasp/pkg/ads/config"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/apiresult"
-	"github.com/cisco-open/nasp/pkg/ads/internal/util"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/apiresult"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/util"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/endpoint"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/cluster"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/cluster"
 
 	"emperror.dev/errors"
 	core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"

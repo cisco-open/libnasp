@@ -33,11 +33,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/cisco-open/nasp/pkg/ca"
-	"github.com/cisco-open/nasp/pkg/ca/selfsigned"
-	"github.com/cisco-open/nasp/pkg/network"
-	"github.com/cisco-open/nasp/pkg/network/listener"
-	"github.com/cisco-open/nasp/pkg/network/pool"
+	"github.com/cisco-open/libnasp/pkg/ca"
+	"github.com/cisco-open/libnasp/pkg/ca/selfsigned"
+	"github.com/cisco-open/libnasp/pkg/network"
+	"github.com/cisco-open/libnasp/pkg/network/listener"
+	"github.com/cisco-open/libnasp/pkg/network/pool"
 )
 
 type NetworkTestSuite struct {

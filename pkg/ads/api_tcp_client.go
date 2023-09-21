@@ -30,13 +30,13 @@ import (
 	extensions_transport_sockets_tls_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/cluster"
-	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
-	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
-	"github.com/cisco-open/nasp/pkg/ads/internal/loadbalancer"
-	routemeta "github.com/cisco-open/nasp/pkg/ads/internal/route"
-	"github.com/cisco-open/nasp/pkg/ads/internal/util"
-	"github.com/cisco-open/nasp/pkg/tls/verify"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/cluster"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/endpoint"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/listener"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/loadbalancer"
+	routemeta "github.com/cisco-open/libnasp/pkg/ads/internal/route"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/util"
+	"github.com/cisco-open/libnasp/pkg/tls/verify"
 )
 
 type clientProperties struct {

@@ -22,7 +22,7 @@ import (
 	authv1 "k8s.io/api/authentication/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/api"
 )
 
 var (

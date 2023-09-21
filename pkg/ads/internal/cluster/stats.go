@@ -15,7 +15,7 @@
 package cluster
 
 import (
-	"github.com/cisco-open/nasp/pkg/ads/internal/util"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/util"
 )
 
 // Stats stores various items related to an upstream cluster

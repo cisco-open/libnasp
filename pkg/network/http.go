@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 
-	"github.com/cisco-open/nasp/pkg/network/listener"
+	"github.com/cisco-open/libnasp/pkg/network/listener"
 )
 
 type Server interface {

@@ -21,8 +21,8 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/internal/protocol"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/fields"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/internal/protocol"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/fields"
 )
 
 const (

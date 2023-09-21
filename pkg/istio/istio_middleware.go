@@ -17,9 +17,9 @@ package istio
 import (
 	"fmt"
 
-	"github.com/cisco-open/nasp/pkg/istio/fb"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
-	pwhttp "github.com/cisco-open/nasp/pkg/proxywasm/http"
+	"github.com/cisco-open/libnasp/pkg/istio/fb"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
+	pwhttp "github.com/cisco-open/libnasp/pkg/proxywasm/http"
 )
 
 const (

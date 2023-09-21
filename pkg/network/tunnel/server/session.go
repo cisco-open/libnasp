@@ -28,9 +28,9 @@ import (
 	"github.com/pborman/uuid"
 	"golang.ngrok.com/muxado"
 
-	"github.com/cisco-open/nasp/pkg/network/proxy"
-	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
-	"github.com/cisco-open/nasp/pkg/network/tunnel/common"
+	"github.com/cisco-open/libnasp/pkg/network/proxy"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/common"
 )
 
 type session struct {

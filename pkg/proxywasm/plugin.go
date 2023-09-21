@@ -23,8 +23,8 @@ import (
 
 	"github.com/banzaicloud/proxy-wasm-go-host/abi"
 
-	"github.com/cisco-open/nasp/pkg/dotn"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/dotn"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
 )
 
 type wasmPlugin struct {

@@ -29,8 +29,8 @@ import (
 	"emperror.dev/errors"
 	"go.uber.org/atomic"
 
-	"github.com/cisco-open/nasp/pkg/ca"
-	"github.com/cisco-open/nasp/pkg/tls/verify"
+	"github.com/cisco-open/libnasp/pkg/ca"
+	"github.com/cisco-open/libnasp/pkg/tls/verify"
 )
 
 type SelfsignedCAClient interface {

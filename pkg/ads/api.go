@@ -26,8 +26,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/cisco-open/nasp/pkg/ads/config"
-	"github.com/cisco-open/nasp/pkg/tls/verify"
+	"github.com/cisco-open/libnasp/pkg/ads/config"
+	"github.com/cisco-open/libnasp/pkg/tls/verify"
 )
 
 // HostNotFoundError is returned when the given host name is not found in Istio's NDS

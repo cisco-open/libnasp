@@ -21,20 +21,20 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/serialization"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/serialization"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/crc32c"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/crc32c"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/compression/gzip"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/compression/lz4"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/compression/snappy"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/compression/zstd"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/compression/gzip"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/compression/lz4"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/compression/snappy"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/compression/zstd"
 
 	"emperror.dev/errors"
 
-	typesbytes "github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	typesbytes "github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
 )
 
 // CompressionType represents the compression applied to a record  batch.

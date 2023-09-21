@@ -19,7 +19,7 @@ import (
 	"github.com/go-logr/logr"
 
 	"github.com/banzaicloud/proxy-wasm-go-host/abi"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
 )
 
 type filterContext struct {

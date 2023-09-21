@@ -25,7 +25,7 @@ import (
 	"github.com/werbenhu/eventbus"
 	"golang.ngrok.com/muxado"
 
-	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/api"
 )
 
 var (

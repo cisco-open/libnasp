@@ -19,7 +19,7 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/libnasp/pkg/network"
 )
 
 func PrintConnectionState(connectionState network.ConnectionState, logger logr.Logger) {

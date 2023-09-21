@@ -25,8 +25,8 @@ import (
 	"emperror.dev/errors"
 	"github.com/klauspost/compress/zstd"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/compression/gzip"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/compression/gzip"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
 )
 
 type Reader struct {

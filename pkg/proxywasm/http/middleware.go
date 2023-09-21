@@ -17,7 +17,7 @@ package http
 import (
 	"sync"
 
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
 )
 
 type HandleMiddleware interface {

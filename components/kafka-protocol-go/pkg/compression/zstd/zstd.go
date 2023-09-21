@@ -15,7 +15,7 @@
 package zstd
 
 import (
-	typesbytes "github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	typesbytes "github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
 
 	"emperror.dev/errors"
 	"github.com/klauspost/compress/zstd"

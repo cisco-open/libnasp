@@ -22,8 +22,8 @@ import (
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
 
-	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
-	"github.com/cisco-open/nasp/pkg/network/tunnel/common"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/common"
 )
 
 type ctrlStream struct {

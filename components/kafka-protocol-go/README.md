@@ -13,7 +13,7 @@ Tested with Kafka versions 2.8.1 to 3.1.0
 ### Installation
 
 ```shell
-go get github.com/cisco-open/nasp/components/kafka-protocol-go/pkg
+go get github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg
 ```
 
 ### Consuming the library
@@ -22,8 +22,8 @@ go get github.com/cisco-open/nasp/components/kafka-protocol-go/pkg
 package main
 
 import (
-    "github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/request"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/response"
+    "github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/request"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/response"
 )
 
 func main() {

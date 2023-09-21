@@ -17,10 +17,10 @@ package ads
 import (
 	"context"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/endpoint"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/cluster"
-	"github.com/cisco-open/nasp/pkg/ads/internal/util"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/cluster"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/util"
 
 	"emperror.dev/errors"
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"

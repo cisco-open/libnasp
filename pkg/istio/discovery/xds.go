@@ -26,9 +26,9 @@ import (
 	"github.com/go-logr/logr"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/cisco-open/nasp/pkg/ads"
-	adsconfig "github.com/cisco-open/nasp/pkg/ads/config"
-	"github.com/cisco-open/nasp/pkg/environment"
+	"github.com/cisco-open/libnasp/pkg/ads"
+	adsconfig "github.com/cisco-open/libnasp/pkg/ads/config"
+	"github.com/cisco-open/libnasp/pkg/environment"
 )
 
 type xdsDiscoveryClient struct {

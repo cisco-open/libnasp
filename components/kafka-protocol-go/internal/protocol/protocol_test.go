@@ -17,8 +17,8 @@ package protocol_test
 import (
 	"testing"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/assets"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/internal/protocol"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/assets"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/internal/protocol"
 )
 
 func TestLoadProtocolSpec(t *testing.T) {

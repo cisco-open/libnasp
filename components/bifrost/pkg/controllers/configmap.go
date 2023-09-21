@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	"sigs.k8s.io/yaml"
 
-	"github.com/cisco-open/nasp/components/heimdall/pkg/predicates"
+	"github.com/cisco-open/libnasp/components/heimdall/pkg/predicates"
 	"github.com/cisco-open/operator-tools/pkg/reconciler"
 )
 

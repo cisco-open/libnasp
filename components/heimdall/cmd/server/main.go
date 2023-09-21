@@ -26,8 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	cluster_registry "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
-	"github.com/cisco-open/nasp/components/heimdall/pkg/controllers"
-	"github.com/cisco-open/nasp/components/heimdall/pkg/server"
+	"github.com/cisco-open/libnasp/components/heimdall/pkg/controllers"
+	"github.com/cisco-open/libnasp/components/heimdall/pkg/server"
 )
 
 var (

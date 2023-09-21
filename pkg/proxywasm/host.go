@@ -25,7 +25,7 @@ import (
 	klog "k8s.io/klog/v2"
 
 	pwapi "github.com/banzaicloud/proxy-wasm-go-host/api"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
 )
 
 type HostFunctions struct {

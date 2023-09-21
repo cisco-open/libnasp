@@ -26,7 +26,7 @@ import (
 	"istio.io/istio/pkg/security"
 	pkiutil "istio.io/istio/security/pkg/pki/util"
 
-	"github.com/cisco-open/nasp/pkg/ca"
+	"github.com/cisco-open/libnasp/pkg/ca"
 )
 
 type IstioCAClient struct {

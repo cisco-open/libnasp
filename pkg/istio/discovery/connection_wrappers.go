@@ -19,7 +19,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/cisco-open/nasp/pkg/network"
+	"github.com/cisco-open/libnasp/pkg/network"
 )
 
 type DialWrapper = network.DialWrapper

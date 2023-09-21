@@ -25,10 +25,10 @@ import (
 	"google.golang.org/grpc/reflection"
 	"k8s.io/klog/v2"
 
-	"github.com/cisco-open/nasp/examples/grpc/pb"
-	"github.com/cisco-open/nasp/pkg/istio"
-	"github.com/cisco-open/nasp/pkg/network"
-	"github.com/cisco-open/nasp/pkg/util"
+	"github.com/cisco-open/libnasp/examples/grpc/pb"
+	"github.com/cisco-open/libnasp/pkg/istio"
+	"github.com/cisco-open/libnasp/pkg/network"
+	"github.com/cisco-open/libnasp/pkg/util"
 )
 
 var heimdallURL string

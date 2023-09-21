@@ -25,8 +25,8 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/cisco-open/nasp/pkg/ca/selfsigned"
-	"github.com/cisco-open/nasp/pkg/tls/verify"
+	"github.com/cisco-open/libnasp/pkg/ca/selfsigned"
+	"github.com/cisco-open/libnasp/pkg/tls/verify"
 )
 
 const (

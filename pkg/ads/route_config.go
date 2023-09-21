@@ -17,7 +17,7 @@ package ads
 import (
 	"context"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/routeconfig"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/routeconfig"
 
 	"emperror.dev/errors"
 	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"

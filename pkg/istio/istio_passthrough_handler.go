@@ -22,8 +22,8 @@ import (
 	"emperror.dev/errors"
 	"google.golang.org/grpc"
 
-	"github.com/cisco-open/nasp/pkg/istio/discovery"
-	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
+	"github.com/cisco-open/libnasp/pkg/istio/discovery"
+	itcp "github.com/cisco-open/libnasp/pkg/istio/tcp"
 )
 
 type passthroughIstioIntegrationHandler struct {

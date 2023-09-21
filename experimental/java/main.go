@@ -38,9 +38,9 @@ import (
 
 	"github.com/pborman/uuid"
 
-	"github.com/cisco-open/nasp/pkg/ads"
-	"github.com/cisco-open/nasp/pkg/istio"
-	itcp "github.com/cisco-open/nasp/pkg/istio/tcp"
+	"github.com/cisco-open/libnasp/pkg/ads"
+	"github.com/cisco-open/libnasp/pkg/istio"
+	itcp "github.com/cisco-open/libnasp/pkg/istio/tcp"
 )
 
 const MAX_WRITE_BUFFERS = 64

@@ -22,13 +22,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/pools"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/pools"
 
-	typesbytes "github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	typesbytes "github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/varint"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/varint"
 
 	"emperror.dev/errors"
 )

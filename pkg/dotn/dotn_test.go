@@ -19,7 +19,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/cisco-open/nasp/pkg/dotn"
+	"github.com/cisco-open/libnasp/pkg/dotn"
 )
 
 func TestDotnGetterSetter(t *testing.T) {

@@ -1,11 +1,11 @@
-module github.com/cisco-open/nasp/components/kafka-protocol-go
+module github.com/cisco-open/libnasp/components/kafka-protocol-go
 
 go 1.20
 
 require (
 	emperror.dev/errors v0.8.1
 	github.com/Masterminds/sprig/v3 v3.2.3
-	github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0
+	github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg v0.0.0
 	github.com/json-iterator/go v1.1.12
 	github.com/tailscale/hujson v0.0.0-20221223112325-20486734a56a
 	golang.org/x/tools v0.11.0
@@ -35,4 +35,4 @@ require (
 	golang.org/x/sys v0.10.0 // indirect
 )
 
-replace github.com/cisco-open/nasp/components/kafka-protocol-go/pkg => ./pkg
+replace github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg => ./pkg

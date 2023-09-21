@@ -24,8 +24,8 @@ import (
 	"github.com/go-logr/logr"
 	"google.golang.org/grpc"
 
-	"github.com/cisco-open/nasp/pkg/proxywasm"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
 )
 
 type Handler interface {

@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/viper"
 	"k8s.io/klog/v2"
 
-	"github.com/cisco-open/nasp/components/bifrost/pkg/commands"
+	"github.com/cisco-open/libnasp/components/bifrost/pkg/commands"
 )
 
 var (

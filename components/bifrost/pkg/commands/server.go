@@ -33,12 +33,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/cisco-open/nasp/components/bifrost/pkg/controllers"
-	"github.com/cisco-open/nasp/components/bifrost/pkg/k8s"
-	"github.com/cisco-open/nasp/pkg/istio"
-	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
-	"github.com/cisco-open/nasp/pkg/network/tunnel/auth"
-	"github.com/cisco-open/nasp/pkg/network/tunnel/server"
+	"github.com/cisco-open/libnasp/components/bifrost/pkg/controllers"
+	"github.com/cisco-open/libnasp/components/bifrost/pkg/k8s"
+	"github.com/cisco-open/libnasp/pkg/istio"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/auth"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/server"
 )
 
 var (

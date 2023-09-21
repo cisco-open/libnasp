@@ -27,8 +27,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/cisco-open/nasp/components/heimdall/pkg/k8sutil"
-	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
+	"github.com/cisco-open/libnasp/components/heimdall/pkg/k8sutil"
+	istio_ca "github.com/cisco-open/libnasp/pkg/ca/istio"
 )
 
 type PodMutator struct {
