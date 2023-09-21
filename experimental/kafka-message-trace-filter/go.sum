@@ -1,5 +1,7 @@
 emperror.dev/errors v0.8.1 h1:UavXZ5cSX/4u9iyvH6aDcuGkVjeexUGJ7Ij7G4VfQT0=
 emperror.dev/errors v0.8.1/go.mod h1:YcRvLPh626Ubn2xqtoprejnA5nFha+TJ+2vew48kWuE=
+github.com/cisco-open/libnasp/components/kafka-protocol-go v0.0.0-20230921201051-485267264307 h1:TSutN/lSVbj3sRIRTtmrhUGX1TV1SlTibMsfaS/Mwes=
+github.com/cisco-open/libnasp/components/kafka-protocol-go v0.0.0-20230921201051-485267264307/go.mod h1:7SVp/9bebrxzz9od1T5D8dSWcuerPqw3t/DxAlLTJbY=
 github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230905170021-d5e11c256620 h1:8Z5uVYYshV4G4u7Q8PgUYwmHobrz7LKaVyXAwuQnd/s=
 github.com/cisco-open/nasp/components/kafka-protocol-go/pkg v0.0.0-20230905170021-d5e11c256620/go.mod h1:aoFPwjMU9yMAGoX8G6WZtol6C18/1sQ+rSJaPwkpw5Q=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

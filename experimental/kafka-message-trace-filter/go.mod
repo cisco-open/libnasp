@@ -12,6 +12,7 @@ require (
 
 require (
 	emperror.dev/errors v0.8.1 // indirect
+	github.com/cisco-open/libnasp/components/kafka-protocol-go v0.0.0-20230921201051-485267264307 // indirect
 	github.com/eapache/go-xerial-snappy v0.0.0-20230111030713-bf00bc1b83b6 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
