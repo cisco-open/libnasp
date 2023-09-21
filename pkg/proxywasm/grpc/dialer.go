@@ -26,10 +26,10 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/cisco-open/nasp/pkg/istio/discovery"
-	"github.com/cisco-open/nasp/pkg/network"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
-	"github.com/cisco-open/nasp/pkg/proxywasm/http"
+	"github.com/cisco-open/libnasp/pkg/istio/discovery"
+	"github.com/cisco-open/libnasp/pkg/network"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/http"
 )
 
 type GRPCDialer struct {

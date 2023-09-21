@@ -2,6 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "self:/Users/nandork/Code/src/github.com/cisco-open/nasp/experimental/mobile/examples/ios-nasp/ios-nasp.xcodeproj">
+      location = "self:/Users/nandork/Code/src/github.com/cisco-open/libnasp/experimental/mobile/examples/ios-nasp/ios-nasp.xcodeproj">
    </FileRef>
 </Workspace>

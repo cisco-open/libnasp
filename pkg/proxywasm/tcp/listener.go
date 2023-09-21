@@ -17,7 +17,7 @@ package tcp
 import (
 	"net"
 
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
 )
 
 type wrappedListener struct {

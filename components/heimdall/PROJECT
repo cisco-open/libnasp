@@ -2,5 +2,5 @@ domain: nasp.k8s.cisco.com
 layout:
   - go.kubebuilder.io/v3
 projectName: heimdall
-repo: github.com/cisco-open/nasp/components/heimdall
+repo: github.com/cisco-open/libnasp/components/heimdall
 version: "3"

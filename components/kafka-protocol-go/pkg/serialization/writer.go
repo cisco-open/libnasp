@@ -23,8 +23,8 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/pierrec/lz4/v4"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/compression/snappy"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/compression/snappy"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
 )
 
 type Writer struct {

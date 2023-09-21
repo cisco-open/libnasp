@@ -17,7 +17,7 @@ package fields
 import (
 	"strconv"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
 )
 
 func PrimitiveTypeSliceEqual[T bool | int8 | int16 | uint16 | int32 | int64 | float64, S []T](x, y S) bool {

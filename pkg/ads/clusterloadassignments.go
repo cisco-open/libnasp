@@ -18,7 +18,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/endpoint"
 
 	"emperror.dev/errors"
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"

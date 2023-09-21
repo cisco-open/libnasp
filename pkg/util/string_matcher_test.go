@@ -20,7 +20,7 @@ import (
 
 	v3matcherpb "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 
-	"github.com/cisco-open/nasp/pkg/util"
+	"github.com/cisco-open/libnasp/pkg/util"
 )
 
 func TestMatch(t *testing.T) {

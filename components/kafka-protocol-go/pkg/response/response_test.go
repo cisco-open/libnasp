@@ -17,8 +17,8 @@ package response_test
 import (
 	"testing"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/assets/test"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/response"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/assets/test"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/response"
 )
 
 func TestParse(t *testing.T) {

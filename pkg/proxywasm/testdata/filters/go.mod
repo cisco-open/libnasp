@@ -1,4 +1,4 @@
-module github.com/cisco-open/nasp/pkg/proxywasm/testdata/filters
+module github.com/cisco-open/libnasp/pkg/proxywasm/testdata/filters
 
 go 1.20
 

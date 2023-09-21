@@ -17,8 +17,8 @@ package ads
 import (
 	"context"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
-	"github.com/cisco-open/nasp/pkg/ads/internal/util"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/listener"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/util"
 
 	"emperror.dev/errors"
 	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"

@@ -1,9 +1,9 @@
-module github.com/cisco-open/nasp
+module github.com/cisco-open/libnasp
 
 go 1.20
 
 replace (
-	github.com/cisco-open/nasp/components/bifrost => ./components/bifrost
+	github.com/cisco-open/libnasp/components/bifrost => ./components/bifrost
 	github.com/spf13/cobra => github.com/spf13/cobra v1.6.0
 	helm.sh/helm/v3 => helm.sh/helm/v3 v3.9.4
 )
@@ -16,7 +16,7 @@ require (
 	github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero v1.2.1
 	github.com/blend/go-sdk v1.20220411.3
 	github.com/cenkalti/backoff/v4 v4.2.0
-	github.com/cisco-open/nasp/components/bifrost v0.0.0-00010101000000-000000000000
+	github.com/cisco-open/libnasp/components/bifrost v0.0.0-00010101000000-000000000000
 	github.com/cisco-open/operator-tools v0.30.0
 	github.com/cncf/xds/go v0.0.0-20230428030218-4003588d1b74
 	github.com/envoyproxy/go-control-plane v0.11.1

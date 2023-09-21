@@ -1,14 +1,14 @@
-module github.com/cisco-open/nasp/components/heimdall
+module github.com/cisco-open/libnasp/components/heimdall
 
 go 1.20
 
-replace github.com/cisco-open/nasp => ../..
+replace github.com/cisco-open/libnasp => ../..
 
 require (
 	emperror.dev/errors v0.8.1
 	github.com/banzaicloud/k8s-objectmatcher v1.8.0
 	github.com/cisco-open/cluster-registry-controller/api v0.2.12
-	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
+	github.com/cisco-open/libnasp v0.0.0-00010101000000-000000000000
 	github.com/cisco-open/operator-tools v0.30.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-logr/logr v1.2.4

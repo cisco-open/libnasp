@@ -21,10 +21,10 @@ import (
 
 	"github.com/blend/go-sdk/envoyutil"
 
-	"github.com/cisco-open/nasp/pkg/network"
-	"github.com/cisco-open/nasp/pkg/proxywasm"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
-	lhttp "github.com/cisco-open/nasp/pkg/proxywasm/http"
+	"github.com/cisco-open/libnasp/pkg/network"
+	"github.com/cisco-open/libnasp/pkg/proxywasm"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
+	lhttp "github.com/cisco-open/libnasp/pkg/proxywasm/http"
 )
 
 type envoyHttpHandlerMiddleware struct {

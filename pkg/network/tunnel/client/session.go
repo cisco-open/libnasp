@@ -22,7 +22,7 @@ import (
 	"emperror.dev/errors"
 	"golang.ngrok.com/muxado"
 
-	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/api"
 )
 
 type session struct {

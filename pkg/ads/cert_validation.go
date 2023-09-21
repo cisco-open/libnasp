@@ -21,8 +21,8 @@ import (
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	extensions_transport_sockets_tls_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 
-	"github.com/cisco-open/nasp/pkg/tls/verify"
-	"github.com/cisco-open/nasp/pkg/util"
+	"github.com/cisco-open/libnasp/pkg/tls/verify"
+	"github.com/cisco-open/libnasp/pkg/util"
 )
 
 func GetCertVerifierConfigFromValidationContext(validationContext *extensions_transport_sockets_tls_v3.CertificateValidationContext) *verify.CertVerifierConfig {

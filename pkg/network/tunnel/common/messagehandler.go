@@ -21,7 +21,7 @@ import (
 	"emperror.dev/errors"
 	"github.com/go-logr/logr"
 
-	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/api"
 )
 
 type messageHandler struct {

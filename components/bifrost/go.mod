@@ -1,16 +1,16 @@
-module github.com/cisco-open/nasp/components/bifrost
+module github.com/cisco-open/libnasp/components/bifrost
 
 go 1.20
 
 replace (
-	github.com/cisco-open/nasp => ../..
-	github.com/cisco-open/nasp/components/heimdall => ../heimdall
+	github.com/cisco-open/libnasp => ../..
+	github.com/cisco-open/libnasp/components/heimdall => ../heimdall
 )
 
 require (
 	emperror.dev/errors v0.8.1
-	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
-	github.com/cisco-open/nasp/components/heimdall v0.0.0-00010101000000-000000000000
+	github.com/cisco-open/libnasp v0.0.0-00010101000000-000000000000
+	github.com/cisco-open/libnasp/components/heimdall v0.0.0-00010101000000-000000000000
 	github.com/cisco-open/operator-tools v0.30.0
 	github.com/go-logr/logr v1.2.4
 	github.com/spf13/cobra v1.7.0

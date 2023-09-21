@@ -44,8 +44,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	clientconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	"github.com/cisco-open/nasp/pkg/environment"
-	"github.com/cisco-open/nasp/pkg/k8s/service"
+	"github.com/cisco-open/libnasp/pkg/environment"
+	"github.com/cisco-open/libnasp/pkg/k8s/service"
 )
 
 var (

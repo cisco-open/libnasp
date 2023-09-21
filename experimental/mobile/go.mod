@@ -3,14 +3,14 @@ module github.com/cisco/nasp/mobile
 go 1.20
 
 replace (
-	github.com/cisco-open/nasp => ../..
-	github.com/cisco-open/nasp/components/bifrost => ../../components/bifrost
+	github.com/cisco-open/libnasp => ../..
+	github.com/cisco-open/libnasp/components/bifrost => ../../components/bifrost
 	github.com/spf13/cobra => github.com/spf13/cobra v1.6.0
 	helm.sh/helm/v3 => helm.sh/helm/v3 v3.9.4
 )
 
 require (
-	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
+	github.com/cisco-open/libnasp v0.0.0-00010101000000-000000000000
 	golang.org/x/mobile v0.0.0-20221110043201-43a038452099
 	k8s.io/klog/v2 v2.90.1
 )
@@ -33,7 +33,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cisco-open/nasp/components/bifrost v0.0.0-00010101000000-000000000000 // indirect
+	github.com/cisco-open/libnasp/components/bifrost v0.0.0-00010101000000-000000000000 // indirect
 	github.com/cisco-open/operator-tools v0.30.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20230428030218-4003588d1b74 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

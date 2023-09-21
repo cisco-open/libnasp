@@ -141,8 +141,8 @@ First, we import the library:
 
 ```go
 import (
-  "github.com/cisco-open/nasp/pkg/istio"
-  "github.com/cisco-open/nasp/pkg/network"
+  "github.com/cisco-open/libnasp/pkg/istio"
+  "github.com/cisco-open/libnasp/pkg/network"
 )
 ```
 

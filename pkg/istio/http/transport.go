@@ -21,9 +21,9 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"github.com/cisco-open/nasp/pkg/istio/discovery"
-	"github.com/cisco-open/nasp/pkg/network"
-	"github.com/cisco-open/nasp/pkg/tls/verify"
+	"github.com/cisco-open/libnasp/pkg/istio/discovery"
+	"github.com/cisco-open/libnasp/pkg/network"
+	"github.com/cisco-open/libnasp/pkg/tls/verify"
 )
 
 type istioHTTPRequestTransport struct {

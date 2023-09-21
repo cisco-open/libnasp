@@ -1,4 +1,4 @@
-module github.com/cisco-open/nasp/components/kafka-protocol-go/pkg
+module github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg
 
 go 1.20
 

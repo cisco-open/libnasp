@@ -1,3 +1,3 @@
-module github.com/cisco-open/nasp/components/bifrost/deploy/charts
+module github.com/cisco-open/libnasp/components/bifrost/deploy/charts
 
 go 1.20

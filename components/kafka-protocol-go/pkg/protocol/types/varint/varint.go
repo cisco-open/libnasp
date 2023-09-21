@@ -23,8 +23,8 @@ import (
 
 	"emperror.dev/errors"
 
-	typesbytes "github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/serialization"
+	typesbytes "github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/serialization"
 )
 
 func Uint32Size(value uint32) int {

@@ -19,7 +19,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/cisco-open/nasp/pkg/proxywasm"
+	"github.com/cisco-open/libnasp/pkg/proxywasm"
 )
 
 func TestStringify(t *testing.T) {

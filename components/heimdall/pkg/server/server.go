@@ -31,10 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	cluster_registry "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
-	istio_ca "github.com/cisco-open/nasp/pkg/ca/istio"
-	"github.com/cisco-open/nasp/pkg/environment"
-	"github.com/cisco-open/nasp/pkg/k8s/labels"
-	k8slabels "github.com/cisco-open/nasp/pkg/k8s/labels"
+	istio_ca "github.com/cisco-open/libnasp/pkg/ca/istio"
+	"github.com/cisco-open/libnasp/pkg/environment"
+	"github.com/cisco-open/libnasp/pkg/k8s/labels"
+	k8slabels "github.com/cisco-open/libnasp/pkg/k8s/labels"
 )
 
 var (

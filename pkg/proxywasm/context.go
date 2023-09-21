@@ -22,8 +22,8 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/klog/v2"
 
-	"github.com/cisco-open/nasp/pkg/dotn"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/dotn"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
 )
 
 var contexts sync.Map

@@ -46,7 +46,7 @@
     <repositories>
 <!--        <repository>-->
 <!--            <id>github-nasp</id>-->
-<!--            <url>https://maven.pkg.github.com/cisco-open/nasp</url>-->
+<!--            <url>https://maven.pkg.github.com/cisco-open/libnasp</url>-->
 <!--            <snapshots>-->
 <!--                <enabled>true</enabled>-->
 <!--            </snapshots>-->
@@ -149,7 +149,7 @@
         <repository>
             <id>github-nasp</id>
             <name>GitHub Nasp Apache Maven Packages</name>
-            <url>https://maven.pkg.github.com/cisco-open/nasp</url>
+            <url>https://maven.pkg.github.com/cisco-open/libnasp</url>
         </repository>
     </distributionManagement>
 

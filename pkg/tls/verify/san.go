@@ -20,7 +20,7 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/cisco-open/nasp/pkg/util"
+	"github.com/cisco-open/libnasp/pkg/util"
 )
 
 type SANType string

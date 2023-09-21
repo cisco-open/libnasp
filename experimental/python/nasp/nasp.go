@@ -31,7 +31,7 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/cisco-open/nasp/pkg/istio"
+	"github.com/cisco-open/libnasp/pkg/istio"
 )
 
 /*

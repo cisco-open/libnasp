@@ -29,11 +29,11 @@ import (
 	"github.com/spf13/viper"
 	"k8s.io/klog/v2"
 
-	"github.com/cisco-open/nasp/components/bifrost/pkg/k8s"
-	"github.com/cisco-open/nasp/pkg/istio"
-	"github.com/cisco-open/nasp/pkg/network/proxy"
-	"github.com/cisco-open/nasp/pkg/network/tunnel/api"
-	"github.com/cisco-open/nasp/pkg/network/tunnel/client"
+	"github.com/cisco-open/libnasp/components/bifrost/pkg/k8s"
+	"github.com/cisco-open/libnasp/pkg/istio"
+	"github.com/cisco-open/libnasp/pkg/network/proxy"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/api"
+	"github.com/cisco-open/libnasp/pkg/network/tunnel/client"
 )
 
 var ErrLocalAddressNotSpecified = errors.New("at least one local address must be specified")

@@ -17,6 +17,6 @@
 
 package istio
 
-import "github.com/cisco-open/nasp/pkg/proxywasm/api"
+import "github.com/cisco-open/libnasp/pkg/proxywasm/api"
 
 var getWasmerRuntime api.WasmRuntime = nil

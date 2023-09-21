@@ -32,10 +32,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	clusterregistryv1alpha1 "github.com/cisco-open/cluster-registry-controller/api/v1alpha1"
-	"github.com/cisco-open/nasp/components/heimdall/pkg/cert"
-	"github.com/cisco-open/nasp/components/heimdall/pkg/k8sutil"
+	"github.com/cisco-open/libnasp/components/heimdall/pkg/cert"
+	"github.com/cisco-open/libnasp/components/heimdall/pkg/k8sutil"
 
-	"github.com/cisco-open/nasp/components/heimdall/pkg/webhooks"
+	"github.com/cisco-open/libnasp/components/heimdall/pkg/webhooks"
 	//+kubebuilder:scaffold:imports
 )
 

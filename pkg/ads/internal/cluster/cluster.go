@@ -25,7 +25,7 @@ import (
 
 	envoy_extensions_transport_sockets_tls_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/util"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/util"
 )
 
 type FilterOption interface {

@@ -19,7 +19,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cisco-open/nasp/components/heimdall/deploy/charts"
+	"github.com/cisco-open/libnasp/components/heimdall/deploy/charts"
 )
 
 func TestEmbed(t *testing.T) {

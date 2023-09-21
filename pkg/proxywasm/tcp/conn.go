@@ -23,10 +23,10 @@ import (
 
 	"emperror.dev/errors"
 
-	"github.com/cisco-open/nasp/pkg/network"
-	"github.com/cisco-open/nasp/pkg/proxywasm"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
-	"github.com/cisco-open/nasp/pkg/proxywasm/middleware"
+	"github.com/cisco-open/libnasp/pkg/network"
+	"github.com/cisco-open/libnasp/pkg/proxywasm"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/middleware"
 )
 
 const (

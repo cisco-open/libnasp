@@ -21,10 +21,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types"
 
-	typesbytes "github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/varint"
+	typesbytes "github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/varint"
 
 	"emperror.dev/errors"
 )

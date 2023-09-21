@@ -57,10 +57,10 @@ import (
 	"github.com/onsi/gomega/format"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/cisco-open/nasp/pkg/ads"
-	adsconfig "github.com/cisco-open/nasp/pkg/ads/config"
-	"github.com/cisco-open/nasp/pkg/ads/internal/endpoint"
-	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
+	"github.com/cisco-open/libnasp/pkg/ads"
+	adsconfig "github.com/cisco-open/libnasp/pkg/ads/config"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/endpoint"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/listener"
 
 	"testing"
 

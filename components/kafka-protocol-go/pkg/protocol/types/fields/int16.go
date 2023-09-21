@@ -17,9 +17,9 @@ package fields
 import (
 	"bytes"
 
-	typesbytes "github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	typesbytes "github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types"
 )
 
 type Int16 struct {

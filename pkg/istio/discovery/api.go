@@ -20,7 +20,7 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"github.com/cisco-open/nasp/pkg/tls/verify"
+	"github.com/cisco-open/libnasp/pkg/tls/verify"
 )
 
 type DiscoveryClient interface {

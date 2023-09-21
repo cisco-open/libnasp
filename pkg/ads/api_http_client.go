@@ -21,11 +21,11 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/listener"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/listener"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/virtualhost"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/virtualhost"
 
-	"github.com/cisco-open/nasp/pkg/ads/internal/route"
+	"github.com/cisco-open/libnasp/pkg/ads/internal/route"
 
 	envoy_config_listener_v3 "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"

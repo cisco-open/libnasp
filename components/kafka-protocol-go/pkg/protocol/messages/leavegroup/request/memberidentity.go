@@ -21,9 +21,9 @@ import (
 	"strings"
 
 	"emperror.dev/errors"
-	typesbytes "github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/fields"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/types/varint"
+	typesbytes "github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/bytes"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/fields"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/types/varint"
 )
 
 var memberIdentityMemberId = fields.Context{

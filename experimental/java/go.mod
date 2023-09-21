@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	code.cloudfoundry.org/go-diodes v0.0.0-20230306185344-fbbc5a1cded8
-	github.com/cisco-open/nasp v0.0.0-00010101000000-000000000000
+	github.com/cisco-open/libnasp v0.0.0-00010101000000-000000000000
 	github.com/go-logr/logr v1.2.4
 	github.com/go-logr/zerologr v1.2.3
 	github.com/pborman/uuid v1.2.1
@@ -30,7 +30,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/cisco-open/nasp/components/bifrost v0.0.0-00010101000000-000000000000 // indirect
+	github.com/cisco-open/libnasp/components/bifrost v0.0.0-00010101000000-000000000000 // indirect
 	github.com/cisco-open/operator-tools v0.30.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20230428030218-4003588d1b74 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -148,6 +148,6 @@ require (
 )
 
 replace (
-	github.com/cisco-open/nasp => ../..
-	github.com/cisco-open/nasp/components/bifrost => ../../components/bifrost
+	github.com/cisco-open/libnasp => ../..
+	github.com/cisco-open/libnasp/components/bifrost => ../../components/bifrost
 )

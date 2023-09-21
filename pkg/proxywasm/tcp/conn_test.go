@@ -34,14 +34,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/nettest"
 
-	"github.com/cisco-open/nasp/pkg/proxywasm/testdata"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/testdata"
 
 	"github.com/banzaicloud/proxy-wasm-go-host/runtime/wazero"
-	"github.com/cisco-open/nasp/pkg/environment"
-	"github.com/cisco-open/nasp/pkg/istio/filters"
-	"github.com/cisco-open/nasp/pkg/proxywasm"
-	"github.com/cisco-open/nasp/pkg/proxywasm/api"
-	"github.com/cisco-open/nasp/pkg/proxywasm/tcp"
+	"github.com/cisco-open/libnasp/pkg/environment"
+	"github.com/cisco-open/libnasp/pkg/istio/filters"
+	"github.com/cisco-open/libnasp/pkg/proxywasm"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/api"
+	"github.com/cisco-open/libnasp/pkg/proxywasm/tcp"
 )
 
 func TestNetConn(t *testing.T) {
