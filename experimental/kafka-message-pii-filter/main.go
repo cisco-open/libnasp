@@ -19,14 +19,14 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/protocol/messages/produce"
-	"github.com/cisco/nasp/kafka-message-pii-filter/pii"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/messages/produce"
+	"github.com/cisco-open/libnasp/kafka-message-pii-filter/pii"
 
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm/types"
 
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/request"
-	"github.com/cisco-open/nasp/components/kafka-protocol-go/pkg/response"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/request"
+	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/response"
 
 	// _ "github.com/wasilibs/nottinygc"
 	"io"
