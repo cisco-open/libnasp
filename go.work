@@ -12,5 +12,5 @@ use (
 	./pkg/proxywasm/testdata/filters
 	components/kafka-protocol-go/pkg
 	components/kafka-protocol-go
-	experimental/kafka-message-trace-filter
+	experimental/kafka-message-pii-filter
 )
