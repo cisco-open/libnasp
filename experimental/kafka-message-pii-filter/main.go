@@ -19,9 +19,11 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+
+	"github.com/tidwall/gjson"
+
 	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/messages/produce"
 	"github.com/cisco-open/libnasp/kafka-message-pii-filter/pii"
-	"github.com/tidwall/gjson"
 
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm/types"
@@ -513,8 +515,6 @@ func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte, outp
 			if err != nil {
 				return errors.New(strings.Join([]string{"couldn't serialize Kafka request message data due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
 			}
-
-			ctx.log(logLevelWarn, strings.Join([]string{"PII BRANCH processed Kafka request message:", req.String()}, " "))
 
 			var sizeInBytes [4]byte
 			binary.BigEndian.PutUint32(sizeInBytes[:], uint32(len(serializedMsg)))
