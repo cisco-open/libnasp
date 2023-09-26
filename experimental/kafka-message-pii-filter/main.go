@@ -21,6 +21,7 @@ import (
 	"errors"
 	"github.com/cisco-open/libnasp/components/kafka-protocol-go/pkg/protocol/messages/produce"
 	"github.com/cisco-open/libnasp/kafka-message-pii-filter/pii"
+	"github.com/tidwall/gjson"
 
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm"
 	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm/types"
@@ -68,6 +69,28 @@ type pluginContext struct {
 	types.DefaultPluginContext
 
 	contextID uint32
+
+	avroSchemas gjson.Result
+}
+
+func (ctx *pluginContext) OnPluginStart(pluginConfigurationSize int) types.OnPluginStartStatus {
+	pluginConfig, err := proxywasm.GetPluginConfiguration()
+	if err != nil && !errors.Is(err, types.ErrorStatusNotFound) {
+		proxywasm.LogCriticalf("error reading plugin configuration: %v", err)
+		return types.OnPluginStartStatusFailed
+	}
+	if len(pluginConfig) == 0 { // no avro schemas to be used is configured
+		return types.OnPluginStartStatusOK
+	}
+
+	if !gjson.ValidBytes(pluginConfig) {
+		proxywasm.LogCriticalf("the plugin configuration is not a valid json: %q", string(pluginConfig))
+		return types.OnPluginStartStatusFailed
+	}
+
+	ctx.avroSchemas = gjson.ParseBytes(pluginConfig)
+
+	return types.OnPluginStartStatusOK
 }
 
 type state int
@@ -96,6 +119,7 @@ func (ctx *pluginContext) NewTcpContext(contextID uint32) types.TcpContext {
 
 	return &networkContext{
 		contextID:        contextID,
+		pluginContext:    ctx,
 		inFlightRequests: make([]requestReference, 0, 100),
 		direction:        trafficDirection(listenerDirection[0]),
 	}
@@ -105,6 +129,8 @@ type networkContext struct {
 	types.DefaultTcpContext
 
 	contextID uint32
+
+	pluginContext *pluginContext
 
 	connectionID uint64
 
@@ -429,11 +455,6 @@ func (ctx *networkContext) handleDownstreamKafkaMessage(sizeAndMsgData []byte) e
 		return err
 	}
 
-	// ide kell majd vissza írni a módosítottat
-	// fetch response, ott megnézni hogy mit ad vissza lehet valami particiok szerint ?
-	// 4 byte hosszt big endian oda rakni majd elé
-	// kellhet majd requestböl kiszedni a clientid-t ha olyan a client akkor a hozzá tartozó responseban (replace rész?)
-	// kell majd meghívni a pii replacert és itt lent vissza írni
 	return nil
 }
 
@@ -480,7 +501,6 @@ func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte, outp
 					for _, r := range batch.Records() {
 						if pii.DetectPII(r.Value(), true) {
 							modified = true
-							ctx.log(logLevelWarn, strings.Join([]string{"PII BRANCH processed Kafka request message modified:", req.String()}, " "))
 						}
 					}
 				}
