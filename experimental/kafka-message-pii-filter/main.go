@@ -54,6 +54,7 @@ func main() {
 	proxywasm.SetVMContext(&vmContext{})
 }
 
+//nolint:unused
 //export sched_yield
 func sched_yield() int32 {
 	return 0
@@ -394,6 +395,7 @@ func (ctx *networkContext) resetDownstreamMessageHandler() {
 		ctx.resetRequestHandler()
 	case traffic_direction_outbound:
 		ctx.resetResponseHandler()
+	case traffic_direction_unspecified:
 	}
 }
 
@@ -403,6 +405,7 @@ func (ctx *networkContext) resetUpstreamMessageHandler() {
 		ctx.resetResponseHandler()
 	case traffic_direction_outbound:
 		ctx.resetRequestHandler()
+	case traffic_direction_unspecified:
 	}
 }
 
@@ -422,6 +425,7 @@ func (ctx *networkContext) failDownstreamMessageHandler() {
 		ctx.failRequestHandler()
 	case traffic_direction_outbound:
 		ctx.failResponseHandler()
+	case traffic_direction_unspecified:
 	}
 }
 
@@ -431,6 +435,7 @@ func (ctx *networkContext) failUpstreamMessageHandler() {
 		ctx.failResponseHandler()
 	case traffic_direction_outbound:
 		ctx.failRequestHandler()
+	case traffic_direction_unspecified:
 	}
 }
 
@@ -451,6 +456,7 @@ func (ctx *networkContext) handleDownstreamKafkaMessage(sizeAndMsgData []byte) e
 		err = ctx.handleKafkaRequestMessage(sizeAndMsgData, &ctx.outputDownstreamData)
 	case traffic_direction_outbound:
 		err = ctx.handleKafkaResponseMessage(sizeAndMsgData, &ctx.outputDownstreamData)
+	case traffic_direction_unspecified:
 	}
 
 	if err != nil {
@@ -467,6 +473,7 @@ func (ctx *networkContext) handleUpstreamKafkaMessage(sizeAndMsgData []byte) err
 		err = ctx.handleKafkaResponseMessage(sizeAndMsgData, &ctx.outputUpstreamData)
 	case traffic_direction_outbound:
 		err = ctx.handleKafkaRequestMessage(sizeAndMsgData, &ctx.outputUpstreamData)
+	case traffic_direction_unspecified:
 	}
 
 	if err != nil {
@@ -479,6 +486,7 @@ func (ctx *networkContext) handleUpstreamKafkaMessage(sizeAndMsgData []byte) err
 func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte, outputData *bytes.Buffer) error {
 	req, err := request.Parse(sizeAndMsgData[kafkaMsgSizeBytesLen:])
 	if err != nil {
+		//nolint: goerr113
 		return errors.New(strings.Join([]string{"couldn't parse Kafka request message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
 	}
 	defer req.Release()
@@ -488,50 +496,60 @@ func (ctx *networkContext) handleKafkaRequestMessage(sizeAndMsgData []byte, outp
 
 	// NOTE: in case the original message is altered than pass back the serialized changed message
 	// Filter message data for PII detection and modification
-	if req.HeaderData().RequestApiKey() == 0 {
-		// produce request api key
-		produceReq, ok := req.Data().(*produce.Request)
-		if !ok {
-			return errors.New(strings.Join([]string{"deserialized Kafka Produce request has wrong type, raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
-		}
+	if req.HeaderData().RequestApiKey() != 0 {
+		// if not produce api key
+		outputData.Write(sizeAndMsgData)
+		return nil
+	}
 
-		modified := false
-		for _, t := range produceReq.TopicData() {
-			for _, p := range t.PartitionData() {
-				recordBatches := p.Records()
-				for _, batch := range recordBatches.Items() {
-					for _, r := range batch.Records() {
-						if pii.DetectPII(r.Value(), true) {
-							modified = true
-						}
+	// produce request api key
+	produceReq, ok := req.Data().(*produce.Request)
+	if !ok {
+		//nolint: goerr113
+		return errors.New(strings.Join([]string{"deserialized Kafka Produce request has wrong type, raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
+	}
+
+	modified := false
+	for _, t := range produceReq.TopicData() {
+		for _, p := range t.PartitionData() {
+			recordBatches := p.Records()
+			for _, batch := range recordBatches.Items() {
+				for _, r := range batch.Records() {
+					if pii.DetectPII(r.Value(), true) {
+						modified = true
 					}
 				}
 			}
 		}
-
-		if modified { // original kafka request was modified
-			// The original sizeAndMsgData has been modified by DetectPII, so re-serialize with correct api version
-			serializedMsg, err := req.Serialize(req.HeaderData().RequestApiVersion())
-			if err != nil {
-				return errors.New(strings.Join([]string{"couldn't serialize Kafka request message data due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
-			}
-
-			var sizeInBytes [4]byte
-			binary.BigEndian.PutUint32(sizeInBytes[:], uint32(len(serializedMsg)))
-
-			if _, err := outputData.Write(sizeInBytes[:]); err != nil {
-				return errors.New(strings.Join([]string{"couldn't write Kafka request message size due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
-			}
-
-			if _, err := outputData.Write(serializedMsg); err != nil {
-				return errors.New(strings.Join([]string{"couldn't write Kafka request message due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
-			}
-
-			return nil
-		}
 	}
 
-	outputData.Write(sizeAndMsgData)
+	if !modified {
+		outputData.Write(sizeAndMsgData)
+		return nil
+	}
+
+	// original kafka request was modified
+	// The original sizeAndMsgData has been modified by DetectPII, so re-serialize with correct api version
+	serializedMsg, err := req.Serialize(req.HeaderData().RequestApiVersion())
+	if err != nil {
+		//nolint: goerr113
+		return errors.New(strings.Join([]string{"couldn't serialize Kafka request message data due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
+	}
+
+	ctx.log(logLevelWarn, strings.Join([]string{"PII BRANCH processed Kafka request message:", req.String()}, " "))
+
+	var sizeInBytes [4]byte
+	binary.BigEndian.PutUint32(sizeInBytes[:], uint32(len(serializedMsg)))
+
+	if _, err := outputData.Write(sizeInBytes[:]); err != nil {
+		//nolint: goerr113
+		return errors.New(strings.Join([]string{"couldn't write Kafka request message size due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
+	}
+
+	if _, err := outputData.Write(serializedMsg); err != nil {
+		//nolint: goerr113
+		return errors.New(strings.Join([]string{"couldn't write Kafka request message due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
+	}
 
 	return nil
 }
@@ -545,6 +563,7 @@ func (ctx *networkContext) handleKafkaResponseMessage(sizeAndMsgData []byte, out
 
 	resp, err := response.Parse(sizeAndMsgData[kafkaMsgSizeBytesLen:], req.requestApiKey, req.requestApiVersion, req.requestCorrelationId)
 	if err != nil {
+		//nolint: goerr113
 		return errors.New(strings.Join([]string{"couldn't parse Kafka response message data bytes due to:", err.Error(), ", raw size and message:", base64.StdEncoding.EncodeToString(sizeAndMsgData)}, " "))
 	}
 	defer resp.Release()
@@ -602,6 +621,7 @@ func (ctx *networkContext) downstreamKafkaMessageDataAvailable(dataSize int) (bo
 		cachedMessageSize = ctx.requestMessageSize
 	case traffic_direction_outbound:
 		cachedMessageSize = ctx.responseMessageSize
+	case traffic_direction_unspecified:
 	}
 
 	var err error
@@ -614,6 +634,7 @@ func (ctx *networkContext) downstreamKafkaMessageDataAvailable(dataSize int) (bo
 
 		cachedMessageSize, err = ctx.kafkaMessageSizeFromDownstreamData()
 		if err != nil {
+			//nolint: goerr113
 			return false, errors.New(strings.Join([]string{"couldn't retrieve kafka message size from downstream data due to:", err.Error()}, " "))
 		}
 
@@ -624,6 +645,7 @@ func (ctx *networkContext) downstreamKafkaMessageDataAvailable(dataSize int) (bo
 		case traffic_direction_outbound:
 			ctx.log(logLevelDebug, strings.Join([]string{"received Kafka response message size from downstream:", strconv.Itoa(int(cachedMessageSize))}, " "))
 			ctx.responseMessageSize = cachedMessageSize
+		case traffic_direction_unspecified:
 		}
 	}
 
@@ -647,6 +669,7 @@ func (ctx *networkContext) upstreamKafkaMessageDataAvailable(dataSize int) (bool
 		cachedMessageSize = ctx.responseMessageSize
 	case traffic_direction_outbound:
 		cachedMessageSize = ctx.requestMessageSize
+	case traffic_direction_unspecified:
 	}
 
 	var err error
@@ -659,6 +682,7 @@ func (ctx *networkContext) upstreamKafkaMessageDataAvailable(dataSize int) (bool
 
 		cachedMessageSize, err = ctx.kafkaMessageSizeFromUpstreamData()
 		if err != nil {
+			//nolint: goerr113
 			return false, errors.New(strings.Join([]string{"couldn't retrieve kafka message size from upstream data due to:", err.Error()}, " "))
 		}
 
@@ -669,6 +693,7 @@ func (ctx *networkContext) upstreamKafkaMessageDataAvailable(dataSize int) (bool
 		case traffic_direction_outbound:
 			ctx.log(logLevelDebug, strings.Join([]string{"received Kafka request message size from upstream:", strconv.Itoa(int(cachedMessageSize))}, " "))
 			ctx.requestMessageSize = cachedMessageSize
+		case traffic_direction_unspecified:
 		}
 	}
 
@@ -732,14 +757,15 @@ func (ctx *networkContext) kafkaMessageSizeFromDownstreamData() (int32, error) {
 	if n < kafkaMsgSizeBytesLen {
 		b, err := proxywasm.GetDownstreamData(0, kafkaMsgSizeBytesLen-n)
 		if err != nil && !errors.Is(err, io.EOF) {
+			//nolint: goerr113
 			return 0, errors.New(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "downstream data bytes from host"}, " "))
 		}
-		m := copy(msgSizeBytes[n:], b)
-		n += m
+		copy(msgSizeBytes[n:], b)
 	}
 
 	size, err := kafkaMessageSize(msgSizeBytes[0:kafkaMsgSizeBytesLen])
 	if err != nil {
+		//nolint: goerr113
 		return 0, errors.New(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, ""))
 	}
 
@@ -756,14 +782,15 @@ func (ctx *networkContext) kafkaMessageSizeFromUpstreamData() (int32, error) {
 	if n < kafkaMsgSizeBytesLen {
 		b, err := proxywasm.GetUpstreamData(0, kafkaMsgSizeBytesLen-n)
 		if err != nil && !errors.Is(err, io.EOF) {
+			//nolint: goerr113
 			return 0, errors.New(strings.Join([]string{"couldn't get", strconv.Itoa(kafkaMsgSizeBytesLen - n), "upstream data bytes from host"}, " "))
 		}
-		m := copy(msgSizeBytes[n:], b)
-		n += m
+		copy(msgSizeBytes[n:], b)
 	}
 
 	size, err := kafkaMessageSize(msgSizeBytes[0:kafkaMsgSizeBytesLen])
 	if err != nil {
+		//nolint: goerr113
 		return 0, errors.New(strings.Join([]string{"couldn't deserialize kafka message size due to:", err.Error()}, ""))
 	}
 
@@ -809,6 +836,7 @@ func (ctx *networkContext) log(level logLevel, msg string) {
 func kafkaMessageSize(msgSizeBytes []byte) (int32, error) {
 	n := len(msgSizeBytes)
 	if n < kafkaMsgSizeBytesLen {
+		//nolint: goerr113
 		return 0, errors.New(strings.Join([]string{"expected", strconv.Itoa(kafkaMsgSizeBytesLen), "bytes, but got", strconv.Itoa(n)}, " "))
 	}
 

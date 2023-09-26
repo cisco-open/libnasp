@@ -179,5 +179,6 @@ func deserializeFromAvro(data []byte) (TestStruct, error) {
 		return TestStruct{}, err
 	}
 
+	//nolint:forcetypeassert
 	return TestStruct{Data: nativeMap["Data"].(string)}, nil
 }

@@ -33,8 +33,8 @@ var patterns = map[string]string{
 func DetectPII(text []byte, obfuscate bool) bool {
 	piiDetected := false
 
-	for secretType, pattern := range patterns {
-		if detect(secretType, pattern, text, obfuscate) {
+	for _, pattern := range patterns {
+		if detect(pattern, text, obfuscate) {
 			piiDetected = true
 		}
 	}
@@ -42,7 +42,7 @@ func DetectPII(text []byte, obfuscate bool) bool {
 	return piiDetected
 }
 
-func detect(secretType, pattern string, text []byte, obfuscate bool) bool {
+func detect(pattern string, text []byte, obfuscate bool) bool {
 	r := regexp.MustCompile(pattern)
 	matches := r.FindAllIndex(text, -1)
 
