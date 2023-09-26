@@ -24,10 +24,6 @@ COPY ./go.sum /go/src/app
 COPY ./components/heimdall/go.mod /go/src/app/components/heimdall
 COPY ./components/heimdall/go.sum /go/src/app/components/heimdall
 
-COPY ./experimental/kafka-message-pii-filter/go.mod /go/src/app/experimental/kafka-message-pii-filter
-COPY ./experimental/kafka-message-pii-filter/go.sum /go/src/app/experimental/kafka-message-pii-filter
-
-
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg/mod go mod download
 
 COPY . /go/src/app/
