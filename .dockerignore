@@ -1,5 +1,6 @@
 experimental
 !experimental/java
 !experimental/mobile
+!experimental/kafka-message-pii-filter
 bin
 build
