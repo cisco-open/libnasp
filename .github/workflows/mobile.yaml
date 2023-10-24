@@ -23,6 +23,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Setup Golang with cache
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          check-latest: true
+
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
       #   with:
@@ -37,14 +44,12 @@ jobs:
       - name: Build plain java library
         working-directory: experimental/java
         run: |
-          export JAVA_HOME="$(brew --prefix)/opt/openjdk/"
           make java
           ./mvnw install
 
       - name: Build spring library
         working-directory: experimental/spring
         run: |
-          export JAVA_HOME="$(brew --prefix)/opt/openjdk/"
           ./mvnw install -Pdarwin
 
       - name: Build android framework
@@ -55,7 +60,6 @@ jobs:
       - name: Build android example
         working-directory: experimental/mobile/examples/android-nasp
         run: |
-          export JAVA_HOME="$(brew --prefix)/opt/openjdk/"
           ./gradlew build
 
       - name: Build ios framework
