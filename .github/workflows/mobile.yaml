@@ -10,7 +10,7 @@ env:
 
 jobs:
   build:
-    if: contains(github.event.pull_request.labels.*.name, 'mobile')
+    if: contains(github.event.pull_request.labels.*.name, 'mobile') || contains(github.event.pull_request.labels.*.name, 'java')
     name: Mobile and Java build
     runs-on: macos-12
 
@@ -22,6 +22,13 @@ jobs:
         uses: magnetikonline/action-golang-cache@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          check-latest: true
 
       # - name: Setup upterm session
       #   uses: lhotari/action-upterm@v1
@@ -37,14 +44,12 @@ jobs:
       - name: Build plain java library
         working-directory: experimental/java
         run: |
-          export JAVA_HOME="$(brew --prefix)/opt/openjdk/"
           make java
           ./mvnw install
 
       - name: Build spring library
         working-directory: experimental/spring
         run: |
-          export JAVA_HOME="$(brew --prefix)/opt/openjdk/"
           ./mvnw install -Pdarwin
 
       - name: Build android framework
@@ -55,7 +60,6 @@ jobs:
       - name: Build android example
         working-directory: experimental/mobile/examples/android-nasp
         run: |
-          export JAVA_HOME="$(brew --prefix)/opt/openjdk/"
           ./gradlew build
 
       - name: Build ios framework
