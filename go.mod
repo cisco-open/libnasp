@@ -18,7 +18,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cisco-open/libnasp/components/bifrost v0.0.0-00010101000000-000000000000
 	github.com/cisco-open/operator-tools v0.30.0
-	github.com/cncf/xds/go v0.0.0-20230428030218-4003588d1b74
+	github.com/cncf/xds/go v0.0.0-20230607035331-e9ce68804cb4
 	github.com/envoyproxy/go-control-plane v0.11.1
 	github.com/gin-contrib/gzip v0.0.6
 	github.com/gin-gonic/gin v1.9.1
@@ -39,7 +39,7 @@ require (
 	golang.org/x/net v0.10.0
 	golang.org/x/sync v0.2.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230526203410-71b5a4ffd15e
-	google.golang.org/grpc v1.55.0
+	google.golang.org/grpc v1.56.3
 	google.golang.org/protobuf v1.30.0
 	istio.io/api v0.0.0-20230713061407-06047cce866f
 	istio.io/istio v0.0.0-20230721203100-0183f2886bc0
@@ -52,7 +52,7 @@ require (
 
 require (
 	cloud.google.com/go v0.110.0 // indirect
-	cloud.google.com/go/compute v1.19.0 // indirect
+	cloud.google.com/go/compute v1.19.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/logging v1.7.0 // indirect
 	cloud.google.com/go/longrunning v0.4.1 // indirect
