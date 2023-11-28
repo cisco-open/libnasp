@@ -30,7 +30,7 @@ public class NaspServerHttpRequest extends AbstractServerHttpRequest {
     }
 
     public NaspServerHttpRequest(NaspHttpRequest request) {
-        super(URI.create(request.uri()), "", parseHeaders(request));
+        super(HttpMethod.valueOf(request.method()), URI.create(request.uri()), "", parseHeaders(request));
         this.request = request;
     }
 
