@@ -26,7 +26,7 @@ jobs:
 
       - name: Cache Go module dependencies
         id: cache-go-module-dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/go/pkg/mod
           key: go-mod-cache-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('go.sum') }}
@@ -37,7 +37,7 @@ jobs:
 
       - name: Cache build dependencies
         id: cache-build-dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: bin/
           key: build-deps-v2-{{ hashFiles('common.mk') }}
